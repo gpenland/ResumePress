@@ -2,6 +2,9 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default async function HomePage() {
   const [recentResumes, recentEntries, counts] = await Promise.all([
@@ -21,81 +24,73 @@ export default async function HomePage() {
   const [entryCount, resumeCount, categoryCount] = counts;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
-        <p className="text-sm text-zinc-500 mt-1">Manage your resume entries and builds</p>
+    <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Manage your resume entries and builds</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-3 gap-4">
         <StatCard label="Entries" value={entryCount} href="/entries" />
         <StatCard label="Resumes" value={resumeCount} href="/resumes" />
         <StatCard label="Categories" value={categoryCount} href="/categories" />
       </div>
 
       <div className="grid grid-cols-2 gap-8">
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-zinc-800">Recent Resumes</h2>
-            <Link href="/resumes/new" className="text-sm text-blue-600 hover:underline">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Recent Resumes</h2>
+            <Link href="/resumes/new" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               New resume
             </Link>
           </div>
           {recentResumes.length === 0 ? (
-            <EmptyState
-              message="No resumes yet"
-              action={{ label: "Create your first resume", href: "/resumes/new" }}
-            />
+            <EmptyState message="No resumes yet" action={{ label: "Create your first resume", href: "/resumes/new" }} />
           ) : (
-            <ul className="space-y-2">
+            <div className="space-y-2">
               {recentResumes.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`/resumes/${r.id}`}
-                    className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 hover:border-zinc-300 transition-colors"
-                  >
-                    <span className="text-sm font-medium text-zinc-800">{r.name}</span>
-                    <span className="text-xs text-zinc-400">
-                      {new Date(r.updatedAt).toLocaleDateString()}
-                    </span>
-                  </Link>
-                </li>
+                <Link key={r.id} href={`/resumes/${r.id}`}>
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+                    <CardContent className="flex items-center justify-between py-3 px-4">
+                      <span className="text-sm font-medium">{r.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(r.updatedAt).toLocaleDateString()}
+                      </span>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
-            </ul>
+            </div>
           )}
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-zinc-800">Recent Entries</h2>
-            <Link href="/entries/new" className="text-sm text-blue-600 hover:underline">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Recent Entries</h2>
+            <Link href="/entries/new" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               New entry
             </Link>
           </div>
           {recentEntries.length === 0 ? (
-            <EmptyState
-              message="No entries yet"
-              action={{ label: "Add your first entry", href: "/entries/new" }}
-            />
+            <EmptyState message="No entries yet" action={{ label: "Add your first entry", href: "/entries/new" }} />
           ) : (
-            <ul className="space-y-2">
+            <div className="space-y-2">
               {recentEntries.map((e) => (
-                <li key={e.id}>
-                  <Link
-                    href={`/entries/${e.id}/edit`}
-                    className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 hover:border-zinc-300 transition-colors"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-zinc-800">{e.title}</p>
-                      <p className="text-xs text-zinc-400">{e.category.name}</p>
-                    </div>
-                    <span className="text-xs text-zinc-400">
-                      {new Date(e.updatedAt).toLocaleDateString()}
-                    </span>
-                  </Link>
-                </li>
+                <Link key={e.id} href={`/entries/${e.id}/edit`}>
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+                    <CardContent className="flex items-center justify-between py-3 px-4">
+                      <div>
+                        <p className="text-sm font-medium">{e.title}</p>
+                        <p className="text-xs text-muted-foreground">{e.category.name}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(e.updatedAt).toLocaleDateString()}
+                      </span>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
-            </ul>
+            </div>
           )}
         </section>
       </div>
@@ -103,39 +98,30 @@ export default async function HomePage() {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: number;
-  href: string;
-}) {
+function StatCard({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <Link
-      href={href}
-      className="rounded-lg border border-zinc-200 bg-white px-5 py-4 hover:border-zinc-300 transition-colors"
-    >
-      <p className="text-2xl font-bold text-zinc-900">{value}</p>
-      <p className="text-sm text-zinc-500 mt-0.5">{label}</p>
+    <Link href={href}>
+      <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+        <CardHeader className="pb-1 pt-4">
+          <CardTitle className="text-3xl font-bold">{value}</CardTitle>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <p className="text-sm text-muted-foreground">{label}</p>
+        </CardContent>
+      </Card>
     </Link>
   );
 }
 
-function EmptyState({
-  message,
-  action,
-}: {
-  message: string;
-  action: { label: string; href: string };
-}) {
+function EmptyState({ message, action }: { message: string; action: { label: string; href: string } }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-200 bg-white px-4 py-8 text-center">
-      <p className="text-sm text-zinc-400 mb-3">{message}</p>
-      <Link href={action.href} className="text-sm text-blue-600 hover:underline">
-        {action.label}
-      </Link>
-    </div>
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center py-10 text-center gap-3">
+        <p className="text-sm text-muted-foreground">{message}</p>
+        <Link href={action.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+          {action.label}
+        </Link>
+      </CardContent>
+    </Card>
   );
 }

@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import EntryForm from "@/components/EntryForm";
 import { updateEntry, deleteEntry } from "../../actions";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default async function EditEntryPage({
   params,
@@ -25,27 +27,23 @@ export default async function EditEntryPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Edit Entry</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Edit Entry</h1>
         <form action={deleteWithId}>
-          <button
-            type="submit"
-            className="rounded-md border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-            onClick={(e) => {
-              if (!confirm("Delete this entry? This cannot be undone.")) e.preventDefault();
-            }}
-          >
-            Delete
-          </button>
+          <Button type="submit" variant="destructive" size="sm">
+            Delete Entry
+          </Button>
         </form>
       </div>
-      <div className="bg-white rounded-lg border border-zinc-200 p-6">
-        <EntryForm
-          categories={categories}
-          entry={entry}
-          action={updateWithId}
-          submitLabel="Save Changes"
-        />
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <EntryForm
+            categories={categories}
+            entry={entry}
+            action={updateWithId}
+            submitLabel="Save Changes"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

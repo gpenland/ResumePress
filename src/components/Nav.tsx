@@ -1,24 +1,26 @@
 import Link from "next/link";
+import { Separator } from "@/components/ui/separator";
 
 export default function Nav() {
   return (
-    <header className="border-b border-zinc-200 bg-white">
-      <nav className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="font-semibold text-zinc-900 tracking-tight">
+    <header className="bg-background sticky top-0 z-50">
+      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
+        <Link href="/" className="font-semibold tracking-tight text-foreground">
           ResumePress
         </Link>
-        <div className="flex items-center gap-6 text-sm text-zinc-600">
-          <Link href="/entries" className="hover:text-zinc-900 transition-colors">
+        <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+          <Link href="/entries" className="hover:text-foreground transition-colors">
             Entries
           </Link>
-          <Link href="/resumes" className="hover:text-zinc-900 transition-colors">
+          <Link href="/resumes" className="hover:text-foreground transition-colors">
             Resumes
           </Link>
-          <Link href="/categories" className="hover:text-zinc-900 transition-colors">
+          <Link href="/categories" className="hover:text-foreground transition-colors">
             Categories
           </Link>
-        </div>
-      </nav>
+        </nav>
+      </div>
+      <Separator />
     </header>
   );
 }

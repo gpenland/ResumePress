@@ -1,4 +1,9 @@
 import { createResume } from "../actions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 const TEMPLATES = [
   { id: "jake", name: "Jake's Resume", description: "Classic single-column professional template" },
@@ -6,97 +11,71 @@ const TEMPLATES = [
 
 export default function NewResumePage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-8">New Resume</h1>
+    <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">New Resume</h1>
+        <p className="text-muted-foreground text-sm mt-1">Set up your resume details and contact info</p>
+      </div>
 
-      <form action={createResume} className="space-y-8">
-        <section className="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-700">Resume Details</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Resume Name *</label>
-            <input
-              type="text"
-              name="resumeName"
-              required
-              placeholder="e.g. Software Engineer Resume"
-              className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-2">Template</label>
+      <form action={createResume} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Resume Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="resumeName">Resume Name *</Label>
+              <Input id="resumeName" name="resumeName" required placeholder="e.g. Software Engineer Resume" />
+            </div>
             <div className="space-y-2">
+              <Label>Template</Label>
               {TEMPLATES.map((t) => (
                 <label
                   key={t.id}
-                  className="flex items-start gap-3 rounded-md border border-zinc-200 p-3 cursor-pointer hover:border-zinc-300"
+                  className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40 transition-colors"
                 >
-                  <input
-                    type="radio"
-                    name="templateId"
-                    value={t.id}
-                    defaultChecked={t.id === "jake"}
-                    className="mt-0.5"
-                  />
+                  <input type="radio" name="templateId" value={t.id} defaultChecked className="mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-zinc-800">{t.name}</p>
-                    <p className="text-xs text-zinc-500">{t.description}</p>
+                    <p className="text-sm font-medium">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.description}</p>
                   </div>
                 </label>
               ))}
             </div>
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
-        <section className="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-700">Identity / Contact Info</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <IdentityField label="Full Name *" name="name" required />
-            <IdentityField label="Email *" name="email" type="email" required />
-            <IdentityField label="Phone" name="phone" placeholder="+1 (555) 000-0000" />
-            <IdentityField label="Website" name="website" type="url" placeholder="https://..." />
-            <IdentityField label="LinkedIn" name="linkedin" placeholder="linkedin.com/in/..." />
-            <IdentityField label="GitHub" name="github" placeholder="github.com/..." />
-          </div>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Identity / Contact Info</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            {[
+              { label: "Full Name *", name: "name", required: true },
+              { label: "Email *", name: "email", type: "email", required: true },
+              { label: "Phone", name: "phone", placeholder: "+1 (555) 000-0000" },
+              { label: "Website", name: "website", type: "url", placeholder: "https://..." },
+              { label: "LinkedIn", name: "linkedin", placeholder: "linkedin.com/in/..." },
+              { label: "GitHub", name: "github", placeholder: "github.com/..." },
+            ].map((f) => (
+              <div key={f.name} className="space-y-1.5">
+                <Label htmlFor={f.name}>{f.label}</Label>
+                <Input
+                  id={f.name}
+                  name={f.name}
+                  type={f.type ?? "text"}
+                  required={f.required}
+                  placeholder={f.placeholder}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end">
-          <button
-            type="submit"
-            className="rounded-md bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
-          >
-            Create Resume
-          </button>
+          <Button type="submit">Create Resume</Button>
         </div>
       </form>
-    </div>
-  );
-}
-
-function IdentityField({
-  label,
-  name,
-  type = "text",
-  placeholder,
-  required,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-zinc-700 mb-1">{label}</label>
-      <input
-        type={type}
-        name={name}
-        required={required}
-        placeholder={placeholder}
-        className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-      />
     </div>
   );
 }

@@ -2,6 +2,17 @@
 
 import { useRef, useState } from "react";
 import type { Category, Entry } from "@prisma/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Props = {
   categories: Category[];
@@ -11,8 +22,10 @@ type Props = {
 };
 
 export default function EntryForm({ categories, entry, action, submitLabel }: Props) {
-  const [bullets, setBullets] = useState<string[]>(entry?.bullets ?? [""]);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [bullets, setBullets] = useState<string[]>(
+    entry?.bullets.length ? entry.bullets : [""]
+  );
+  const [categoryId, setCategoryId] = useState(entry?.categoryId ?? "");
 
   function addBullet() {
     setBullets((prev) => [...prev, ""]);
@@ -27,82 +40,94 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
   }
 
   return (
-    <form ref={formRef} action={action} className="space-y-6">
+    <form action={action} className="space-y-6">
       <input type="hidden" name="bullets" value={bullets.filter(Boolean).join("\n")} />
+      <input type="hidden" name="categoryId" value={categoryId} />
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Title *" name="title" defaultValue={entry?.title} required />
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Category *</label>
-          <select
-            name="categoryId"
-            defaultValue={entry?.categoryId ?? ""}
-            required
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
-          >
-            <option value="" disabled>
-              Select category
-            </option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
+        <div className="space-y-1.5">
+          <Label htmlFor="title">Title *</Label>
+          <Input id="title" name="title" defaultValue={entry?.title} required />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Category *</Label>
+          <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")} required>
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Organization / Employer" name="organization" defaultValue={entry?.organization ?? ""} />
-        <Field label="Location" name="location" defaultValue={entry?.location ?? ""} />
+        <div className="space-y-1.5">
+          <Label htmlFor="organization">Organization / Employer</Label>
+          <Input id="organization" name="organization" defaultValue={entry?.organization ?? ""} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="location">Location</Label>
+          <Input id="location" name="location" defaultValue={entry?.location ?? ""} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Start Date" name="startDate" placeholder="e.g. Jan 2022" defaultValue={entry?.startDate ?? ""} />
-        <Field label="End Date" name="endDate" placeholder="e.g. Dec 2023 or Present" defaultValue={entry?.endDate ?? ""} />
+        <div className="space-y-1.5">
+          <Label htmlFor="startDate">Start Date</Label>
+          <Input id="startDate" name="startDate" placeholder="e.g. Jan 2022" defaultValue={entry?.startDate ?? ""} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="endDate">End Date</Label>
+          <Input id="endDate" name="endDate" placeholder="e.g. Dec 2023 or Present" defaultValue={entry?.endDate ?? ""} />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-1">Description</label>
-        <textarea
+      <div className="space-y-1.5">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
           name="description"
           defaultValue={entry?.description ?? ""}
           rows={3}
-          className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-y"
           placeholder="Brief summary..."
+          className="resize-y"
         />
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-zinc-700">Bullet Points</label>
-          <button
-            type="button"
-            onClick={addBullet}
-            className="text-sm text-blue-600 hover:underline"
-          >
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Bullet Points</Label>
+          <Button type="button" variant="ghost" size="sm" onClick={addBullet}>
             Add bullet
-          </button>
+          </Button>
         </div>
         <div className="space-y-2">
           {bullets.map((bullet, i) => (
             <div key={i} className="flex gap-2 items-start">
-              <span className="mt-2 text-zinc-300 text-xs">•</span>
-              <textarea
+              <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
+              <Textarea
                 value={bullet}
                 onChange={(e) => updateBullet(i, e.target.value)}
                 rows={2}
-                className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 resize-y"
                 placeholder="Bullet point..."
+                className="flex-1 resize-y"
               />
               {bullets.length > 1 && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => removeBullet(i)}
-                  className="mt-2 text-zinc-400 hover:text-red-500 transition-colors text-xs"
+                  className="mt-1 text-muted-foreground hover:text-destructive"
                 >
                   Remove
-                </button>
+                </Button>
               )}
             </div>
           ))}
@@ -110,59 +135,26 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="URL" name="url" type="url" defaultValue={entry?.url ?? ""} placeholder="https://..." />
-        <Field
-          label="Tags"
-          name="tags"
-          defaultValue={entry?.tags.join(", ") ?? ""}
-          placeholder="React, TypeScript, Node.js"
-          helpText="Comma-separated"
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="url">URL</Label>
+          <Input id="url" name="url" type="url" placeholder="https://..." defaultValue={entry?.url ?? ""} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="tags">
+            Tags <span className="text-muted-foreground font-normal">(comma-separated)</span>
+          </Label>
+          <Input
+            id="tags"
+            name="tags"
+            placeholder="React, TypeScript, Node.js"
+            defaultValue={entry?.tags.join(", ") ?? ""}
+          />
+        </div>
       </div>
 
       <div className="flex justify-end pt-2">
-        <button
-          type="submit"
-          className="rounded-md bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
-        >
-          {submitLabel}
-        </button>
+        <Button type="submit">{submitLabel}</Button>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type = "text",
-  defaultValue,
-  placeholder,
-  required,
-  helpText,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  defaultValue?: string;
-  placeholder?: string;
-  required?: boolean;
-  helpText?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-zinc-700 mb-1">
-        {label}
-        {helpText && <span className="ml-1 text-zinc-400 font-normal">({helpText})</span>}
-      </label>
-      <input
-        type={type}
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        required={required}
-        className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900"
-      />
-    </div>
   );
 }

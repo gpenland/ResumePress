@@ -3,6 +3,10 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateResumeIdentity } from "../../actions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default async function EditResumePage({
   params,
@@ -16,52 +20,54 @@ export default async function EditResumePage({
   const identity = (resume.identity as Record<string, string>) ?? {};
   const updateWithId = updateResumeIdentity.bind(null, id);
 
+  const fields = [
+    { label: "Full Name *", name: "name", required: true },
+    { label: "Email *", name: "email", type: "email", required: true },
+    { label: "Phone", name: "phone" },
+    { label: "Website", name: "website", type: "url" },
+    { label: "LinkedIn", name: "linkedin" },
+    { label: "GitHub", name: "github" },
+  ];
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-zinc-900 mb-8">Edit Resume</h1>
+    <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
+      <h1 className="text-2xl font-bold tracking-tight">Edit Resume</h1>
 
-      <form action={updateWithId} className="space-y-6 bg-white rounded-lg border border-zinc-200 p-6">
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Resume Name *</label>
-          <input
-            type="text"
-            name="resumeName"
-            required
-            defaultValue={resume.name}
-            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-          />
-        </div>
-
-        <h2 className="text-sm font-semibold text-zinc-700">Identity / Contact Info</h2>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { label: "Full Name *", name: "name", required: true },
-            { label: "Email *", name: "email", type: "email", required: true },
-            { label: "Phone", name: "phone" },
-            { label: "Website", name: "website", type: "url" },
-            { label: "LinkedIn", name: "linkedin" },
-            { label: "GitHub", name: "github" },
-          ].map((f) => (
-            <div key={f.name}>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">{f.label}</label>
-              <input
-                type={f.type ?? "text"}
-                name={f.name}
-                required={f.required}
-                defaultValue={identity[f.name] ?? ""}
-                className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900"
-              />
+      <form action={updateWithId} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Resume Name</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              <Label htmlFor="resumeName">Name *</Label>
+              <Input id="resumeName" name="resumeName" required defaultValue={resume.name} />
             </div>
-          ))}
-        </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Identity / Contact Info</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            {fields.map((f) => (
+              <div key={f.name} className="space-y-1.5">
+                <Label htmlFor={f.name}>{f.label}</Label>
+                <Input
+                  id={f.name}
+                  name={f.name}
+                  type={f.type ?? "text"}
+                  required={f.required}
+                  defaultValue={identity[f.name] ?? ""}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end">
-          <button
-            type="submit"
-            className="rounded-md bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
-          >
-            Save Changes
-          </button>
+          <Button type="submit">Save Changes</Button>
         </div>
       </form>
     </div>
