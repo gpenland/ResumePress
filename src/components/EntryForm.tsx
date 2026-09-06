@@ -1,20 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Category, Entry } from "@prisma/client";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
+import { ChevronUp, ChevronDown, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -25,6 +24,10 @@ type Props = {
 };
 
 export default function EntryForm({ categories, entry, action, submitLabel }: Props) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+
   const [title, setTitle] = useState(entry?.title ?? "");
   const [organization, setOrganization] = useState(entry?.organization ?? "");
   const [location, setLocation] = useState(entry?.location ?? "");
@@ -38,6 +41,18 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
   const [categoryId, setCategoryId] = useState(entry?.categoryId ?? "");
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(formRef.current!);
+    formData.set("bullets", bullets.filter(Boolean).join("\n"));
+    formData.set("categoryId", categoryId);
+    startTransition(async () => {
+      await action(formData);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    });
+  }
 
   function addBullet() {
     setBullets((prev) => [...prev, ""]);
@@ -63,7 +78,7 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
   return (
     <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
       {/* ── Form ── */}
-      <form action={action} className="space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <input type="hidden" name="bullets" value={bullets.filter(Boolean).join("\n")} />
         <input type="hidden" name="categoryId" value={categoryId} />
 
@@ -238,8 +253,20 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
-          <Button type="submit">{submitLabel}</Button>
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <span
+            className={cn(
+              "flex items-center gap-1.5 text-sm text-green-600 transition-all duration-300",
+              saved ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 pointer-events-none"
+            )}
+          >
+            <CheckCircle className="size-4" />
+            Saved
+          </span>
+          <Button type="submit" disabled={isPending}>
+            {isPending && <Loader2 className="size-4 animate-spin" />}
+            {submitLabel}
+          </Button>
         </div>
       </form>
 
