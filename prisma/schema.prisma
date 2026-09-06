@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isBuiltIn Boolean  @default(false)
+  entries   Entry[]
+}
+
+model Entry {
+  id            String        @id @default(cuid())
+  title         String
+  organization  String?
+  location      String?
+  startDate     String?
+  endDate       String?
+  description   String?
+  bullets       String[]
+  url           String?
+  tags          String[]
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id])
+  resumeEntries ResumeEntry[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Resume {
+  id         String        @id @default(cuid())
+  name       String
+  templateId String        @default("jake")
+  entries    ResumeEntry[]
+  identity   Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model ResumeEntry {
+  resumeId String
+  entryId  String
+  order    Int
+  resume   Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  entry    Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([resumeId, entryId])
+}
