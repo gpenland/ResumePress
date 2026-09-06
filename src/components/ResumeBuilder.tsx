@@ -5,9 +5,7 @@ import type { Category, Entry, ResumeEntry } from "@prisma/client";
 import { updateResumeEntries } from "@/app/resumes/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 
 type EntryWithCategory = Entry & { category: Category };
 
@@ -22,6 +20,7 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
   const initialSelected = new Set(selectedEntries.map((re) => re.entryId));
   const [selected, setSelected] = useState<Set<string>>(initialSelected);
   const [saving, startSave] = useTransition();
+  const [downloading, startDownload] = useTransition();
   const [saved, setSaved] = useState(false);
 
   function toggle(entryId: string) {
@@ -34,10 +33,21 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
     setSaved(false);
   }
 
-  function save() {
-    startSave(async () => {
+  function save(): Promise<void> {
+    return new Promise((resolve) => {
+      startSave(async () => {
+        await updateResumeEntries(resumeId, Array.from(selected));
+        setSaved(true);
+        resolve();
+      });
+    });
+  }
+
+  function handleDownload() {
+    startDownload(async () => {
       await updateResumeEntries(resumeId, Array.from(selected));
       setSaved(true);
+      window.open(`/api/pdf/${resumeId}`, "_blank");
     });
   }
 
@@ -48,16 +58,32 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
     }))
     .filter((g) => g.entries.length > 0);
 
+  const isBusy = saving || downloading;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {selected.size} {selected.size === 1 ? "entry" : "entries"} selected
         </p>
-        <div className="flex items-center gap-3">
-          {saved && <span className="text-sm text-green-600">Saved</span>}
-          <Button onClick={save} disabled={saving} size="sm">
-            {saving ? "Saving..." : "Save Selection"}
+        <div className="flex items-center gap-2">
+          {saved && !isBusy && (
+            <span className="text-sm text-green-600">Saved</span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => save()}
+            disabled={isBusy}
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleDownload}
+            disabled={isBusy}
+          >
+            {downloading ? "Generating..." : "Download PDF"}
           </Button>
         </div>
       </div>
@@ -75,22 +101,25 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
           </CardContent>
         </Card>
       ) : (
-        entriesByCategory.map(({ category, entries }, gi) => (
+        entriesByCategory.map(({ category, entries }) => (
           <div key={category.id} className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
               {category.name}
             </p>
             {entries.map((entry) => (
-              <label
+              <div
                 key={entry.id}
-                className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                  selected.has(entry.id) ? "bg-muted/60 border-border" : "hover:bg-muted/30"
+                onClick={() => toggle(entry.id)}
+                className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors select-none ${
+                  selected.has(entry.id)
+                    ? "bg-muted/60 border-primary/40"
+                    : "hover:bg-muted/30 border-border"
                 }`}
               >
                 <Checkbox
                   checked={selected.has(entry.id)}
                   onCheckedChange={() => toggle(entry.id)}
-                  className="mt-0.5"
+                  className="mt-0.5 pointer-events-none"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{entry.title}</p>
@@ -110,7 +139,7 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
                     </p>
                   )}
                 </div>
-              </label>
+              </div>
             ))}
           </div>
         ))

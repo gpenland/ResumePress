@@ -44,14 +44,6 @@ export default async function ResumeDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a
-            href={`/api/pdf/${id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(buttonVariants({ variant: "outline" }))}
-          >
-            Download PDF
-          </a>
           <form action={deleteResume.bind(null, id)}>
             <Button type="submit" variant="destructive" size="sm">Delete</Button>
           </form>
