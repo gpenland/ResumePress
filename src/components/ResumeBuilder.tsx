@@ -75,7 +75,8 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
   function handleDownload() {
     startDownload(async () => {
       await persistSelection();
-      window.open(`/api/pdf/${resumeId}`, "_blank");
+      // Use location.href so popup blockers don't interfere with file downloads
+      window.location.href = `/api/pdf/${resumeId}`;
     });
   }
 

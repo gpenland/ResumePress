@@ -11,8 +11,18 @@ type Identity = {
 
 type EntryWithCategory = Entry & { category: Category };
 
-function escapeLatex(str: string): string {
+function normalizeUnicode(str: string): string {
   return str
+    .replace(/[‘’]/g, "'")   // curly single quotes → '
+    .replace(/[“”]/g, '"')   // curly double quotes → "
+    .replace(/–/g, "--")          // en-dash → --
+    .replace(/—/g, "---")         // em-dash → ---
+    .replace(/…/g, "...")         // ellipsis → ...
+    .replace(/ /g, " ");          // non-breaking space → regular space
+}
+
+function escapeLatex(str: string): string {
+  return normalizeUnicode(str)
     .replace(/\\/g, "\\textbackslash{}")
     .replace(/&/g, "\\&")
     .replace(/%/g, "\\%")
@@ -109,7 +119,7 @@ export function render(
   entriesByCategory: { category: Category; entries: EntryWithCategory[] }[]
 ): string {
   const contactParts = [
-    identity.phone,
+    identity.phone ? e(identity.phone) : null,
     identity.email ? `\\href{mailto:${identity.email}}{${e(identity.email)}}` : null,
     identity.linkedin ? `\\href{https://${identity.linkedin}}{${e(identity.linkedin)}}` : null,
     identity.github ? `\\href{https://${identity.github}}{${e(identity.github)}}` : null,
@@ -128,6 +138,8 @@ export function render(
 
 \\documentclass[letterpaper,11pt]{article}
 
+\\usepackage[T1]{fontenc}
+\\usepackage[utf8]{inputenc}
 \\usepackage{latexsym}
 \\usepackage[empty]{fullpage}
 \\usepackage{titlesec}
