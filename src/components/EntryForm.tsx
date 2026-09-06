@@ -53,7 +53,11 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
           <Label>Category *</Label>
           <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")} required>
             <SelectTrigger>
-              <SelectValue placeholder="Select category" />
+              <span className="flex-1 text-left text-sm">
+                {categoryId
+                  ? categories.find((c) => c.id === categoryId)?.name
+                  : <span className="text-muted-foreground">Select category</span>}
+              </span>
             </SelectTrigger>
             <SelectContent>
               {categories.map((cat) => (
