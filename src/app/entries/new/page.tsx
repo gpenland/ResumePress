@@ -9,7 +9,7 @@ export default async function NewEntryPage() {
   const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold tracking-tight mb-8">New Entry</h1>
       <Card>
         <CardContent className="pt-6">
