@@ -50,7 +50,7 @@ export default async function HomePage() {
             <div className="space-y-2">
               {recentResumes.map((r) => (
                 <Link key={r.id} href={`/resumes/${r.id}`}>
-                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <span className="text-sm font-medium">{r.name}</span>
                       <span className="text-xs text-muted-foreground">
@@ -77,7 +77,7 @@ export default async function HomePage() {
             <div className="space-y-2">
               {recentEntries.map((e) => (
                 <Link key={e.id} href={`/entries/${e.id}/edit`}>
-                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <div>
                         <p className="text-sm font-medium">{e.title}</p>

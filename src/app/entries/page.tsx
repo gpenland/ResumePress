@@ -64,7 +64,7 @@ export default async function EntriesPage({
         <div className="space-y-2">
           {entries.map((entry) => (
             <Link key={entry.id} href={`/entries/${entry.id}/edit`}>
-              <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
+              <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                 <CardContent className="flex items-center justify-between py-3 px-5">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{entry.title}</p>
