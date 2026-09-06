@@ -30,13 +30,13 @@ export default async function HomePage() {
         <p className="text-muted-foreground mt-1 text-sm">Manage your resume entries and builds</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Entries" value={entryCount} href="/entries" />
         <StatCard label="Resumes" value={resumeCount} href="/resumes" />
         <StatCard label="Categories" value={categoryCount} href="/categories" />
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Recent Resumes</h2>

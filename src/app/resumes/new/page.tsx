@@ -49,7 +49,7 @@ export default function NewResumePage() {
           <CardHeader>
             <CardTitle className="text-base">Identity / Contact Info</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { label: "Full Name *", name: "name", required: true },
               { label: "Email *", name: "email", type: "email", required: true },

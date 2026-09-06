@@ -76,13 +76,13 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
   }
 
   return (
-    <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 items-start">
       {/* ── Form ── */}
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <input type="hidden" name="bullets" value={bullets.filter(Boolean).join("\n")} />
         <input type="hidden" name="categoryId" value={categoryId} />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="title">Title *</Label>
             <Input
@@ -114,7 +114,7 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="organization">Organization / Employer</Label>
             <Input
@@ -135,7 +135,7 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="startDate">Start Date</Label>
             <Input
@@ -227,7 +227,7 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="url">URL</Label>
             <Input
@@ -271,7 +271,7 @@ export default function EntryForm({ categories, entry, action, submitLabel }: Pr
       </form>
 
       {/* ── Preview ── */}
-      <div className="sticky top-20 space-y-3">
+      <div className="xl:sticky xl:top-20 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
           Preview
         </p>

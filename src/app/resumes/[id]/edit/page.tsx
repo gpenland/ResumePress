@@ -50,7 +50,7 @@ export default async function EditResumePage({
           <CardHeader>
             <CardTitle className="text-base">Identity / Contact Info</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fields.map((f) => (
               <div key={f.name} className="space-y-1.5">
                 <Label htmlFor={f.name}>{f.label}</Label>
