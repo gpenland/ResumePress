@@ -49,38 +49,44 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Nord light theme
+     Primary accent : hsl(213.1 32% 52.2%)  — nord9 blue
+     Card surface   : hsl(218.2 26.8% 92%)  — nord5 snow
+     Page background: hsl(217.5 26.7% 94.1%)— nord6 snow (lightest)
+     Foreground     : hsl(220 16.4% 21.6%)  — nord0 polar night
+  */
+  --background:          hsl(217.5 26.7% 94.1%);
+  --foreground:          hsl(220 16.4% 21.6%);
+  --card:                hsl(218.2 26.8% 92%);
+  --card-foreground:     hsl(220 16.4% 21.6%);
+  --popover:             hsl(218.2 26.8% 92%);
+  --popover-foreground:  hsl(220 16.4% 21.6%);
+  --primary:             hsl(213.1 32% 52.2%);
+  --primary-foreground:  hsl(218.2 26.8% 98%);
+  --secondary:           hsl(218 27% 89%);
+  --secondary-foreground:hsl(220 16.4% 21.6%);
+  --muted:               hsl(218 27% 89%);
+  --muted-foreground:    hsl(220 10% 46%);
+  --accent:              hsl(218 27% 89%);
+  --accent-foreground:   hsl(220 16.4% 21.6%);
+  --destructive:         hsl(354 42% 56%);
+  --border:              hsl(218 22% 84%);
+  --input:               hsl(218 22% 84%);
+  --ring:                hsl(213.1 32% 52.2%);
+  --chart-1:             hsl(213.1 32% 52.2%);
+  --chart-2:             hsl(193 43% 67%);
+  --chart-3:             hsl(178 35% 58%);
+  --chart-4:             hsl(92 28% 65%);
+  --chart-5:             hsl(40 68% 73%);
+  --radius: 0.5rem;
+  --sidebar:             hsl(218.2 26.8% 92%);
+  --sidebar-foreground:  hsl(220 16.4% 21.6%);
+  --sidebar-primary:     hsl(213.1 32% 52.2%);
+  --sidebar-primary-foreground: hsl(218.2 26.8% 98%);
+  --sidebar-accent:      hsl(218 27% 89%);
+  --sidebar-accent-foreground:  hsl(220 16.4% 21.6%);
+  --sidebar-border:      hsl(218 22% 84%);
+  --sidebar-ring:        hsl(213.1 32% 52.2%);
 }
 
 .dark {

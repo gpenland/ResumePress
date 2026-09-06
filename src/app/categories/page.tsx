@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 export default async function CategoriesPage() {
   const categories = await prisma.category.findMany({
@@ -21,27 +20,30 @@ export default async function CategoriesPage() {
         <p className="text-muted-foreground text-sm mt-1">Built-in categories cannot be deleted</p>
       </div>
 
-      <Card>
+      {/* Category list — plain rows so spacing is fully controlled */}
+      <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
         {categories.map((cat, i) => (
-          <div key={cat.id}>
-            {i > 0 && <Separator />}
-            <CardContent className="flex items-center justify-between py-3 px-5">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">{cat.name}</span>
-                {cat.isBuiltIn && <Badge variant="secondary">built-in</Badge>}
-                <span className="text-xs text-muted-foreground">{cat._count.entries} entries</span>
-              </div>
-              {!cat.isBuiltIn && (
-                <form action={deleteCategory.bind(null, cat.id)}>
-                  <Button type="submit" variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                    Delete
-                  </Button>
-                </form>
-              )}
-            </CardContent>
+          <div
+            key={cat.id}
+            className={`flex items-center justify-between px-5 py-3 ${
+              i > 0 ? "border-t border-border" : ""
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">{cat.name}</span>
+              {cat.isBuiltIn && <Badge variant="secondary">built-in</Badge>}
+              <span className="text-xs text-muted-foreground">{cat._count.entries} entries</span>
+            </div>
+            {!cat.isBuiltIn && (
+              <form action={deleteCategory.bind(null, cat.id)}>
+                <Button type="submit" variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                  Delete
+                </Button>
+              </form>
+            )}
           </div>
         ))}
-      </Card>
+      </div>
 
       <Card>
         <CardHeader>
