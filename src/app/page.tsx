@@ -2,38 +2,25 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default async function HomePage() {
-  const [recentResumes, recentEntries, counts] = await Promise.all([
+  const [recentResumes, recentEntries] = await Promise.all([
     prisma.resume.findMany({ orderBy: { updatedAt: "desc" }, take: 5 }),
     prisma.entry.findMany({
       orderBy: { updatedAt: "desc" },
       take: 5,
       include: { category: true },
     }),
-    prisma.$transaction([
-      prisma.entry.count(),
-      prisma.resume.count(),
-      prisma.category.count(),
-    ]),
   ]);
-
-  const [entryCount, resumeCount, categoryCount] = counts;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1 text-sm">Manage your resume entries and builds</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Entries" value={entryCount} href="/entries" />
-        <StatCard label="Resumes" value={resumeCount} href="/resumes" />
-        <StatCard label="Categories" value={categoryCount} href="/categories" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
@@ -95,21 +82,6 @@ export default async function HomePage() {
         </section>
       </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, href }: { label: string; value: number; href: string }) {
-  return (
-    <Link href={href}>
-      <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
-        <CardHeader className="pb-1 pt-4">
-          <CardTitle className="text-3xl font-bold">{value}</CardTitle>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <p className="text-sm text-muted-foreground">{label}</p>
-        </CardContent>
-      </Card>
-    </Link>
   );
 }
 
