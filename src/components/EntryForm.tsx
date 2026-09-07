@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import type { Category, Entry } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown } from "lucide-react";
@@ -95,7 +95,7 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
         {cfg.description && (
           <div className="space-y-1.5">
             <Label htmlFor="description">{descLabel}</Label>
-            <Textarea id="description" name="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="resize-y" />
+            <RichTextArea value={description} onChange={setDescription} rows={2} />
           </div>
         )}
 
@@ -117,7 +117,7 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
                     </button>
                   </div>
                   <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
-                  <Textarea value={bullet} onChange={(e) => updateBullet(i, e.target.value)} rows={2} placeholder="Bullet point..." className="flex-1 resize-y" />
+                  <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
                   {bullets.length > 1 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
                   )}
@@ -187,7 +187,7 @@ function EntryPreview({ categorySlug, title, organization, location, startDate, 
     <div className="space-y-1">
       <span className="font-semibold">{title || <Ghost>Skill Category</Ghost>}</span>
       {tagList.length > 0 && <span className="text-muted-foreground">: {tagList.join(", ")}</span>}
-      {description && <p className="text-muted-foreground text-xs mt-1">{description}</p>}
+      {description && <p className="text-muted-foreground text-xs mt-1">{renderRich(description)}</p>}
     </div>
   );
 
@@ -229,7 +229,7 @@ function EntryPreview({ categorySlug, title, organization, location, startDate, 
           {location && <span className="italic shrink-0 text-xs">{location}</span>}
         </div>
       )}
-      {description && <p className="text-muted-foreground mt-1">{description}</p>}
+      {description && <p className="text-muted-foreground mt-1">{renderRich(description)}</p>}
       <BulletList bullets={filledBullets} />
     </div>
   );
@@ -240,7 +240,7 @@ function BulletList({ bullets }: { bullets: string[] }) {
   return (
     <ul className="space-y-1 pl-3 mt-1">
       {bullets.map((b, i) => (
-        <li key={i} className="flex gap-1.5"><span className="text-muted-foreground shrink-0">•</span><span>{b}</span></li>
+        <li key={i} className="flex gap-1.5"><span className="text-muted-foreground shrink-0">•</span><span>{renderRich(b)}</span></li>
       ))}
     </ul>
   );
@@ -248,4 +248,16 @@ function BulletList({ bullets }: { bullets: string[] }) {
 
 function Ghost({ children }: { children: React.ReactNode }) {
   return <span className="text-muted-foreground/40 italic font-normal">{children}</span>;
+}
+
+// Parse **bold** and *italic* markers for the preview
+function renderRich(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**"))
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("*") && part.endsWith("*"))
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    return part;
+  });
 }

@@ -35,8 +35,16 @@ function escapeLatex(str: string): string {
     .replace(/\^/g, "\\textasciicircum{}");
 }
 
+// Convert **bold** and *italic* markers to LaTeX commands.
+// Must run after escapeLatex so inner content is already safe.
+function applyFormatting(str: string): string {
+  return str
+    .replace(/\*\*([^*]+)\*\*/g, "\\textbf{$1}")
+    .replace(/\*([^*]+)\*/g, "\\textit{$1}");
+}
+
 function e(str: string | null | undefined): string {
-  return escapeLatex(str ?? "");
+  return applyFormatting(escapeLatex(str ?? ""));
 }
 
 function renderExperienceEntry(entry: EntryWithCategory): string {
