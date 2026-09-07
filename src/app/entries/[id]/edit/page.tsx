@@ -7,7 +7,8 @@ import { getUserId } from "@/lib/auth";
 import EntryForm from "@/components/EntryForm";
 import { updateEntry, deleteEntry } from "../../actions";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,9 @@ export default async function EditEntryPage({
             New Entry
           </Link>
           <form action={deleteWithId}>
-            <Button type="submit" variant="destructive" size="sm">Delete Entry</Button>
+            <SubmitButton variant="destructive" size="sm" pendingText="Deleting…">
+              Delete Entry
+            </SubmitButton>
           </form>
         </div>
       </div>

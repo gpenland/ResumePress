@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { createCategory, deleteCategory } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
@@ -43,9 +43,14 @@ export default async function CategoriesPage() {
             </div>
             {!cat.isBuiltIn && (
               <form action={deleteCategory.bind(null, cat.id)}>
-                <Button type="submit" variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                <SubmitButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  pendingText="Deleting…"
+                >
                   Delete
-                </Button>
+                </SubmitButton>
               </form>
             )}
           </div>
@@ -59,7 +64,7 @@ export default async function CategoriesPage() {
         <CardContent>
           <form action={createCategory} className="flex gap-3">
             <Input name="name" required placeholder="Category name..." className="flex-1" />
-            <Button type="submit">Add</Button>
+            <SubmitButton pendingText="Adding…">Add</SubmitButton>
           </form>
         </CardContent>
       </Card>

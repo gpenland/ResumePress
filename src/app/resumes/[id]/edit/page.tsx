@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { updateResumeIdentity } from "../../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -70,7 +70,7 @@ export default async function EditResumePage({
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit">Save Changes</Button>
+          <SubmitButton pendingText="Saving…">Save Changes</SubmitButton>
         </div>
       </form>
     </div>

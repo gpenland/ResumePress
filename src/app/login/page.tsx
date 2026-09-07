@@ -1,5 +1,5 @@
 import { signIn } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 
 export default async function LoginPage({
   searchParams,
@@ -20,9 +20,9 @@ export default async function LoginPage({
         Sign in to see and manage your entries and resumes.
       </p>
       <form action={signInWithGoogle}>
-        <Button type="submit" size="lg" className="w-full">
+        <SubmitButton size="lg" className="w-full" pendingText="Signing in…">
           Sign in with Google
-        </Button>
+        </SubmitButton>
       </form>
     </div>
   );

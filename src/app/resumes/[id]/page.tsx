@@ -7,7 +7,8 @@ import { getUserId } from "@/lib/auth";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import { deleteResume } from "../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -52,7 +53,9 @@ export default async function ResumeDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <form action={deleteResume.bind(null, id)}>
-            <Button type="submit" variant="destructive" size="sm">Delete</Button>
+            <SubmitButton variant="destructive" size="sm" pendingText="Deleting…">
+              Delete
+            </SubmitButton>
           </form>
         </div>
       </div>

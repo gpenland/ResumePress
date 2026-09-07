@@ -1,6 +1,6 @@
 import { createResume } from "../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -73,7 +73,7 @@ export default function NewResumePage() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit">Create Resume</Button>
+          <SubmitButton pendingText="Creating…">Create Resume</SubmitButton>
         </div>
       </form>
     </div>

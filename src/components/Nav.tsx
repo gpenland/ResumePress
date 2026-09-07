@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
+import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
 
@@ -40,9 +40,9 @@ export default async function Nav() {
                 await signIn("google");
               }}
             >
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline" pendingText="Signing in…">
                 Sign in
-              </Button>
+              </SubmitButton>
             </form>
           )}
         </div>
