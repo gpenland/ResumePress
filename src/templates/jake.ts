@@ -47,12 +47,16 @@ function e(str: string | null | undefined): string {
   return applyFormatting(escapeLatex(str ?? ""));
 }
 
+function renderTitle(entry: EntryWithCategory): string {
+  return entry.pdfTitle || entry.title;
+}
+
 function renderExperienceEntry(entry: EntryWithCategory): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   const lines: string[] = [];
   // #1=title #2=date #3=organization #4=location  (matches Jake's Experience layout)
   lines.push(
-    `    \\resumeSubheading{${e(entry.title)}}{${e(dateStr)}}{${e(entry.organization ?? "")}}{${e(entry.location ?? "")}}`
+    `    \\resumeSubheading{${e(renderTitle(entry))}}{${e(dateStr)}}{${e(entry.organization ?? "")}}{${e(entry.location ?? "")}}`
   );
   if (entry.bullets.length > 0) {
     lines.push("      \\resumeItemListStart");
@@ -69,7 +73,7 @@ function renderProjectEntry(entry: EntryWithCategory): string {
   const techTags = entry.tags.length > 0 ? ` $|$ \\emph{${e(entry.tags.join(", "))}}` : "";
   const lines: string[] = [];
   lines.push(
-    `      \\resumeProjectHeading{\\textbf{${e(entry.title)}}${techTags}}{${e(dateStr)}}`
+    `      \\resumeProjectHeading{\\textbf{${e(renderTitle(entry))}}${techTags}}{${e(dateStr)}}`
   );
   if (entry.bullets.length > 0) {
     lines.push("        \\resumeItemListStart");
@@ -90,7 +94,7 @@ function renderProjectEntry(entry: EntryWithCategory): string {
 function renderSkillsSection(entries: EntryWithCategory[]): string {
   const lines = entries.map((entry) => {
     const items = [entry.description, entry.tags.join(", ")].filter(Boolean).join(", ");
-    return `     \\textbf{${e(entry.title)}}{: ${e(items)}} \\\\`;
+    return `     \\textbf{${e(renderTitle(entry))}}{: ${e(items)}} \\\\`;
   });
   return (
     `  \\begin{itemize}[leftmargin=0.15in, label={}]\n` +
@@ -104,7 +108,8 @@ function renderSkillsSection(entries: EntryWithCategory[]): string {
 function renderEducationEntry(entry: EntryWithCategory): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   // #1=school #2=location #3=degree #4=date  (matches Jake's Education layout)
-  return `    \\resumeSubheading{${e(entry.organization ?? entry.title)}}{${e(entry.location ?? "")}}{${e(entry.title)}}{${e(dateStr)}}`;
+  const degree = renderTitle(entry);
+  return `    \\resumeSubheading{${e(entry.organization ?? degree)}}{${e(entry.location ?? "")}}{${e(degree)}}{${e(dateStr)}}`;
 }
 
 function renderSection(

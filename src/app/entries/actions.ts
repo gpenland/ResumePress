@@ -11,6 +11,7 @@ export async function createEntry(formData: FormData) {
   const entry = await prisma.entry.create({
     data: {
       title: formData.get("title") as string,
+      pdfTitle: (formData.get("pdfTitle") as string) || null,
       organization: (formData.get("organization") as string) || null,
       location: (formData.get("location") as string) || null,
       startDate: (formData.get("startDate") as string) || null,
@@ -36,6 +37,7 @@ export async function updateEntry(id: string, formData: FormData) {
     where: { id },
     data: {
       title: formData.get("title") as string,
+      pdfTitle: (formData.get("pdfTitle") as string) || null,
       organization: (formData.get("organization") as string) || null,
       location: (formData.get("location") as string) || null,
       startDate: (formData.get("startDate") as string) || null,

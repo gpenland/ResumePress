@@ -172,6 +172,9 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
                     {/* Entry info */}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-tight">{entry.title}</p>
+                      {entry.pdfTitle && entry.pdfTitle !== entry.title && (
+                        <p className="text-xs text-muted-foreground/80 italic mt-0.5">renders as "{entry.pdfTitle}"</p>
+                      )}
                       {(entry.organization || entry.location || entry.startDate) && (
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {[entry.organization, entry.location]

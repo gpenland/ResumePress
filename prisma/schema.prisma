@@ -17,7 +17,8 @@ model Category {
 
 model Entry {
   id            String        @id @default(cuid())
-  title         String
+  title         String // internal/ResumePress-facing label, shown in lists
+  pdfTitle      String? // text rendered on the PDF; null falls back to `title`
   organization  String?
   location      String?
   startDate     String?

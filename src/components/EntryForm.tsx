@@ -24,6 +24,7 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const [saved, setSaved] = useState(false);
 
   const [title, setTitle] = useState(entry?.title ?? "");
+  const [pdfTitle, setPdfTitle] = useState(entry?.pdfTitle ?? "");
   const [organization, setOrganization] = useState(entry?.organization ?? "");
   const [location, setLocation] = useState(entry?.location ?? "");
   const [startDate, setStartDate] = useState(entry?.startDate ?? "");
@@ -60,6 +61,22 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
         <div className="space-y-1.5">
           <Label htmlFor="title">{cfg.titleLabel} *</Label>
           <Input id="title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <p className="text-xs text-muted-foreground">Internal label used to identify this entry in ResumePress.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="pdfTitle">{cfg.titleLabel} on Resume</Label>
+          <Input
+            id="pdfTitle"
+            name="pdfTitle"
+            value={pdfTitle}
+            onChange={(e) => setPdfTitle(e.target.value)}
+            placeholder={title || "Same as above"}
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional. Overrides the title above when this entry is rendered into a PDF — use it to keep
+            keyword-tailored variants of the same entry under one recognizable {cfg.titleLabel.toLowerCase()}.
+          </p>
         </div>
 
         {cfg.organizationLabel && (
@@ -156,7 +173,7 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
           <CardContent className="pt-5 pb-5 text-[13px] leading-snug space-y-2">
             <EntryPreview
               categorySlug={category.slug}
-              title={title} organization={organization} location={location}
+              title={pdfTitle || title} organization={organization} location={location}
               startDate={startDate} endDate={endDate} description={description}
               bullets={bullets} tags={tags}
             />
