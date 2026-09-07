@@ -13,12 +13,12 @@ type EntryWithCategory = Entry & { category: Category };
 
 function normalizeUnicode(str: string): string {
   return str
-    .replace(/[‘’]/g, "'")   // curly single quotes → '
-    .replace(/[“”]/g, '"')   // curly double quotes → "
-    .replace(/–/g, "--")          // en-dash → --
-    .replace(/—/g, "---")         // em-dash → ---
-    .replace(/…/g, "...")         // ellipsis → ...
-    .replace(/ /g, " ");          // non-breaking space → regular space
+    .replace(/['']/g, "'")
+    .replace(/[""]/g, '"')
+    .replace(/–/g, "--")
+    .replace(/—/g, "---")
+    .replace(/…/g, "...")
+    .replace(/ /g, " ");
 }
 
 function escapeLatex(str: string): string {
@@ -40,9 +40,11 @@ function e(str: string | null | undefined): string {
 }
 
 function renderExperienceEntry(entry: EntryWithCategory): string {
+  const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   const lines: string[] = [];
+  // #1=title #2=date #3=organization #4=location  (matches Jake's Experience layout)
   lines.push(
-    `    \\resumeSubheading{${e(entry.title)}}{${e(entry.startDate ?? "")}${entry.endDate ? " -- " + e(entry.endDate) : ""}}{${e(entry.organization ?? "")}}{${e(entry.location ?? "")}}`
+    `    \\resumeSubheading{${e(entry.title)}}{${e(dateStr)}}{${e(entry.organization ?? "")}}{${e(entry.location ?? "")}}`
   );
   if (entry.bullets.length > 0) {
     lines.push("      \\resumeItemListStart");
@@ -55,33 +57,46 @@ function renderExperienceEntry(entry: EntryWithCategory): string {
 }
 
 function renderProjectEntry(entry: EntryWithCategory): string {
-  const lines: string[] = [];
-  const techTags = entry.tags.length > 0 ? ` $|$ \\emph{${e(entry.tags.join(", "))}}` : "";
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
+  const techTags = entry.tags.length > 0 ? ` $|$ \\emph{${e(entry.tags.join(", "))}}` : "";
+  const lines: string[] = [];
   lines.push(
-    `    \\resumeProjectHeading{\\textbf{${e(entry.title)}}${techTags}}{${e(dateStr)}}`
+    `      \\resumeProjectHeading{\\textbf{${e(entry.title)}}${techTags}}{${e(dateStr)}}`
   );
   if (entry.bullets.length > 0) {
-    lines.push("      \\resumeItemListStart");
+    lines.push("        \\resumeItemListStart");
     for (const bullet of entry.bullets) {
-      lines.push(`        \\resumeItem{${e(bullet)}}`);
+      lines.push(`          \\resumeItem{${e(bullet)}}`);
     }
-    lines.push("      \\resumeItemListEnd");
+    lines.push("        \\resumeItemListEnd");
   }
   return lines.join("\n");
 }
 
+// Matches Jake's original Technical Skills format:
+// \begin{itemize}[leftmargin=0.15in, label={}]
+//   \small{\item{
+//     \textbf{Category}{: item1, item2} \\
+//   }}
+// \end{itemize}
 function renderSkillsSection(entries: EntryWithCategory[]): string {
-  const items = entries.map((entry) => {
-    const detail = [entry.description, entry.tags.join(", ")].filter(Boolean).join(": ");
-    return `\\textbf{${e(entry.title)}}{: ${e(detail)}}`;
+  const lines = entries.map((entry) => {
+    const items = [entry.description, entry.tags.join(", ")].filter(Boolean).join(", ");
+    return `     \\textbf{${e(entry.title)}}{: ${e(items)}} \\\\`;
   });
-  return `    \\resumeItemListStart\n      \\resumeItem{${items.join(" \\\\ ")}}\n    \\resumeItemListEnd`;
+  return (
+    `  \\begin{itemize}[leftmargin=0.15in, label={}]\n` +
+    `    \\small{\\item{\n` +
+    lines.join("\n") + "\n" +
+    `    }}\n` +
+    `  \\end{itemize}`
+  );
 }
 
 function renderEducationEntry(entry: EntryWithCategory): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
-  return `    \\resumeSubheading{${e(entry.organization ?? entry.title)}}{${e(dateStr)}}{${e(entry.title)}}{${e(entry.location ?? "")}}`;
+  // #1=school #2=location #3=degree #4=date  (matches Jake's Education layout)
+  return `    \\resumeSubheading{${e(entry.organization ?? entry.title)}}{${e(entry.location ?? "")}}{${e(entry.title)}}{${e(dateStr)}}`;
 }
 
 function renderSection(
@@ -107,7 +122,6 @@ function renderSection(
       content = `  \\resumeSubHeadingListStart\n${entries.map(renderEducationEntry).join("\n")}\n  \\resumeSubHeadingListEnd`;
       break;
     default:
-      // Custom category: render like experience
       content = `  \\resumeSubHeadingListStart\n${entries.map(renderExperienceEntry).join("\n")}\n  \\resumeSubHeadingListEnd`;
   }
 
@@ -120,10 +134,18 @@ export function render(
 ): string {
   const contactParts = [
     identity.phone ? e(identity.phone) : null,
-    identity.email ? `\\href{mailto:${identity.email}}{${e(identity.email)}}` : null,
-    identity.linkedin ? `\\href{https://${identity.linkedin}}{${e(identity.linkedin)}}` : null,
-    identity.github ? `\\href{https://${identity.github}}{${e(identity.github)}}` : null,
-    identity.website ? `\\href{${identity.website}}{${e(identity.website)}}` : null,
+    identity.email
+      ? `\\href{mailto:${identity.email}}{\\underline{${e(identity.email)}}}`
+      : null,
+    identity.linkedin
+      ? `\\href{https://${identity.linkedin}}{\\underline{${e(identity.linkedin)}}}`
+      : null,
+    identity.github
+      ? `\\href{https://${identity.github}}{\\underline{${e(identity.github)}}}`
+      : null,
+    identity.website
+      ? `\\href{${identity.website}}{\\underline{${e(identity.website)}}}`
+      : null,
   ].filter(Boolean);
 
   const sections = entriesByCategory
@@ -133,7 +155,9 @@ export function render(
 
   return `%-------------------------
 % Resume in LaTeX
-% Based on Jake's Resume Template
+% Author : Jake Gutierrez
+% Based off of: https://github.com/sb2nov/resume
+% License : MIT
 %-------------------------
 
 \\documentclass[letterpaper,11pt]{article}
@@ -170,12 +194,20 @@ export function render(
 \\raggedright
 \\setlength{\\tabcolsep}{0in}
 
-\\titleformat{\\section}{\\vspace{-4pt}\\scshape\\raggedright\\large}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
+\\titleformat{\\section}{
+  \\vspace{-4pt}\\scshape\\raggedright\\large
+}{}{0em}{}[\\color{black}\\titlerule \\vspace{-5pt}]
 
 \\pdfgentounicode=1
 
-%--- Custom commands ---
-\\newcommand{\\resumeItem}[1]{\\item\\small{#1 \\vspace{-2pt}}}
+%-------------------------
+% Custom commands
+\\newcommand{\\resumeItem}[1]{
+  \\item\\small{
+    {#1 \\vspace{-2pt}}
+  }
+}
+
 \\newcommand{\\resumeSubheading}[4]{
   \\vspace{-2pt}\\item
     \\begin{tabular*}{0.97\\textwidth}[t]{l@{\\extracolsep{\\fill}}r}
@@ -183,20 +215,35 @@ export function render(
       \\textit{\\small#3} & \\textit{\\small #4} \\\\
     \\end{tabular*}\\vspace{-7pt}
 }
+
+\\newcommand{\\resumeSubSubheading}[2]{
+    \\item
+    \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
+      \\textit{\\small#1} & \\textit{\\small #2} \\\\
+    \\end{tabular*}\\vspace{-7pt}
+}
+
 \\newcommand{\\resumeProjectHeading}[2]{
     \\item
     \\begin{tabular*}{0.97\\textwidth}{l@{\\extracolsep{\\fill}}r}
       \\small#1 & #2 \\\\
     \\end{tabular*}\\vspace{-7pt}
 }
+
+\\newcommand{\\resumeSubItem}[1]{\\resumeItem{#1}\\vspace{-4pt}}
+
+\\renewcommand\\labelitemii{$\\vcenter{\\hbox{\\tiny$\\bullet$}}$}
+
 \\newcommand{\\resumeSubHeadingListStart}{\\begin{itemize}[leftmargin=0.15in, label={}]}
 \\newcommand{\\resumeSubHeadingListEnd}{\\end{itemize}}
-\\newcommand{\\resumeItemListStart}{\\begin{itemize}[leftmargin=*, label=$\\bullet$]}
+\\newcommand{\\resumeItemListStart}{\\begin{itemize}}
 \\newcommand{\\resumeItemListEnd}{\\end{itemize}\\vspace{-5pt}}
+
+%-------------------------------------------
 
 \\begin{document}
 
-%--- Header ---
+%----------HEADING----------
 \\begin{center}
   \\textbf{\\Huge \\scshape ${e(identity.name)}} \\\\ \\vspace{1pt}
   \\small ${contactParts.join(" $|$ ")}
