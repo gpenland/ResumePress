@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
+import { createResumeForUser } from "@/lib/resumes";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -16,13 +17,10 @@ export async function createResume(formData: FormData) {
     github: (formData.get("github") as string) || "",
   };
 
-  const resume = await prisma.resume.create({
-    data: {
-      name: formData.get("resumeName") as string,
-      templateId: (formData.get("templateId") as string) || "jake",
-      identity,
-      userId,
-    },
+  const resume = await createResumeForUser(userId, {
+    name: formData.get("resumeName") as string,
+    templateId: (formData.get("templateId") as string) || "jake",
+    identity,
   });
 
   revalidatePath("/resumes");

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -35,6 +36,9 @@ export default function UserMenu({
           <p className="text-sm font-medium truncate">{user.name}</p>
           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
         </div>
+        <DropdownMenuItem render={<Link href="/settings/tokens" />}>
+          API Tokens
+        </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={() => {

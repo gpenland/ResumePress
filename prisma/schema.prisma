@@ -18,6 +18,7 @@ model User {
   entries       Entry[]
   resumes       Resume[]
   categories    Category[]
+  apiTokens     ApiToken[]
 }
 
 model Account {
@@ -107,4 +108,16 @@ model ResumeEntry {
   entry    Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@id([resumeId, entryId])
+}
+
+model ApiToken {
+  id         String    @id @default(cuid())
+  name       String
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
 }

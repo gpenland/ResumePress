@@ -2,41 +2,34 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
+import { createEntryForUser } from "@/lib/entries";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
 export async function createEntry(formData: FormData) {
   const userId = await requireUserId();
   const categoryId = formData.get("categoryId") as string;
-
-  const category = await prisma.category.findFirst({
-    where: { id: categoryId, OR: [{ userId: null }, { userId }] },
-  });
-  if (!category) notFound();
-
   const bullets = parseBullets(formData.get("bullets") as string);
   const tags = parseTags(formData.get("tags") as string);
 
-  const entry = await prisma.entry.create({
-    data: {
-      title: formData.get("title") as string,
-      pdfTitle: (formData.get("pdfTitle") as string) || null,
-      organization: (formData.get("organization") as string) || null,
-      location: (formData.get("location") as string) || null,
-      startDate: (formData.get("startDate") as string) || null,
-      endDate: (formData.get("endDate") as string) || null,
-      description: (formData.get("description") as string) || null,
-      url: (formData.get("url") as string) || null,
-      bullets,
-      tags,
-      categoryId,
-      userId,
-    },
+  const result = await createEntryForUser(userId, {
+    title: formData.get("title") as string,
+    categoryId,
+    pdfTitle: (formData.get("pdfTitle") as string) || null,
+    organization: (formData.get("organization") as string) || null,
+    location: (formData.get("location") as string) || null,
+    startDate: (formData.get("startDate") as string) || null,
+    endDate: (formData.get("endDate") as string) || null,
+    description: (formData.get("description") as string) || null,
+    url: (formData.get("url") as string) || null,
+    bullets,
+    tags,
   });
+  if (!result.ok) notFound();
 
   revalidatePath("/entries");
   revalidatePath("/");
-  redirect(`/entries/${entry.id}/edit`);
+  redirect(`/entries/${result.entry.id}/edit`);
 }
 
 export async function updateEntry(id: string, formData: FormData) {
