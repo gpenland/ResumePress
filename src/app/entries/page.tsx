@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { deleteEntry } from "./actions";
+import DeleteItemButton from "@/components/DeleteItemButton";
 
 export default async function EntriesPage({
   searchParams,
@@ -63,9 +65,12 @@ export default async function EntriesPage({
       ) : (
         <div className="space-y-2">
           {entries.map((entry) => (
-            <Link key={entry.id} href={`/entries/${entry.id}/edit`}>
-              <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
-                <CardContent className="flex items-center justify-between py-3 px-5">
+            <Card key={entry.id} className="py-0 hover:bg-muted/30 transition-colors">
+              <CardContent className="flex items-center gap-2 py-3 px-5">
+                <Link
+                  href={`/entries/${entry.id}/edit`}
+                  className="flex items-center justify-between flex-1 min-w-0"
+                >
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{entry.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -80,12 +85,18 @@ export default async function EntriesPage({
                   <div className="flex items-center gap-2 ml-4 shrink-0">
                     <Badge variant="secondary">{entry.category.name}</Badge>
                     {entry.bullets.length > 0 && (
-                      <span className="text-xs text-muted-foreground">{entry.bullets.length} bullets</span>
+                      <span className="text-xs text-muted-foreground hidden sm:block">
+                        {entry.bullets.length} bullets
+                      </span>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </Link>
+                <DeleteItemButton
+                  action={deleteEntry.bind(null, entry.id)}
+                  itemName={entry.title}
+                />
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

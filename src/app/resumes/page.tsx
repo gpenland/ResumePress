@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { deleteResume } from "./actions";
+import DeleteItemButton from "@/components/DeleteItemButton";
 
 export default async function ResumesPage() {
   const resumes = await prisma.resume.findMany({
@@ -35,13 +37,19 @@ export default async function ResumesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {resumes.map((resume) => (
-            <Link key={resume.id} href={`/resumes/${resume.id}`}>
-              <Card className="hover:bg-muted/40 transition-colors cursor-pointer h-full">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{resume.name}</CardTitle>
-                </CardHeader>
+            <Card key={resume.id} className="hover:bg-muted/30 transition-colors">
+              <CardHeader className="pb-2 flex-row items-start justify-between gap-2">
+                <Link href={`/resumes/${resume.id}`} className="flex-1 min-w-0">
+                  <CardTitle className="text-base truncate">{resume.name}</CardTitle>
+                </Link>
+                <DeleteItemButton
+                  action={deleteResume.bind(null, resume.id)}
+                  itemName={resume.name}
+                />
+              </CardHeader>
+              <Link href={`/resumes/${resume.id}`}>
                 <CardContent className="space-y-2">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Badge variant="secondary">{resume._count.entries} entries</Badge>
                     <Badge variant="outline">{resume.templateId}</Badge>
                   </div>
@@ -49,8 +57,8 @@ export default async function ResumesPage() {
                     Updated {new Date(resume.updatedAt).toLocaleDateString()}
                   </p>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+            </Card>
           ))}
         </div>
       )}
