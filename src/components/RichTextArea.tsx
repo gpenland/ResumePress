@@ -45,7 +45,7 @@ export default function RichTextArea({ value, onChange, rows = 2, placeholder, c
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 flex-1 min-w-0">
       <div className="flex gap-1">
         <button
           type="button"
