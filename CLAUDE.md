@@ -17,7 +17,7 @@ npm run db:studio    # Open Prisma Studio
 npx shadcn@latest add <component-name>
 ```
 
-Postgres must be running for `dev` and `db:*` commands. `.env` needs `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/resumepress?schema=public`.
+Postgres must be running for `dev` and `db:*` commands. `.env` needs `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/resumepress?schema=public`, plus `AUTH_SECRET` (generate with `npx auth secret`), `AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET` from a Google Cloud OAuth 2.0 Web application client (authorized redirect URI: `<origin>/api/auth/callback/google`, for both `http://localhost:3000` and the Sevalla production domain).
 
 ## Architecture
 
@@ -27,9 +27,15 @@ Postgres must be running for `dev` and `db:*` commands. `.env` needs `DATABASE_U
 
 **Deployment:** Docker + Sevalla. `docker-entrypoint.sh` runs `prisma migrate deploy`, seeds categories, then `node server.js`. `next.config.ts` uses `output: "standalone"`.
 
+**Auth:** NextAuth.js (Auth.js v5) with Google OAuth only, configured in `src/lib/auth.ts` (database session strategy via `@auth/prisma-adapter`). There is **no route-level auth gate** — every page renders for everyone, logged in or not; a logged-out visitor just sees no entries/resumes. The nav (`src/components/Nav.tsx`) shows a "Sign in" button when logged out, or `UserMenu` (avatar + sign-out) when logged in. Two helpers from `src/lib/auth.ts`:
+- `getUserId()` — for pages/reads. Returns the session's user id or `null`; never redirects. Pages branch on `null` to render an empty list (list pages) or call `notFound()` before querying (detail/edit pages for a specific id — never let `userId` be `undefined` in a `where` clause, since Prisma treats `undefined` as "field omitted" and would query across all users).
+- `requireUserId()` — for server actions that write data. Redirects to `/login` if there's no session (this is the only place unauthenticated users get redirected — submitting a create/update/delete while logged out).
+
 ## Key Patterns
 
 **Server Actions** are the mutation layer — every create/update/delete is a `"use server"` function in an `actions.ts` file colocated with its route. Pages are async RSC that fetch directly via `prisma`; all data-fetching pages export `dynamic = "force-dynamic"`.
+
+**Ownership checks:** `Entry`, `Resume`, and custom `Category` rows each have a required/nullable `userId`. Prisma's singular `update`/`delete`/`findUnique` build their `where` from unique fields only — adding `userId` alongside `id` there does **not** enforce ownership. Always use `updateMany`/`deleteMany` with `{ id, userId }` in `where` and check the returned `count` (0 means not found or not owned → `notFound()`), and use `findFirst` (not `findUnique`) with `{ id, userId }` for ownership-checked reads. Built-in categories have `userId: null`; category lookups that should include them use `where: { OR: [{ userId: null }, { userId }] }`.
 
 **shadcn/ui here uses `@base-ui/react`**, not Radix UI. Important differences:
 - `Button` has no `asChild` prop — use `buttonVariants` on a `<Link>` instead: `<Link className={cn(buttonVariants({ variant: "outline" }))}>`
@@ -48,10 +54,11 @@ Postgres must be running for `dev` and `db:*` commands. `.env` needs `DATABASE_U
 ## Data Model
 
 ```
-Category  id, name, slug, isBuiltIn
+User      id, name?, email?, image?  (+ NextAuth Account/Session/VerificationToken)
+Category  id, name, slug, isBuiltIn, userId?  ← null = global built-in, set = a user's custom category
 Entry     id, title, organization?, location?, startDate?, endDate?,
-          description?, bullets[], url?, tags[], categoryId
-Resume    id, name, templateId ("jake"), identity (JSON), entries[]
+          description?, bullets[], url?, tags[], categoryId, userId
+Resume    id, name, templateId ("jake"), identity (JSON), entries[], userId
 ResumeEntry  resumeId, entryId, order  ← join table; order controls PDF ordering
 ```
 

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,14 +16,23 @@ export default async function EntriesPage({
   searchParams: Promise<{ category?: string }>;
 }) {
   const { category } = await searchParams;
+  const userId = await getUserId();
 
   const [categories, entries] = await Promise.all([
-    prisma.category.findMany({ orderBy: { name: "asc" } }),
-    prisma.entry.findMany({
-      where: category ? { category: { slug: category } } : undefined,
-      orderBy: { updatedAt: "desc" },
-      include: { category: true },
+    prisma.category.findMany({
+      where: { OR: [{ userId: null }, { userId }] },
+      orderBy: { name: "asc" },
     }),
+    userId
+      ? prisma.entry.findMany({
+          where: {
+            userId,
+            ...(category ? { category: { slug: category } } : {}),
+          },
+          orderBy: { updatedAt: "desc" },
+          include: { category: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   return (

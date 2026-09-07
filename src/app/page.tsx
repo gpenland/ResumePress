@@ -2,19 +2,25 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default async function HomePage() {
-  const [recentResumes, recentEntries] = await Promise.all([
-    prisma.resume.findMany({ orderBy: { updatedAt: "desc" }, take: 5 }),
-    prisma.entry.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-      include: { category: true },
-    }),
-  ]);
+  const userId = await getUserId();
+
+  const [recentResumes, recentEntries] = userId
+    ? await Promise.all([
+        prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 5 }),
+        prisma.entry.findMany({
+          where: { userId },
+          orderBy: { updatedAt: "desc" },
+          take: 5,
+          include: { category: true },
+        }),
+      ])
+    : [[], []];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">

@@ -11,11 +11,14 @@ async function main() {
   ];
 
   for (const cat of builtInCategories) {
-    await prisma.category.upsert({
-      where: { slug: cat.slug },
-      update: {},
-      create: cat,
+    // upsert can't target a compound unique key whose userId is NULL (Prisma/Postgres
+    // limitation), so check-then-create instead.
+    const existing = await prisma.category.findFirst({
+      where: { userId: null, slug: cat.slug },
     });
+    if (!existing) {
+      await prisma.category.create({ data: { ...cat, userId: null } });
+    }
   }
 
   console.log("Seeded built-in categories");

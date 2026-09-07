@@ -12,7 +12,10 @@ const cats = [
   { name: 'Skills',     slug: 'skills'     },
   { name: 'Education',  slug: 'education'  },
 ];
-Promise.all(cats.map(c => p.category.upsert({ where: { slug: c.slug }, update: {}, create: { ...c, isBuiltIn: true } })))
+Promise.all(cats.map(async c => {
+  const existing = await p.category.findFirst({ where: { userId: null, slug: c.slug } });
+  if (!existing) await p.category.create({ data: { ...c, isBuiltIn: true, userId: null } });
+}))
   .then(() => { console.log('categories seeded'); return p.\$disconnect(); })
   .catch(e => { console.error(e); process.exit(1); });
 "

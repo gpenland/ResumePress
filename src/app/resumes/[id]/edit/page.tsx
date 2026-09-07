@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import { updateResumeIdentity } from "../../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,9 @@ export default async function EditResumePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const resume = await prisma.resume.findUnique({ where: { id } });
+  const userId = await getUserId();
+  if (!userId) notFound();
+  const resume = await prisma.resume.findFirst({ where: { id, userId } });
   if (!resume) notFound();
 
   const identity = (resume.identity as Record<string, string>) ?? {};

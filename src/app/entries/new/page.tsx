@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import EntryForm from "@/components/EntryForm";
 import { createEntry } from "../actions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +22,11 @@ export default async function NewEntryPage({
   searchParams: Promise<{ cat?: string }>;
 }) {
   const { cat } = await searchParams;
-  const categories = await prisma.category.findMany({ orderBy: [{ isBuiltIn: "desc" }, { name: "asc" }] });
+  const userId = await getUserId();
+  const categories = await prisma.category.findMany({
+    where: { OR: [{ userId: null }, { userId }] },
+    orderBy: [{ isBuiltIn: "desc" }, { name: "asc" }],
+  });
 
   // Step 2: category selected → show form
   if (cat) {

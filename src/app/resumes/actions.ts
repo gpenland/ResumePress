@@ -1,10 +1,12 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 
 export async function createResume(formData: FormData) {
+  const userId = await requireUserId();
   const identity = {
     name: formData.get("name") as string,
     email: formData.get("email") as string,
@@ -19,6 +21,7 @@ export async function createResume(formData: FormData) {
       name: formData.get("resumeName") as string,
       templateId: (formData.get("templateId") as string) || "jake",
       identity,
+      userId,
     },
   });
 
@@ -28,6 +31,7 @@ export async function createResume(formData: FormData) {
 }
 
 export async function updateResumeIdentity(resumeId: string, formData: FormData) {
+  const userId = await requireUserId();
   const identity = {
     name: formData.get("name") as string,
     email: formData.get("email") as string,
@@ -37,13 +41,14 @@ export async function updateResumeIdentity(resumeId: string, formData: FormData)
     github: (formData.get("github") as string) || "",
   };
 
-  await prisma.resume.update({
-    where: { id: resumeId },
+  const { count } = await prisma.resume.updateMany({
+    where: { id: resumeId, userId },
     data: {
       name: formData.get("resumeName") as string,
       identity,
     },
   });
+  if (count === 0) notFound();
 
   revalidatePath(`/resumes/${resumeId}`);
 }
@@ -52,6 +57,23 @@ export async function updateResumeEntries(
   resumeId: string,
   selectedEntryIds: string[]
 ) {
+  const userId = await requireUserId();
+
+  const resume = await prisma.resume.findFirst({
+    where: { id: resumeId, userId },
+    select: { id: true },
+  });
+  if (!resume) notFound();
+
+  if (selectedEntryIds.length > 0) {
+    const owned = await prisma.entry.count({
+      where: { id: { in: selectedEntryIds }, userId },
+    });
+    if (owned !== selectedEntryIds.length) {
+      throw new Error("One or more selected entries are invalid.");
+    }
+  }
+
   await prisma.$transaction([
     prisma.resumeEntry.deleteMany({ where: { resumeId } }),
     prisma.resumeEntry.createMany({
@@ -67,7 +89,9 @@ export async function updateResumeEntries(
 }
 
 export async function deleteResume(id: string) {
-  await prisma.resume.delete({ where: { id } });
+  const userId = await requireUserId();
+  const { count } = await prisma.resume.deleteMany({ where: { id, userId } });
+  if (count === 0) notFound();
   revalidatePath("/resumes");
   revalidatePath("/");
   redirect("/resumes");

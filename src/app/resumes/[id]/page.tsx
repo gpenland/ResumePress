@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import { deleteResume } from "../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,17 +18,23 @@ export default async function ResumeDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const userId = await getUserId();
+  if (!userId) notFound();
 
   const [resume, allEntries, categories] = await Promise.all([
-    prisma.resume.findUnique({
-      where: { id },
+    prisma.resume.findFirst({
+      where: { id, userId },
       include: { entries: { orderBy: { order: "asc" } } },
     }),
     prisma.entry.findMany({
+      where: { userId },
       orderBy: { updatedAt: "desc" },
       include: { category: true },
     }),
-    prisma.category.findMany({ orderBy: { name: "asc" } }),
+    prisma.category.findMany({
+      where: { OR: [{ userId: null }, { userId }] },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   if (!resume) notFound();

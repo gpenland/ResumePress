@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { render } from "@/templates/jake";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -17,10 +18,15 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ resumeId: string }> }
 ) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { resumeId } = await params;
 
-  const resume = await prisma.resume.findUnique({
-    where: { id: resumeId },
+  const resume = await prisma.resume.findFirst({
+    where: { id: resumeId, userId: session.user.id },
     include: {
       entries: {
         orderBy: { order: "asc" },
@@ -39,7 +45,7 @@ export async function GET(
   const identity = (resume.identity ?? {}) as Record<string, string>;
 
   // Group entries by category, preserving selection order
-  const categoryMap = new Map<string, { category: { id: string; name: string; slug: string; isBuiltIn: boolean }; entries: typeof resume.entries[number]["entry"][] }>();
+  const categoryMap = new Map<string, { category: typeof resume.entries[number]["entry"]["category"]; entries: typeof resume.entries[number]["entry"][] }>();
   for (const re of resume.entries) {
     const cat = re.entry.category;
     if (!categoryMap.has(cat.id)) {

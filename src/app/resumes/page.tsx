@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +11,14 @@ import { deleteResume } from "./actions";
 import DeleteItemButton from "@/components/DeleteItemButton";
 
 export default async function ResumesPage() {
-  const resumes = await prisma.resume.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { entries: true } } },
-  });
+  const userId = await getUserId();
+  const resumes = userId
+    ? await prisma.resume.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+        include: { _count: { select: { entries: true } } },
+      })
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">

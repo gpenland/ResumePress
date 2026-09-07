@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/auth";
 import EntryForm from "@/components/EntryForm";
 import { updateEntry, deleteEntry } from "../../actions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,9 +17,11 @@ export default async function EditEntryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const userId = await getUserId();
+  if (!userId) notFound();
 
-  const entry = await prisma.entry.findUnique({
-    where: { id },
+  const entry = await prisma.entry.findFirst({
+    where: { id, userId },
     include: { category: true },
   });
 

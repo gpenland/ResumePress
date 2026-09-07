@@ -1,10 +1,19 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 
 export async function createEntry(formData: FormData) {
+  const userId = await requireUserId();
+  const categoryId = formData.get("categoryId") as string;
+
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, OR: [{ userId: null }, { userId }] },
+  });
+  if (!category) notFound();
+
   const bullets = parseBullets(formData.get("bullets") as string);
   const tags = parseTags(formData.get("tags") as string);
 
@@ -20,7 +29,8 @@ export async function createEntry(formData: FormData) {
       url: (formData.get("url") as string) || null,
       bullets,
       tags,
-      categoryId: formData.get("categoryId") as string,
+      categoryId,
+      userId,
     },
   });
 
@@ -30,11 +40,12 @@ export async function createEntry(formData: FormData) {
 }
 
 export async function updateEntry(id: string, formData: FormData) {
+  const userId = await requireUserId();
   const bullets = parseBullets(formData.get("bullets") as string);
   const tags = parseTags(formData.get("tags") as string);
 
-  await prisma.entry.update({
-    where: { id },
+  const { count } = await prisma.entry.updateMany({
+    where: { id, userId },
     data: {
       title: formData.get("title") as string,
       pdfTitle: (formData.get("pdfTitle") as string) || null,
@@ -49,6 +60,7 @@ export async function updateEntry(id: string, formData: FormData) {
       categoryId: formData.get("categoryId") as string,
     },
   });
+  if (count === 0) notFound();
 
   revalidatePath("/entries");
   revalidatePath(`/entries/${id}/edit`);
@@ -56,7 +68,9 @@ export async function updateEntry(id: string, formData: FormData) {
 }
 
 export async function deleteEntry(id: string) {
-  await prisma.entry.delete({ where: { id } });
+  const userId = await requireUserId();
+  const { count } = await prisma.entry.deleteMany({ where: { id, userId } });
+  if (count === 0) notFound();
   revalidatePath("/entries");
   revalidatePath("/");
   redirect("/entries");
