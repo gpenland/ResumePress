@@ -13,7 +13,11 @@ export default async function CategoriesPage() {
   const categories = await prisma.category.findMany({
     where: { OR: [{ userId: null }, { userId }] },
     orderBy: [{ isBuiltIn: "desc" }, { name: "asc" }],
-    include: { _count: { select: { entries: true } } },
+    include: {
+      _count: {
+        select: { entries: { where: { userId: userId ?? "__none__" } } },
+      },
+    },
   });
 
   return (
