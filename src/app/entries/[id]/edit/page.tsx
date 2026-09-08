@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import EntryForm from "@/components/EntryForm";
-import { updateEntry, deleteEntry } from "../../actions";
+import { updateEntry, deleteEntry, cloneEntry } from "../../actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
@@ -30,6 +30,7 @@ export default async function EditEntryPage({
 
   const updateWithId = updateEntry.bind(null, id);
   const deleteWithId = deleteEntry.bind(null, id);
+  const cloneWithId = cloneEntry.bind(null, id);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -42,6 +43,11 @@ export default async function EditEntryPage({
           <Link href="/entries/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             New Entry
           </Link>
+          <form action={cloneWithId}>
+            <SubmitButton variant="outline" size="sm" pendingText="Cloning…">
+              Clone Entry
+            </SubmitButton>
+          </form>
           <form action={deleteWithId}>
             <SubmitButton variant="destructive" size="sm" pendingText="Deleting…">
               Delete Entry
