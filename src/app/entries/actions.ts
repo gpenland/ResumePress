@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
-import { createEntryForUser } from "@/lib/entries";
+import { createEntryForUser, getEntryForUser } from "@/lib/entries";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -24,6 +24,31 @@ export async function createEntry(formData: FormData) {
     url: (formData.get("url") as string) || null,
     bullets,
     tags,
+  });
+  if (!result.ok) notFound();
+
+  revalidatePath("/entries");
+  revalidatePath("/");
+  redirect(`/entries/${result.entry.id}/edit`);
+}
+
+export async function cloneEntry(id: string) {
+  const userId = await requireUserId();
+  const source = await getEntryForUser(userId, id);
+  if (!source) notFound();
+
+  const result = await createEntryForUser(userId, {
+    title: `${source.title} (Copy)`,
+    categoryId: source.categoryId,
+    pdfTitle: source.pdfTitle,
+    organization: source.organization,
+    location: source.location,
+    startDate: source.startDate,
+    endDate: source.endDate,
+    description: source.description,
+    url: source.url,
+    bullets: source.bullets,
+    tags: source.tags,
   });
   if (!result.ok) notFound();
 

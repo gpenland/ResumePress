@@ -7,8 +7,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { deleteEntry } from "./actions";
+import { deleteEntry, cloneEntry } from "./actions";
 import DeleteItemButton from "@/components/DeleteItemButton";
+import CloneItemButton from "@/components/CloneItemButton";
 
 export default async function EntriesPage({
   searchParams,
@@ -101,6 +102,10 @@ export default async function EntriesPage({
                     )}
                   </div>
                 </Link>
+                <CloneItemButton
+                  action={cloneEntry.bind(null, entry.id)}
+                  itemName={entry.title}
+                />
                 <DeleteItemButton
                   action={deleteEntry.bind(null, entry.id)}
                   itemName={entry.title}
