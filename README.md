@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ResumePress
 
-## Getting Started
+ResumePress is a resume builder: keep a library of reusable experience/education/project/skill entries, assemble them into resumes, and export a polished PDF rendered with LaTeX (Jake Gutierrez's popular resume template).
 
-First, run the development server:
+- **Entries** — durable, reusable content (jobs, degrees, projects, skills) organized by category.
+- **Resumes** — pick a subset of entries, order them, and set an identity block (name, email, phone, links).
+- **PDF export** — `GET /api/pdf/[resumeId]` renders the selected entries to a `.tex` file and compiles it with `pdflatex`.
+
+## Stack
+
+Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · Prisma 5 + PostgreSQL · shadcn/ui (base-ui variant) · Auth.js v5 (Google OAuth)
+
+## Prerequisites
+
+- Node.js and npm
+- PostgreSQL running locally (or via Docker, see below)
+- `pdflatex` installed locally — `brew install --cask mactex-no-gui` on macOS (not needed if you only run via Docker, which bundles TeX Live)
+- A Google Cloud OAuth 2.0 **Web application** client, with an authorized redirect URI of `http://localhost:3000/api/auth/callback/google` for local dev
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in `.env`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/resumepress?schema=public"
+AUTH_SECRET=""      # generate with: npx auth secret
+AUTH_GOOGLE_ID=""
+AUTH_GOOGLE_SECRET=""
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then, with Postgres running:
 
-## Learn More
+```bash
+npm run db:migrate   # apply Prisma migrations
+npm run db:seed      # seed built-in categories (experience, education, projects, skills)
+npm run dev           # start the dev server at http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Other useful commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build         # production build
+npx tsc --noEmit      # type-check without building
+npm run db:studio     # open Prisma Studio
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Running with Docker
 
-## Deploy on Vercel
+`docker-compose.yml` brings up Postgres and the app together (the app image includes TeX Live, so `pdflatex` doesn't need to be installed on the host):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+docker compose up
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Set `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET` via a `.env` file or your environment before starting.
+
+## Architecture & contributing
+
+See [`CLAUDE.md`](./CLAUDE.md) for a deeper dive into the architecture, data model, and codebase conventions (ownership checks, server actions, the LaTeX template, etc.), and [`CONTRIBUTING.md`](./CONTRIBUTING.md) for how to submit changes.
+
+## License
+
+[MIT](./LICENSE)
