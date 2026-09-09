@@ -13,12 +13,12 @@ type EntryWithCategory = Entry & { category: Category };
 
 function normalizeUnicode(str: string): string {
   return str
-    .replace(/['']/g, "'")
-    .replace(/[""]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
     .replace(/–/g, "--")
     .replace(/—/g, "---")
     .replace(/…/g, "...")
-    .replace(/ /g, " ");
+    .replace(/ /g, " ");
 }
 
 function escapeLatex(str: string): string {
