@@ -49,6 +49,12 @@ Postgres must be running for `dev` and `db:*` commands. `.env` needs `DATABASE_U
 
 **LaTeX template** lives entirely in `src/templates/jake.ts`. `escapeLatex` → `applyFormatting` → template string. Education uses `\resumeSubheading{school}{location}{degree}{date}` (location is arg #2, date is arg #4) — this differs from Experience where date is arg #2.
 
+**Do not edit the static LaTeX in `jake.ts`** (the preamble, custom commands like `\resumeItem`/`\resumeSubheading`, margins, `\titleformat`) without a deliberate decision to diverge from upstream. The template must stay byte-for-byte identical to the canonical upstream template (https://github.com/jakegut/resume/blob/master/resume.tex — the "Jake Ryan" resume, credited in `jake.ts`'s own header comment) except for one documented, necessary exception:
+
+- `\usepackage[T1]{fontenc}` + `\usepackage[utf8]{inputenc}` — added in commit `ac0dc83` (2026-09-06). Upstream doesn't need these because it's a static example with hardcoded ASCII sample text; ResumePress renders arbitrary user-entered Unicode (accented names like "José", "Renée"). Verified by direct testing: without these packages, modern pdfTeX doesn't crash, but accented characters render/extract as decomposed glyphs (e.g. "í" → "ı" + floating accent mark) — a real, visible defect, not just cosmetic. This is the one deviation from upstream; everything else (margins, custom commands, section layout) matches exactly.
+
+Run `npm run check:jake-template` after any change to `jake.ts` — it renders the template with fixed dummy data and diffs the output against the golden fixture at `src/templates/__fixtures__/jake.golden.tex`, failing loudly (with a line-level diff) on any unintended change. If a change to the static LaTeX is genuinely needed, update the golden fixture *and* add the new discrepancy to the list above in the same commit — don't let the two drift apart.
+
 **Card spacing gotcha:** The shadcn Card applies `py-(--card-spacing)` (16px) to itself plus `gap-(--card-spacing)` between children. For list-row cards that use `CardContent` with its own `py-*`, add `py-0` to the `Card` to avoid double-stacking vertical padding.
 
 ## Data Model
