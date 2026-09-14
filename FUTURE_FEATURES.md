@@ -33,18 +33,6 @@
 - **Side-by-side PDF preview** — live-rendered PDF preview panel in the builder (using PDF.js)
 - **Share link** — generate a read-only link to a compiled resume PDF (useful for recruiters)
 
-## User & Multi-user
-- **Auth / accounts** — NextAuth.js integration so multiple users can each have their own entry library (also unblocks the "Claude Desktop MCP server" idea under Integrations, and any other API/MCP exposure of this data)
-- **Team / organization mode** — shared entry library for a team, with per-member resume customization
-- **Resume feedback requests** — share a draft resume and invite collaborators to leave inline comments
-
-## MCP / Claude Desktop Integration — Shipped
-- **Remote MCP server** at `POST /api/mcp` (`src/app/api/mcp/route.ts`), using `@modelcontextprotocol/sdk`'s stateless Streamable HTTP transport. Auth is a new bearer-token model (`ApiToken` Prisma model, hashed with SHA-256, never stored in plaintext), fully separate from NextAuth's cookie-based sessions. Tokens are issued/revoked at `/settings/tokens`.
-- Tool scope is **read + create only** (no update/delete): `list_categories`, `list_entries`, `get_entry`, `list_resumes`, `get_resume`, `create_entry`, `create_resume` — see `src/lib/mcpTools.ts`. Lower blast radius from a bad/manipulated tool call, since there's no entry/resume version history yet for undo.
-- Shared DB logic lives in `src/lib/entries.ts`, `src/lib/resumes.ts`, `src/lib/categories.ts` as plain `*ForUser(userId, ...)` functions, called by both the MCP tools and the existing `"use server"` actions (which still own their own `requireUserId()`/`redirect()`/`revalidatePath()` handling).
-- **Connecting Claude:** create a token at `/settings/tokens`, then in Claude add a custom connector with URL `https://<your-domain>/api/mcp`, **Authentication: None**, and a **Request header** `Authorization` = `Bearer <token>` (marked Required). This uses Claude's `static_headers` request-header auth (currently in beta, gated per-organization) rather than full OAuth — avoids standing up an OAuth authorization server (DCR/CIMD) for what's a personal single-user integration.
-- Follow-up ideas: update/delete tools once entry/resume versioning exists for recoverability; token expiry reminders; per-token tool scoping.
-
 ## Integrations
 - **LinkedIn sync** — pull work history and projects from a LinkedIn profile URL
 - **GitHub sync** — auto-generate project entries from pinned GitHub repos (name, description, languages as tags)
