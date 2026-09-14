@@ -69,8 +69,8 @@ model Category {
 
 model Entry {
   id            String        @id @default(cuid())
-  title         String // internal/ResumePress-facing label, shown in lists
-  pdfTitle      String? // text rendered on the PDF; null falls back to `title`
+  title         String // the text rendered into the PDF export
+  displayTitle  String? // optional display-name override shown only in the ResumePress UI; has no effect on the PDF export
   organization  String?
   location      String?
   startDate     String?

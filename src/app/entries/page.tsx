@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { deleteEntry, cloneEntry } from "./actions";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import CloneItemButton from "@/components/CloneItemButton";
+import { entryLabel } from "@/lib/entries";
 
 export default async function EntriesPage({
   searchParams,
@@ -83,7 +84,7 @@ export default async function EntriesPage({
                   className="flex items-center justify-between flex-1 min-w-0"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{entry.title}</p>
+                    <p className="font-medium text-sm truncate">{entryLabel(entry)}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {[entry.organization, entry.location].filter(Boolean).join(" · ")}
                       {entry.startDate && (
@@ -104,11 +105,11 @@ export default async function EntriesPage({
                 </Link>
                 <CloneItemButton
                   action={cloneEntry.bind(null, entry.id)}
-                  itemName={entry.title}
+                  itemName={entryLabel(entry)}
                 />
                 <DeleteItemButton
                   action={deleteEntry.bind(null, entry.id)}
-                  itemName={entry.title}
+                  itemName={entryLabel(entry)}
                 />
               </CardContent>
             </Card>

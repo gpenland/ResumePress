@@ -6,6 +6,7 @@ import { getUserId } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { entryLabel } from "@/lib/entries";
 
 export default async function HomePage() {
   const userId = await getUserId();
@@ -73,7 +74,7 @@ export default async function HomePage() {
                   <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <div>
-                        <p className="text-sm font-medium">{e.title}</p>
+                        <p className="text-sm font-medium">{entryLabel(e)}</p>
                         <p className="text-xs text-muted-foreground">{e.category.name}</p>
                       </div>
                       <span className="text-xs text-muted-foreground">

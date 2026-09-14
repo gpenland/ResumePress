@@ -4,7 +4,7 @@ import type { Entry } from "@prisma/client";
 export type EntryInput = {
   title: string;
   categoryId: string;
-  pdfTitle?: string | null;
+  displayTitle?: string | null;
   organization?: string | null;
   location?: string | null;
   startDate?: string | null;
@@ -33,7 +33,7 @@ export async function createEntryForUser(
   const entry = await prisma.entry.create({
     data: {
       title: data.title,
-      pdfTitle: data.pdfTitle ?? null,
+      displayTitle: data.displayTitle ?? null,
       organization: data.organization ?? null,
       location: data.location ?? null,
       startDate: data.startDate ?? null,
@@ -65,4 +65,8 @@ export async function getEntryForUser(
   entryId: string
 ): Promise<Entry | null> {
   return prisma.entry.findFirst({ where: { id: entryId, userId } });
+}
+
+export function entryLabel(entry: { title: string; displayTitle: string | null }): string {
+  return entry.displayTitle || entry.title;
 }
