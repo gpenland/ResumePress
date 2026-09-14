@@ -15,7 +15,7 @@ export async function createEntry(formData: FormData) {
   const result = await createEntryForUser(userId, {
     title: formData.get("title") as string,
     categoryId,
-    pdfTitle: (formData.get("pdfTitle") as string) || null,
+    displayTitle: (formData.get("displayTitle") as string) || null,
     organization: (formData.get("organization") as string) || null,
     location: (formData.get("location") as string) || null,
     startDate: (formData.get("startDate") as string) || null,
@@ -40,7 +40,7 @@ export async function cloneEntry(id: string) {
   const result = await createEntryForUser(userId, {
     title: `${source.title} (Copy)`,
     categoryId: source.categoryId,
-    pdfTitle: source.pdfTitle,
+    displayTitle: source.displayTitle,
     organization: source.organization,
     location: source.location,
     startDate: source.startDate,
@@ -66,7 +66,7 @@ export async function updateEntry(id: string, formData: FormData) {
     where: { id, userId },
     data: {
       title: formData.get("title") as string,
-      pdfTitle: (formData.get("pdfTitle") as string) || null,
+      displayTitle: (formData.get("displayTitle") as string) || null,
       organization: (formData.get("organization") as string) || null,
       location: (formData.get("location") as string) || null,
       startDate: (formData.get("startDate") as string) || null,

@@ -48,7 +48,7 @@ function e(str: string | null | undefined): string {
 }
 
 function renderTitle(entry: EntryWithCategory): string {
-  return entry.pdfTitle || entry.title;
+  return entry.title;
 }
 
 function renderExperienceEntry(entry: EntryWithCategory): string {

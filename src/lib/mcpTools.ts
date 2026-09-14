@@ -92,7 +92,7 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
       inputSchema: {
         title: z.string(),
         categoryId: z.string(),
-        pdfTitle: z.string().optional(),
+        displayTitle: z.string().optional(),
         organization: z.string().optional(),
         location: z.string().optional(),
         startDate: z.string().optional(),
