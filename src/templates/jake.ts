@@ -1,15 +1,32 @@
-import type { Category, Entry } from "@prisma/client";
-
-type Identity = {
+export type Identity = {
   name: string;
   email: string;
-  phone?: string;
-  website?: string;
-  linkedin?: string;
-  github?: string;
+  phone?: string | null;
+  website?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
 };
 
-type EntryWithCategory = Entry & { category: Category };
+// Structural subset of the Prisma Category/Entry models — anything satisfying this
+// shape (a real Entry/Category row, or an inline object from an MCP tool call) can
+// be rendered, so the renderer stays agnostic of where the data came from.
+export type CategoryLike = {
+  slug: string;
+  name: string;
+};
+
+export type EntryLike = {
+  title: string;
+  organization?: string | null;
+  location?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  description?: string | null;
+  bullets: string[];
+  tags: string[];
+};
+
+export type EntriesByCategory = { category: CategoryLike; entries: EntryLike[] }[];
 
 function normalizeUnicode(str: string): string {
   return str
@@ -47,11 +64,11 @@ function e(str: string | null | undefined): string {
   return applyFormatting(escapeLatex(str ?? ""));
 }
 
-function renderTitle(entry: EntryWithCategory): string {
+function renderTitle(entry: EntryLike): string {
   return entry.title;
 }
 
-function renderExperienceEntry(entry: EntryWithCategory): string {
+function renderExperienceEntry(entry: EntryLike): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   const lines: string[] = [];
   // #1=title #2=date #3=organization #4=location  (matches Jake's Experience layout)
@@ -68,7 +85,7 @@ function renderExperienceEntry(entry: EntryWithCategory): string {
   return lines.join("\n");
 }
 
-function renderProjectEntry(entry: EntryWithCategory): string {
+function renderProjectEntry(entry: EntryLike): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   const techTags = entry.tags.length > 0 ? ` $|$ \\emph{${e(entry.tags.join(", "))}}` : "";
   const lines: string[] = [];
@@ -91,7 +108,7 @@ function renderProjectEntry(entry: EntryWithCategory): string {
 //     \textbf{Category}{: item1, item2} \\
 //   }}
 // \end{itemize}
-function renderSkillsSection(entries: EntryWithCategory[]): string {
+function renderSkillsSection(entries: EntryLike[]): string {
   const lines = entries.map((entry) => {
     const items = [entry.description, entry.tags.join(", ")].filter(Boolean).join(", ");
     return `     \\textbf{${e(renderTitle(entry))}}{: ${e(items)}} \\\\`;
@@ -105,7 +122,7 @@ function renderSkillsSection(entries: EntryWithCategory[]): string {
   );
 }
 
-function renderEducationEntry(entry: EntryWithCategory): string {
+function renderEducationEntry(entry: EntryLike): string {
   const dateStr = [entry.startDate, entry.endDate].filter(Boolean).join(" -- ");
   // #1=school #2=location #3=degree #4=date  (matches Jake's Education layout)
   const degree = renderTitle(entry);
@@ -115,7 +132,7 @@ function renderEducationEntry(entry: EntryWithCategory): string {
 function renderSection(
   title: string,
   slug: string,
-  entries: EntryWithCategory[]
+  entries: EntryLike[]
 ): string {
   if (entries.length === 0) return "";
 
@@ -143,7 +160,7 @@ function renderSection(
 
 export function render(
   identity: Identity,
-  entriesByCategory: { category: Category; entries: EntryWithCategory[] }[]
+  entriesByCategory: EntriesByCategory
 ): string {
   const contactParts = [
     identity.phone ? e(identity.phone) : null,

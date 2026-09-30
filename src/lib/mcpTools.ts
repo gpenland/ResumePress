@@ -11,6 +11,8 @@ import {
   getResumeForUser,
   listResumesForUser,
 } from "@/lib/resumes";
+import { compileResumeSchema } from "@/lib/schemas/resumeEntry";
+import { compileResumeToPdf, type EntriesByCategory } from "@/lib/resumeCompiler";
 
 function textResult(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
@@ -128,5 +130,45 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
       },
     },
     async (data) => textResult(await createResumeForUser(userId, data))
+  );
+
+  server.registerTool(
+    "compile_resume",
+    {
+      description:
+        "Compile a resume to PDF from inline identity + entries, without saving anything to the database. " +
+        "Returns the PDF as a base64-encoded blob resource. Nothing about this call is persisted.",
+      inputSchema: compileResumeSchema.shape,
+    },
+    async ({ templateId, identity, sections }) => {
+      const entriesByCategory: EntriesByCategory = sections.map((section) => ({
+        category: { slug: section.categorySlug, name: section.categoryName },
+        entries: section.entries.map((entry) => ({
+          ...entry,
+          bullets: entry.bullets ?? [],
+          tags: entry.tags ?? [],
+        })),
+      }));
+
+      try {
+        const pdfBuffer = await compileResumeToPdf(templateId, identity, entriesByCategory);
+        return {
+          content: [
+            {
+              type: "resource" as const,
+              resource: {
+                uri: "data:application/pdf;name=resume.pdf",
+                mimeType: "application/pdf",
+                blob: pdfBuffer.toString("base64"),
+              },
+            },
+          ],
+        };
+      } catch (err) {
+        return errorResult(
+          `PDF compilation failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
   );
 }
