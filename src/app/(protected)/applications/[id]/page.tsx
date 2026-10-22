@@ -1,0 +1,110 @@
+export const dynamic = "force-dynamic";
+
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { requireUserId } from "@/lib/auth";
+import { getApplicationForUser } from "@/lib/applications";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import StatusBadge from "@/components/applications/StatusBadge";
+import ResumeSection from "@/components/applications/ResumeSection";
+import DeleteItemButton from "@/components/DeleteItemButton";
+import { deleteApplication } from "../actions";
+
+function formatDate(d: Date | null): string | null {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const userId = await requireUserId();
+  const application = await getApplicationForUser(userId, id);
+  if (!application) notFound();
+
+  const details: Array<[string, string | null]> = [
+    ["Term", application.term],
+    ["Location", application.location],
+    ["Applied", formatDate(application.appliedAt)],
+    ["Deadline", formatDate(application.deadline)],
+    ["Next follow-up", formatDate(application.nextFollowUpAt)],
+    ["Source", application.source],
+    ["Priority", application.priority],
+  ].filter(([, v]) => v) as Array<[string, string]>;
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight">{application.roleTitle}</h1>
+            <StatusBadge status={application.status} />
+          </div>
+          <p className="text-muted-foreground text-sm mt-1">
+            {application.company.name}
+            {application.postingUrl && (
+              <>
+                {" · "}
+                <a href={application.postingUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                  Posting
+                </a>
+              </>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href={`/applications/${application.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Edit
+          </Link>
+          <DeleteItemButton
+            action={deleteApplication.bind(null, application.id)}
+            itemName={`${application.roleTitle} @ ${application.company.name}`}
+          />
+        </div>
+      </div>
+
+      {details.length > 0 && (
+        <Card>
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-5">
+            {details.map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-sm font-medium mt-0.5">{value}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {application.notes && (
+        <Card>
+          <CardContent className="py-5">
+            <p className="text-xs text-muted-foreground mb-2">Notes</p>
+            <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <ResumeSection applicationId={application.id} resumeId={application.resumeId} />
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+          Status History
+        </p>
+        <div className="space-y-1.5">
+          {application.statusHistory.map((h) => (
+            <div key={h.id} className="flex items-center gap-2 text-sm px-1">
+              <span className="text-muted-foreground text-xs w-32 shrink-0">
+                {new Date(h.changedAt).toLocaleString()}
+              </span>
+              <span>
+                {h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : `Created as ${h.toStatus}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
