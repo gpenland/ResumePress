@@ -8,17 +8,25 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  name          String?
-  email         String?    @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  entries       Entry[]
-  resumes       Resume[]
-  categories    Category[]
-  apiTokens     ApiToken[]
+  id                         String                     @id @default(cuid())
+  name                       String?
+  email                      String?                    @unique
+  emailVerified              DateTime?
+  image                      String?
+  accounts                   Account[]
+  sessions                   Session[]
+  entries                    Entry[]
+  resumes                    Resume[]
+  categories                 Category[]
+  apiTokens                  ApiToken[]
+  companies                  Company[]
+  applications               Application[]
+  applicationStatusHistories ApplicationStatusHistory[]
+  contacts                   Contact[]
+  applicationContacts        ApplicationContact[]
+  interactions               Interaction[]
+  emailThreads               EmailThread[]
+  gmailAccount               GmailAccount?
 }
 
 model Account {
@@ -56,12 +64,12 @@ model VerificationToken {
 }
 
 model Category {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   name      String
   slug      String
-  isBuiltIn Boolean  @default(false)
+  isBuiltIn Boolean @default(false)
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   entries   Entry[]
 
   @@unique([userId, slug])
@@ -89,15 +97,16 @@ model Entry {
 }
 
 model Resume {
-  id         String        @id @default(cuid())
-  name       String
-  templateId String        @default("jake")
-  entries    ResumeEntry[]
-  identity   Json?
-  userId     String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  name         String
+  templateId   String        @default("jake")
+  entries      ResumeEntry[]
+  identity     Json?
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model ResumeEntry {
@@ -120,4 +129,152 @@ model ApiToken {
   expiresAt  DateTime?
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
+}
+
+// --- Applications tracker (added in the ResumePress + Applications merge) ---
+
+model Company {
+  id           String        @id @default(cuid())
+  name         String
+  website      String?
+  tier         String? // free-form priority label (e.g. "Target", "Reach", "Safety"); not an enum, kept configurable like Application.status
+  notes        String?
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+  contacts     Contact[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Application {
+  id             String                     @id @default(cuid())
+  companyId      String
+  company        Company                    @relation(fields: [companyId], references: [id])
+  roleTitle      String
+  term           String? // e.g. "Summer 2027"
+  status         String                     @default("Wishlist") // free-form, not an enum — see PLAN.md "keep statuses configurable"
+  appliedAt      DateTime?
+  deadline       DateTime?
+  postingUrl     String?
+  location       String?
+  source         String?
+  priority       String?
+  resumeId       String?
+  resume         Resume?                    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  nextFollowUpAt DateTime?
+  notes          String? // markdown
+  externalId     String? // set by the CSV/Notion importer so re-imports are idempotent; not used elsewhere
+  userId         String
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statusHistory  ApplicationStatusHistory[]
+  contacts       ApplicationContact[]
+  interactions   Interaction[]
+  emailThreads   EmailThread[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+}
+
+// One row per status change, written automatically by the server action that
+// updates Application.status (same transaction) — never written directly by a user.
+model ApplicationStatusHistory {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    String?
+  toStatus      String
+  changedAt     DateTime    @default(now())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Contact {
+  id                  String               @id @default(cuid())
+  name                String
+  companyId           String?
+  company             Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  title               String?
+  emails              String[]
+  linkedinUrl         String?
+  phone               String?
+  howMet              String? // career fair, referral, cold outreach, event name, etc. — free-form
+  metAt               DateTime?
+  notes               String? // markdown
+  tags                String[]
+  nextFollowUpAt      DateTime?
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications        ApplicationContact[]
+  interactions        Interaction[]
+  matchedEmailThreads EmailThread[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model ApplicationContact {
+  applicationId String
+  contactId     String
+  role          String // recruiter, referrer, hiring manager, other — free-form
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  contact       Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, contactId])
+}
+
+model Interaction {
+  id            String       @id @default(cuid())
+  type          String // email, call, meeting, career_fair, coffee_chat, linkedin, other — free-form
+  occurredAt    DateTime
+  summary       String
+  contactId     String?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  emailThreadId String?
+  emailThread   EmailThread? @relation(fields: [emailThreadId], references: [id], onDelete: SetNull)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model EmailThread {
+  id                   String        @id @default(cuid())
+  gmailThreadId        String
+  subject              String?
+  snippet              String?
+  participants         String[]
+  lastMessageAt        DateTime?
+  gmailUrl             String?
+  matchedContactId     String?
+  matchedContact       Contact?      @relation(fields: [matchedContactId], references: [id], onDelete: SetNull)
+  matchedApplicationId String?
+  matchStatus          String        @default("unmatched") // auto, confirmed, unmatched, ignored
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interactions         Interaction[]
+  matchedApplication   Application?  @relation(fields: [matchedApplicationId], references: [id], onDelete: SetNull)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([userId, gmailThreadId])
+}
+
+// Gmail OAuth grant, fully decoupled from Auth.js's own Account model — see
+// docs/MIGRATION_PLAN.md §1.1 for why. Absence of this row (no connected
+// Gmail account) must never be required by any other feature: PLAN.md
+// principle 1 ("Applications work without contacts") extends to "everything
+// works without Gmail" too.
+model GmailAccount {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email                 String // the connected Gmail address, for display
+  encryptedRefreshToken String    @db.Text
+  scopes                String[]
+  historyId             String?
+  lastSyncAt            DateTime?
+  connectedAt           DateTime  @default(now())
 }
