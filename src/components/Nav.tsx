@@ -15,6 +15,12 @@ export default async function Nav() {
         </Link>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
           <nav className="flex items-center gap-3 sm:gap-6 text-sm text-muted-foreground overflow-x-auto min-w-0">
+            <Link href="/applications" className="hover:text-foreground transition-colors shrink-0">
+              Applications
+            </Link>
+            <Link href="/contacts" className="hover:text-foreground transition-colors shrink-0">
+              Contacts
+            </Link>
             <Link href="/entries" className="hover:text-foreground transition-colors shrink-0">
               Entries
             </Link>

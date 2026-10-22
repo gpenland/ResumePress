@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Category, Entry, ResumeEntry } from "@prisma/client";
-import { updateResumeEntries } from "@/app/resumes/actions";
+import { updateResumeEntries } from "@/app/(protected)/resumes/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
