@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { getOwnerUserId } from "@/lib/auth";
+import { getAllowedUserId } from "@/lib/auth";
 
 // Separate "Connect Gmail" flow, decoupled from NextAuth's own signIn()/Account
 // — see docs/MIGRATION_PLAN.md §1.1 for why. Reuses the existing AUTH_GOOGLE_ID
@@ -15,7 +15,7 @@ const GMAIL_SCOPES = [
 const STATE_COOKIE = "gmail_oauth_state";
 
 export async function GET(req: Request) {
-  const userId = await getOwnerUserId();
+  const userId = await getAllowedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

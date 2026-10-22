@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOwnerUserId } from "@/lib/auth";
+import { getAllowedUserId } from "@/lib/auth";
 import { saveGmailAccount } from "@/lib/gmailAccount";
 
 const STATE_COOKIE = "gmail_oauth_state";
@@ -25,7 +25,7 @@ function decodeEmailFromIdToken(idToken: string): string | null {
 }
 
 export async function GET(req: Request) {
-  const userId = await getOwnerUserId();
+  const userId = await getAllowedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
