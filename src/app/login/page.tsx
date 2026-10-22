@@ -1,4 +1,5 @@
-import { signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getUserId, signIn } from "@/lib/auth";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function LoginPage({
@@ -7,6 +8,14 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const { callbackUrl } = await searchParams;
+
+  // Without this, a sign-in that doesn't specify where to go next (e.g. the
+  // Nav's corner button) lands back here with a session already established,
+  // and this page would just render the same form again — looking like
+  // login silently failed.
+  if (await getUserId()) {
+    redirect(callbackUrl || "/");
+  }
 
   async function signInWithGoogle() {
     "use server";
