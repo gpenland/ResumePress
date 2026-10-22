@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOwnerUserId } from "@/lib/auth";
+import { getAllowedUserId } from "@/lib/auth";
 import { compileResumeToPdf } from "@/lib/resumeCompiler";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ resumeId: string }> }
 ) {
-  const userId = await getOwnerUserId();
+  const userId = await getAllowedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

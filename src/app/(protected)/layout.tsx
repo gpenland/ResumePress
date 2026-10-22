@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth, isOwner } from "@/lib/auth";
+import { auth, isAllowedEmail } from "@/lib/auth";
 
 export default async function ProtectedLayout({
   children,
@@ -11,7 +11,7 @@ export default async function ProtectedLayout({
   if (!session?.user) {
     redirect("/login");
   }
-  if (!isOwner(session.user.email)) {
+  if (!isAllowedEmail(session.user.email)) {
     redirect("/unauthorized");
   }
 
