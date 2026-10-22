@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { getOwnerUserId } from "@/lib/auth";
 import { compileResumeToPdf } from "@/lib/resumeCompiler";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ resumeId: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const userId = await getOwnerUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { resumeId } = await params;
 
   const resume = await prisma.resume.findFirst({
-    where: { id: resumeId, userId: session.user.id },
+    where: { id: resumeId, userId },
     include: {
       entries: {
         orderBy: { order: "asc" },
