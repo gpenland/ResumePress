@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllowedUserId } from "@/lib/auth";
+import { getAllowedUserId, getAppOrigin } from "@/lib/auth";
 import { saveGmailAccount } from "@/lib/gmailAccount";
 
 const STATE_COOKIE = "gmail_oauth_state";
@@ -49,7 +49,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Google OAuth client not configured" }, { status: 500 });
   }
 
-  const redirectUri = `${url.origin}/api/gmail/oauth/callback`;
+  const origin = getAppOrigin(req);
+  const redirectUri = `${origin}/api/gmail/oauth/callback`;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -86,7 +87,7 @@ export async function GET(req: Request) {
     scopes: (tokens.scope ?? "").split(" ").filter(Boolean),
   });
 
-  const response = NextResponse.redirect(new URL("/settings/gmail", url.origin));
+  const response = NextResponse.redirect(new URL("/settings/gmail", origin));
   response.cookies.delete(STATE_COOKIE);
   return response;
 }
