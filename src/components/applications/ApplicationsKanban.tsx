@@ -1,0 +1,72 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { APPLICATION_STATUSES, type ApplicationWithCompany } from "@/lib/applicationsShared";
+
+type Props = {
+  applications: ApplicationWithCompany[];
+  updateStatus: (id: string, status: string) => Promise<void>;
+};
+
+export default function ApplicationsKanban({ applications, updateStatus }: Props) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+
+  function handleDrop(status: string, e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverStatus(null);
+    const id = e.dataTransfer.getData("text/application-id");
+    if (!id) return;
+    startTransition(async () => {
+      await updateStatus(id, status);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4" aria-busy={isPending}>
+      {APPLICATION_STATUSES.map((status) => {
+        const columnApps = applications.filter((a) => a.status === status);
+        return (
+          <div
+            key={status}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverStatus(status);
+            }}
+            onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
+            onDrop={(e) => handleDrop(status, e)}
+            className={`w-64 shrink-0 rounded-lg border bg-muted/20 p-2 space-y-2 min-h-[120px] transition-colors ${
+              dragOverStatus === status ? "border-primary bg-primary/5" : "border-border"
+            }`}
+          >
+            <div className="flex items-center justify-between px-1.5 py-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{status}</p>
+              <span className="text-xs text-muted-foreground">{columnApps.length}</span>
+            </div>
+            {columnApps.map((app) => (
+              <Card
+                key={app.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("text/application-id", app.id)}
+                className="py-0 cursor-grab active:cursor-grabbing hover:bg-muted/40 transition-colors"
+              >
+                <CardContent className="p-3">
+                  <Link href={`/applications/${app.id}`} className="block min-w-0">
+                    <p className="font-medium text-sm truncate">{app.roleTitle}</p>
+                    <p className="text-xs text-muted-foreground truncate">{app.company.name}</p>
+                    {app.term && <p className="text-xs text-muted-foreground mt-1">{app.term}</p>}
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
