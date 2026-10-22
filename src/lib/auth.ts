@@ -67,3 +67,16 @@ export async function getAllowedUserId(): Promise<string | null> {
   if (!session?.user?.id || !isAllowedEmail(session.user.email)) return null;
   return session.user.id;
 }
+
+/**
+ * Canonical public origin — the same source of truth `trustHost: true` lets
+ * NextAuth use for its own callback URL. Behind Sevalla's reverse proxy, a
+ * Route Handler's own `req.url` reflects the container's internal bind
+ * address (0.0.0.0, per the Dockerfile), not the public domain, so anything
+ * building its own redirect/callback URL (e.g. the Gmail OAuth routes) must
+ * use this instead of `new URL(req.url).origin`. Falls back to the request
+ * for local dev, where AUTH_URL typically isn't set.
+ */
+export function getAppOrigin(req: Request): string {
+  return process.env.AUTH_URL?.replace(/\/$/, "") || new URL(req.url).origin;
+}

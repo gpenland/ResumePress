@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { getAllowedUserId } from "@/lib/auth";
+import { getAllowedUserId, getAppOrigin } from "@/lib/auth";
 
 // Separate "Connect Gmail" flow, decoupled from NextAuth's own signIn()/Account
 // — see docs/MIGRATION_PLAN.md §1.1 for why. Reuses the existing AUTH_GOOGLE_ID
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "AUTH_GOOGLE_ID is not configured" }, { status: 500 });
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = getAppOrigin(req);
   const redirectUri = `${origin}/api/gmail/oauth/callback`;
   const state = randomBytes(16).toString("hex");
 
