@@ -39,6 +39,9 @@ export default function UserMenu({
         <DropdownMenuItem render={<Link href="/settings/tokens" />}>
           API Tokens
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/settings/gmail" />}>
+          Gmail
+        </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={() => {
