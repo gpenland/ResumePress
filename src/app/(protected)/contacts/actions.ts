@@ -77,15 +77,21 @@ export async function logInteraction(formData: FormData) {
   if (!result.ok) throw new Error(result.error);
 
   if (result.interaction.contactId) revalidatePath(`/contacts/${result.interaction.contactId}`);
+  if (result.interaction.applicationId) revalidatePath(`/applications/${result.interaction.applicationId}`);
   revalidatePath("/contacts");
 }
 
-export async function deleteInteraction(contactId: string, interactionId: string) {
+/** Takes only the interaction's own id — looks up which contact/application to revalidate itself, so callers on either side (contact or application detail page) can pass it directly with no `.bind`. */
+export async function deleteInteraction(interactionId: string) {
   const userId = await requireUserId();
+  const interaction = await prisma.interaction.findFirst({ where: { id: interactionId, userId } });
+  if (!interaction) notFound();
+
   const result = await deleteInteractionForUser(userId, interactionId);
   if (!result.ok) notFound();
 
-  revalidatePath(`/contacts/${contactId}`);
+  if (interaction.contactId) revalidatePath(`/contacts/${interaction.contactId}`);
+  if (interaction.applicationId) revalidatePath(`/applications/${interaction.applicationId}`);
 }
 
 export async function linkContactToApplication(contactId: string, applicationId: string, role: string) {

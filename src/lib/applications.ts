@@ -206,6 +206,8 @@ export async function getApplicationForUser(userId: string, applicationId: strin
       company: true,
       resume: true,
       statusHistory: { orderBy: { changedAt: "desc" } },
+      contacts: { include: { contact: true } },
+      interactions: { orderBy: { occurredAt: "desc" } },
     },
   });
 }
