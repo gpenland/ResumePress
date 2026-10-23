@@ -5,6 +5,7 @@
 // so client components can import from here without bundling the Prisma client.
 
 import type { Application, Company } from "@prisma/client";
+import { splitCsvLine, csvField } from "@/lib/csv";
 
 // Suggested statuses from PLAN.md §3, trimmed per GitHub issue #17 (fewer
 // statuses; use status-history notes for anything finer-grained). Stored as a
@@ -44,12 +45,6 @@ export const APPLICATION_CSV_COLUMNS = [
 export type ApplicationCsvColumn = (typeof APPLICATION_CSV_COLUMNS)[number];
 export type ApplicationCsvRow = Record<ApplicationCsvColumn, string>;
 
-function csvField(value: string | null | undefined): string {
-  const v = value ?? "";
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
-  return v;
-}
-
 function isoDate(d: Date | null): string {
   return d ? d.toISOString().slice(0, 10) : "";
 }
@@ -70,37 +65,6 @@ export function applicationsToCsv(applications: ApplicationWithCompany[]): strin
     ].join(",")
   );
   return [header, ...lines].join("\n") + "\n";
-}
-
-/** Minimal RFC4180-ish line splitter: handles quoted fields with embedded commas/quotes. */
-function splitCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += char;
-      }
-    } else if (char === '"') {
-      inQuotes = true;
-    } else if (char === ",") {
-      fields.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  fields.push(current);
-  return fields;
 }
 
 export type ParsedApplicationsCsv = {

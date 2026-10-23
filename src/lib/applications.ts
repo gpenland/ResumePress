@@ -7,6 +7,7 @@ import {
   type ApplicationWithCompany,
   type ApplicationCsvRow,
 } from "@/lib/applicationsShared";
+import type { MappedApplicationRow } from "@/lib/notionImportShared";
 
 // Re-exported so server code (actions.ts) can import everything it needs from
 // this one module. Client components should import the shared module
@@ -23,6 +24,7 @@ export type ApplicationInput = {
   location?: string | null;
   source?: string | null;
   notes?: string | null;
+  externalId?: string | null;
 };
 
 function toDate(value?: string | null): Date | null {
@@ -50,6 +52,7 @@ export async function createApplicationForUser(
         location: data.location ?? null,
         source: data.source ?? null,
         notes: data.notes ?? null,
+        externalId: data.externalId ?? null,
         userId,
       },
     });
@@ -231,4 +234,49 @@ export async function importApplicationCsvRowsForUser(
     imported++;
   }
   return { imported };
+}
+
+/**
+ * Commits a Notion-importer dry-run (PLAN.md §6 Phase 3). Idempotent on
+ * re-run: a row whose mapped `externalId` matches an existing Application's
+ * updates that row instead of creating a duplicate. Rows with no mapped
+ * `externalId` always create a new Application — there's no stable key to
+ * match on, so re-running an import with no ID column produces duplicates,
+ * same as any other id-less CSV import.
+ */
+export async function importMappedApplicationsForUser(
+  userId: string,
+  rows: MappedApplicationRow[]
+): Promise<{ created: number; updated: number }> {
+  let created = 0;
+  let updated = 0;
+
+  for (const row of rows) {
+    const input: ApplicationInput = {
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      term: row.term,
+      status: APPLICATION_STATUSES.includes(row.status as ApplicationStatus) ? row.status! : undefined,
+      appliedAt: row.appliedAt,
+      postingUrl: row.postingUrl,
+      location: row.location,
+      source: row.source,
+      notes: row.notes,
+      externalId: row.externalId,
+    };
+
+    const existing = row.externalId
+      ? await prisma.application.findFirst({ where: { userId, externalId: row.externalId } })
+      : null;
+
+    if (existing) {
+      await updateApplicationForUser(userId, existing.id, input);
+      updated++;
+    } else {
+      await createApplicationForUser(userId, input);
+      created++;
+    }
+  }
+
+  return { created, updated };
 }
