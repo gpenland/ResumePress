@@ -3,7 +3,10 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
+import { listContactsForUser } from "@/lib/contacts";
+import { listTriageThreadsForUser } from "@/lib/emailThreads";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { entryLabel } from "@/lib/entries";
@@ -11,7 +14,7 @@ import { entryLabel } from "@/lib/entries";
 export default async function HomePage() {
   const userId = await getUserId();
 
-  const [recentResumes, recentEntries] = userId
+  const [recentResumes, recentEntries, followUpContacts, triageThreads] = userId
     ? await Promise.all([
         prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 5 }),
         prisma.entry.findMany({
@@ -20,14 +23,70 @@ export default async function HomePage() {
           take: 5,
           include: { category: true },
         }),
+        listContactsForUser(userId, { followUpDue: true }),
+        listTriageThreadsForUser(userId),
       ])
-    : [[], []];
+    : [[], [], [], []];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Manage your resume entries and builds</p>
+        <p className="text-muted-foreground mt-1 text-sm">What needs your attention, and your resume entries and builds</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Needs Follow-up</h2>
+            <Link href="/contacts?followUp=due" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+              See all
+            </Link>
+          </div>
+          {followUpContacts.length === 0 ? (
+            <EmptyState message="No contacts due for follow-up" />
+          ) : (
+            <div className="space-y-2">
+              {followUpContacts.slice(0, 5).map((c) => (
+                <Link key={c.id} href={`/contacts/${c.id}`}>
+                  <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
+                    <CardContent className="flex items-center justify-between py-3 px-4">
+                      <span className="text-sm font-medium">{c.name}</span>
+                      {c.nextFollowUpAt && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(c.nextFollowUpAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Email Triage</h2>
+            <Link href="/triage" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+              See all
+            </Link>
+          </div>
+          {triageThreads.length === 0 ? (
+            <EmptyState message="Nothing pending triage" />
+          ) : (
+            <Link href="/triage">
+              <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
+                <CardContent className="flex items-center justify-between py-3 px-4">
+                  <span className="text-sm">
+                    <Badge variant="secondary">{triageThreads.length}</Badge>{" "}
+                    thread{triageThreads.length === 1 ? "" : "s"} awaiting review
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </section>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
@@ -92,14 +151,16 @@ export default async function HomePage() {
   );
 }
 
-function EmptyState({ message, action }: { message: string; action: { label: string; href: string } }) {
+function EmptyState({ message, action }: { message: string; action?: { label: string; href: string } }) {
   return (
     <Card className="border-dashed">
       <CardContent className="flex flex-col items-center py-10 text-center gap-3">
         <p className="text-sm text-muted-foreground">{message}</p>
-        <Link href={action.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-          {action.label}
-        </Link>
+        {action && (
+          <Link href={action.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            {action.label}
+          </Link>
+        )}
       </CardContent>
     </Card>
   );
