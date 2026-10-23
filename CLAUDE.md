@@ -25,7 +25,7 @@ Postgres must be running for `dev` and `db:*` commands. `.env` (see `.env.exampl
 
 **Stack:** Next.js 16 App Router · TypeScript · Tailwind CSS v4 · Prisma 5 + PostgreSQL · shadcn/ui (base-ui variant)
 
-**PDF generation:** `GET /api/pdf/[resumeId]` fetches the resume + selected entries from the DB and groups them by category, then hands off to `compileResumeToPdf` (`src/lib/resumeCompiler.ts`, see "Key Patterns"), which renders via `src/templates/jake.ts`, writes the `.tex` to a temp dir, runs `pdflatex` twice, and returns the PDF buffer for the route to stream back. The same `compileResumeToPdf` is also called by the MCP `compile_resume` tool (see "MCP Server") for DB-free, inline compiles. pdflatex must be installed locally (`brew install --cask mactex-no-gui`) or is included in the Docker image via `apt-get install texlive-*`.
+**PDF generation:** `GET /api/pdf/[resumeId]` fetches the resume + selected entries from the DB and groups them by category, then hands off to `compileResumeToPdf` (`src/lib/resumeCompiler.ts`, see "Key Patterns"), which renders via `src/templates/jake.ts`, writes the `.tex` to a temp dir, runs `pdflatex` twice, and returns the PDF buffer for the route to stream back. `GET /api/pdf/snapshot/[snapshotId]` is the counterpart for a frozen `ResumeSnapshot` (see "Resume version history" below) — same `compileResumeToPdf` call, but sourced from the snapshot's own inlined entry content via `snapshotSectionsToEntriesByCategory` (`src/lib/resumes.ts`) instead of a live Prisma fetch. The same `compileResumeToPdf` is also called by the MCP `compile_resume` tool (see "MCP Server") for DB-free, inline compiles. pdflatex must be installed locally (`brew install --cask mactex-no-gui`) or is included in the Docker image via `apt-get install texlive-*`.
 
 **Deployment:** Docker + Sevalla. `docker-entrypoint.sh` runs `prisma migrate deploy`, seeds categories, then `node server.js`. `next.config.ts` uses `output: "standalone"`.
 
@@ -80,7 +80,11 @@ A companies/applications/contacts/interactions/Gmail-sync tracker merged into th
 
 **Entry field visibility** is driven by `src/lib/entryFields.ts`. `FIELD_CONFIGS` maps category slugs to `FieldConfig` objects that control which fields render in `EntryForm`. Add a new built-in category type by adding an entry to `FIELD_CONFIGS`; custom categories fall back to `DEFAULT_FIELD_CONFIG` (all fields).
 
-**PDF compilation** is centralized in `src/lib/resumeCompiler.ts`'s `compileResumeToPdf(templateId, identity, entriesByCategory)` — the pdflatex/tempdir/cleanup mechanics (write `.tex`, run `pdflatex` twice with a timeout, read the PDF, clean up in `finally`) live here exactly once. Both `GET /api/pdf/[resumeId]` (DB-backed, session-authenticated) and the MCP `compile_resume` tool (inline data, bearer-token-authenticated) call this same function — the DB route does its own Prisma fetch/grouping into `EntriesByCategory` first, then hands off; the MCP tool builds `EntriesByCategory` from inline request data instead. Any future template-selection or pdflatex-invocation change belongs here, not duplicated in a route.
+**PDF compilation** is centralized in `src/lib/resumeCompiler.ts`'s `compileResumeToPdf(templateId, identity, entriesByCategory)` — the pdflatex/tempdir/cleanup mechanics (write `.tex`, run `pdflatex` twice with a timeout, read the PDF, clean up in `finally`) live here exactly once. `GET /api/pdf/[resumeId]` (DB-backed, session-authenticated), `GET /api/pdf/snapshot/[snapshotId]` (frozen-snapshot-backed), and the MCP `compile_resume` tool (inline data, bearer-token-authenticated) all call this same function — each just builds `EntriesByCategory` differently (live Prisma fetch, snapshot JSON, or inline request data) before handing off. Any future template-selection or pdflatex-invocation change belongs here, not duplicated in a route.
+
+**Resume version history** (GitHub issue #26) addresses two gaps: `Entry` had no edit history, and `ResumeEntry` is a *live* FK to `Entry`, so editing an Entry retroactively changed every `Resume` (and every `Application`) referencing it — there was no way to pin "the resume as it was when I applied."
+- **Entry history** — `updateEntryForUser` (`src/lib/entries.ts`) snapshots an Entry's pre-update field values into `EntryVersion.data` (a JSON blob) before applying an edit, skipping the write entirely when the edit is a no-op (deep-equal old/new). It's audit-log only by design — no revert button; reverting means copying old values back into the form by hand. `EntryHistory.tsx` renders the list (collapsed by default) on the entry edit page, each row expandable to show that version's full field dump.
+- **Resume pinning** — attaching a resume to an application (`attachResumeToApplication`, `src/app/(protected)/applications/resumeActions.ts`) calls `createResumeSnapshotForUser` (`src/lib/resumes.ts`), which freezes the resume's *current* rendered content (identity + each entry's content inlined, grouped by category exactly like the PDF route groups it) into a new `ResumeSnapshot`, and points `Application.resumeSnapshotId` at it. `Application.resumeId` is kept too, but only for UI navigation (the "Open"/"Change" resume picker in `ResumeSection.tsx` still deals with the live `Resume`) — the snapshot, not the live resume, is what the application is actually pinned to, and what "Download PDF" compiles from. Later edits to the resume's entries never change an already-attached application. There's no automatic re-sync: "Refresh snapshot" in `ResumeSection.tsx` re-runs the same attach flow against the already-attached resume to deliberately pull in edits by creating a fresh snapshot. Applications attached before this feature shipped have `resumeSnapshotId: null` and fall back to compiling the live resume until re-attached.
 
 **LaTeX template** lives entirely in `src/templates/jake.ts`. `escapeLatex` → `applyFormatting` → template string. Education uses `\resumeSubheading{school}{location}{degree}{date}` (location is arg #2, date is arg #4) — this differs from Experience where date is arg #2.
 
@@ -100,14 +104,18 @@ Category  id, name, slug, isBuiltIn, userId?  ← null = global built-in, set = 
 Entry     id, title, displayTitle?, organization?, location?, startDate?, endDate?,
           description?, bullets[], url?, tags[], categoryId, userId
           ← title is what renders into the PDF; displayTitle is a UI-only override with no PDF effect
+EntryVersion  id, entryId, data (JSON snapshot of Entry's editable fields), userId, createdAt
+          ← written by updateEntryForUser *before* applying an edit, so it only ever holds past versions (the live Entry row is always current); skipped on a no-op save
 Resume    id, name, templateId ("jake"), identity (JSON), entries[], userId
-ResumeEntry  resumeId, entryId, order  ← join table; order controls PDF ordering
+ResumeEntry  resumeId, entryId, order  ← join table; order controls PDF ordering; entryId is a *live* FK — editing that Entry changes every Resume referencing it
+ResumeSnapshot  id, resumeId? (SetNull), name, templateId, identity (JSON), entries (JSON, EntriesByCategory-shaped with entry content inlined, not FKs), userId, createdAt
+          ← a frozen copy of a Resume's rendered content, created by createResumeSnapshotForUser each time a resume is attached to an Application; self-contained, so it survives edits to (or deletion of) the source Resume/Entries
 ApiToken  id, name, tokenHash (unique), userId, lastUsedAt?, expiresAt?, revokedAt?  ← bearer tokens for MCP/agent auth, see "MCP Server" above
 
 Company   id, name, website?, tier?, notes?, userId
 Application  id, companyId, roleTitle, term?, status ("Applied" default, free-form),
-          appliedAt?, postingUrl?, location?, source?, resumeId?, notes?, externalId?, userId
-          ← externalId is set by the Notion/CSV importer so re-imports are idempotent
+          appliedAt?, postingUrl?, location?, source?, resumeId?, resumeSnapshotId?, notes?, externalId?, userId
+          ← externalId is set by the Notion/CSV importer so re-imports are idempotent; resumeId is for navigation/display (open the live resume, pick a different one), resumeSnapshotId is the actually-pinned frozen version — see "Resume version history" below
 ApplicationStatusHistory  id, applicationId, fromStatus?, toStatus, note?, changedAt, userId
           ← written automatically on every Application.status change (same transaction);
             note-only rows (fromStatus === toStatus) are a user-authored "log update", not a status change

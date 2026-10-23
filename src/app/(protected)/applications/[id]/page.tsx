@@ -103,6 +103,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       <ResumeSection
         applicationId={application.id}
         resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
+        snapshot={application.resumeSnapshot ? { id: application.resumeSnapshot.id, createdAt: application.resumeSnapshot.createdAt } : null}
         resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
         attach={attachResumeToApplication}
         detach={detachResumeFromApplication}

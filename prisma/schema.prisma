@@ -27,6 +27,8 @@ model User {
   interactions               Interaction[]
   emailThreads               EmailThread[]
   gmailAccount               GmailAccount?
+  entryVersions              EntryVersion[]
+  resumeSnapshots            ResumeSnapshot[]
 }
 
 model Account {
@@ -76,7 +78,7 @@ model Category {
 }
 
 model Entry {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String // the text rendered into the PDF export
   displayTitle  String? // optional display-name override shown only in the ResumePress UI; has no effect on the PDF export
   organization  String?
@@ -88,25 +90,64 @@ model Entry {
   url           String?
   tags          String[]
   categoryId    String
-  category      Category      @relation(fields: [categoryId], references: [id])
+  category      Category       @relation(fields: [categoryId], references: [id])
   userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   resumeEntries ResumeEntry[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  versions      EntryVersion[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+// One row per edit, written automatically by updateEntryForUser before it
+// applies the new values — see "Entry version history" in CLAUDE.md. `data`
+// is a frozen snapshot of the Entry's own editable fields immediately
+// *before* the edit that created this row (the live Entry row is always the
+// current version; this table only ever holds past ones).
+model EntryVersion {
+  id        String   @id @default(cuid())
+  entryId   String
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  data      Json
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 model Resume {
-  id           String        @id @default(cuid())
+  id           String           @id @default(cuid())
   name         String
-  templateId   String        @default("jake")
+  templateId   String           @default("jake")
   entries      ResumeEntry[]
   identity     Json?
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+  snapshots    ResumeSnapshot[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+// A frozen copy of a Resume's rendered content (identity + ordered,
+// fully-inlined entry content — not live Entry references), created each
+// time a resume is attached to an Application. GitHub issue #26: an
+// Application's attached resume must stay what it was *at attach time*,
+// not silently change if the underlying Resume's entries are edited later.
+// `resumeId` is kept for traceability but is nullable/SetNull — the
+// snapshot's own `identity`/`entries` are self-contained and don't need the
+// source Resume to still exist to be re-compiled to PDF.
+model ResumeSnapshot {
+  id           String        @id @default(cuid())
+  resumeId     String?
+  resume       Resume?       @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  name         String
+  templateId   String
+  identity     Json?
+  entries      Json // EntriesByCategory-shaped: [{ categorySlug, categoryName, entries: EntryLike[] }]
   userId       String
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications Application[]
   createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
 }
 
 model ResumeEntry {
@@ -148,28 +189,30 @@ model Company {
 }
 
 model Application {
-  id            String                     @id @default(cuid())
-  companyId     String
-  company       Company                    @relation(fields: [companyId], references: [id])
-  roleTitle     String
-  term          String? // e.g. "Summer 2027"
-  status        String                     @default("Applied") // free-form, not an enum — see PLAN.md "keep statuses configurable"
-  appliedAt     DateTime?
-  postingUrl    String?
-  location      String?
-  source        String?
-  resumeId      String?
-  resume        Resume?                    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  notes         String? // markdown
-  externalId    String? // set by the CSV/Notion importer so re-imports are idempotent; not used elsewhere
-  userId        String
-  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  statusHistory ApplicationStatusHistory[]
-  contacts      ApplicationContact[]
-  interactions  Interaction[]
-  emailThreads  EmailThread[]
-  createdAt     DateTime                   @default(now())
-  updatedAt     DateTime                   @updatedAt
+  id               String                     @id @default(cuid())
+  companyId        String
+  company          Company                    @relation(fields: [companyId], references: [id])
+  roleTitle        String
+  term             String? // e.g. "Summer 2027"
+  status           String                     @default("Applied") // free-form, not an enum — see PLAN.md "keep statuses configurable"
+  appliedAt        DateTime?
+  postingUrl       String?
+  location         String?
+  source           String?
+  resumeId         String?
+  resume           Resume?                    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  resumeSnapshotId String? // the frozen version attached at attach-time — see ResumeSnapshot
+  resumeSnapshot   ResumeSnapshot?            @relation(fields: [resumeSnapshotId], references: [id], onDelete: SetNull)
+  notes            String? // markdown
+  externalId       String? // set by the CSV/Notion importer so re-imports are idempotent; not used elsewhere
+  userId           String
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statusHistory    ApplicationStatusHistory[]
+  contacts         ApplicationContact[]
+  interactions     Interaction[]
+  emailThreads     EmailThread[]
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 }
 
 // One row per status change, written automatically by the server action that

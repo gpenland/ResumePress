@@ -4,7 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
+import { listEntryVersionsForUser } from "@/lib/entries";
 import EntryForm from "@/components/EntryForm";
+import EntryHistory from "@/components/EntryHistory";
 import { updateEntry, deleteEntry, cloneEntry } from "../../actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
@@ -27,6 +29,8 @@ export default async function EditEntryPage({
   });
 
   if (!entry) notFound();
+
+  const versions = await listEntryVersionsForUser(userId, id);
 
   const updateWithId = updateEntry.bind(null, id);
   const deleteWithId = deleteEntry.bind(null, id);
@@ -63,6 +67,7 @@ export default async function EditEntryPage({
             action={updateWithId}
             submitLabel="Save Changes"
           />
+          <EntryHistory versions={versions} />
         </CardContent>
       </Card>
     </div>

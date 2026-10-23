@@ -12,12 +12,14 @@ import { cn } from "@/lib/utils";
 export default function ResumeSection({
   applicationId,
   resume,
+  snapshot,
   resumes,
   attach,
   detach,
 }: {
   applicationId: string;
   resume: { id: string; name: string } | null;
+  snapshot: { id: string; createdAt: Date } | null;
   resumes: { id: string; name: string }[];
   attach: (applicationId: string, resumeId: string) => Promise<void>;
   detach: (applicationId: string) => Promise<void>;
@@ -27,10 +29,11 @@ export default function ResumeSection({
   const [selectedId, setSelectedId] = useState(resumes[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
 
-  function handleAttach() {
-    if (!selectedId) return;
+  function handleAttach(resumeId?: string) {
+    const id = resumeId ?? selectedId;
+    if (!id) return;
     startTransition(async () => {
-      await attach(applicationId, selectedId);
+      await attach(applicationId, id);
       setPicking(false);
       router.refresh();
     });
@@ -56,15 +59,24 @@ export default function ResumeSection({
             Open
           </Link>
           <a
-            href={`/api/pdf/${resume.id}`}
+            href={snapshot ? `/api/pdf/snapshot/${snapshot.id}` : `/api/pdf/${resume.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            Recompile PDF
+            Download PDF
           </a>
           <Button type="button" variant="ghost" size="sm" onClick={() => setPicking(true)}>
             Change
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => handleAttach(resume.id)}
+            disabled={isPending}
+          >
+            {isPending ? "Refreshing…" : "Refresh snapshot"}
           </Button>
           <Button
             type="button"
@@ -76,6 +88,12 @@ export default function ResumeSection({
           >
             Remove
           </Button>
+          {snapshot && (
+            <span className="text-xs text-muted-foreground basis-full">
+              Pinned to the version attached on {new Date(snapshot.createdAt).toLocaleDateString()} — editing the
+              resume won&apos;t change this until you refresh the snapshot.
+            </span>
+          )}
         </div>
       ) : resumes.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -88,7 +106,7 @@ export default function ResumeSection({
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
-          <Button type="button" size="sm" onClick={handleAttach} disabled={isPending}>
+          <Button type="button" size="sm" onClick={() => handleAttach()} disabled={isPending}>
             {isPending ? "Attaching…" : "Attach"}
           </Button>
           {resume && (
