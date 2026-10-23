@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
+import { listResumesForUser } from "@/lib/resumes";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import ResumeSection from "@/components/applications/ResumeSection";
 import StatusHistoryList from "@/components/applications/StatusHistoryList";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import { deleteApplication, logApplicationUpdate, setApplicationHistoryNote } from "../actions";
+import { attachResumeToApplication, detachResumeFromApplication } from "../resumeActions";
 
 function formatDate(d: Date | null): string | null {
   if (!d) return null;
@@ -21,7 +23,10 @@ function formatDate(d: Date | null): string | null {
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
-  const application = await getApplicationForUser(userId, id);
+  const [application, resumes] = await Promise.all([
+    getApplicationForUser(userId, id),
+    listResumesForUser(userId),
+  ]);
   if (!application) notFound();
 
   const details: Array<[string, string | null]> = [
@@ -84,7 +89,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         </Card>
       )}
 
-      <ResumeSection applicationId={application.id} resumeId={application.resumeId} />
+      <ResumeSection
+        applicationId={application.id}
+        resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
+        resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
+        attach={attachResumeToApplication}
+        detach={detachResumeFromApplication}
+      />
 
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
