@@ -276,6 +276,7 @@ model GmailAccount {
   email                 String // the connected Gmail address, for display
   encryptedRefreshToken String    @db.Text
   scopes                String[]
+  syncLabelIds          String[]  @default([]) // Gmail label ids the user chose to sync (Phase 2C)
   historyId             String?
   lastSyncAt            DateTime?
   connectedAt           DateTime  @default(now())
