@@ -4,7 +4,7 @@ import type { Interaction } from "@prisma/client";
 import DeleteItemButton from "@/components/DeleteItemButton";
 
 type Props = {
-  interactions: Interaction[];
+  interactions: (Interaction & { emailThread?: { gmailUrl: string | null } | null })[];
   deleteInteraction: (interactionId: string) => Promise<void>;
 };
 
@@ -24,6 +24,16 @@ export default function InteractionTimeline({ interactions, deleteInteraction }:
             <span className="font-medium">{i.type}</span>
             <p className="text-muted-foreground text-xs mt-0.5">{i.summary}</p>
           </div>
+          {i.emailThread?.gmailUrl && (
+            <a
+              href={i.emailThread.gmailUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline hover:text-foreground shrink-0 mt-0.5"
+            >
+              Open email
+            </a>
+          )}
           <DeleteItemButton action={deleteInteraction.bind(null, i.id)} itemName={`${i.type} on ${new Date(i.occurredAt).toLocaleDateString()}`} />
         </div>
       ))}

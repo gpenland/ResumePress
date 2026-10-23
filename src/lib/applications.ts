@@ -206,7 +206,7 @@ export async function getApplicationForUser(userId: string, applicationId: strin
       resume: true,
       statusHistory: { orderBy: { changedAt: "desc" } },
       contacts: { include: { contact: true } },
-      interactions: { orderBy: { occurredAt: "desc" } },
+      interactions: { orderBy: { occurredAt: "desc" }, include: { emailThread: true } },
     },
   });
 }
