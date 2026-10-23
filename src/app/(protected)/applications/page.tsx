@@ -44,6 +44,9 @@ export default async function ApplicationsPage({
               Kanban
             </Link>
           </div>
+          <Link href="/applications/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Import
+          </Link>
           <Link href="/applications/new" className={cn(buttonVariants())}>New Application</Link>
         </div>
       </div>
