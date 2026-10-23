@@ -36,6 +36,7 @@ export async function updateSyncLabelsForUser(userId: string, labelIds: string[]
 type MatchCandidates = {
   contactsByEmail: Map<string, string>;
   applicationByDomain: Map<string, string>;
+  applicationByContact: Map<string, string>;
 };
 
 function extractDomain(url: string): string | null {
@@ -48,7 +49,7 @@ function extractDomain(url: string): string | null {
 }
 
 async function loadMatchCandidates(userId: string): Promise<MatchCandidates> {
-  const [contacts, companies] = await Promise.all([
+  const [contacts, companies, applicationContacts] = await Promise.all([
     prisma.contact.findMany({ where: { userId }, select: { id: true, emails: true } }),
     prisma.company.findMany({
       where: { userId },
@@ -57,6 +58,10 @@ async function loadMatchCandidates(userId: string): Promise<MatchCandidates> {
         website: true,
         applications: { select: { id: true }, orderBy: { updatedAt: "desc" }, take: 1 },
       },
+    }),
+    prisma.applicationContact.findMany({
+      where: { userId },
+      select: { contactId: true, application: { select: { id: true, updatedAt: true } } },
     }),
   ]);
 
@@ -72,13 +77,33 @@ async function loadMatchCandidates(userId: string): Promise<MatchCandidates> {
     if (domain) applicationByDomain.set(domain, company.applications[0].id);
   }
 
-  return { contactsByEmail, applicationByDomain };
+  // A contact can be linked to more than one application (e.g. re-applying
+  // next cycle); when picking one to push an email through to, prefer the
+  // application that was touched most recently.
+  const applicationByContact = new Map<string, { id: string; updatedAt: Date }>();
+  for (const ac of applicationContacts) {
+    const current = applicationByContact.get(ac.contactId);
+    if (!current || ac.application.updatedAt > current.updatedAt) {
+      applicationByContact.set(ac.contactId, ac.application);
+    }
+  }
+
+  return {
+    contactsByEmail,
+    applicationByDomain,
+    applicationByContact: new Map([...applicationByContact].map(([contactId, app]) => [contactId, app.id])),
+  };
 }
 
 /**
  * Exact participant-email-to-contact match only; anything else is a
  * suggestion, never auto-linked (PLAN.md §4: "Auto-link only on exact
  * contact-email matches. Everything else goes to a triage queue").
+ *
+ * When a thread matches a contact who is already linked to an application
+ * (via ApplicationContact — an explicit link the user made, not a guess),
+ * that application link is pushed through onto the thread/interaction too,
+ * taking priority over the weaker company-domain guess below.
  */
 function matchThread(
   thread: GmailThread,
@@ -90,6 +115,13 @@ function matchThread(
     if (match) {
       contactId = match;
       break;
+    }
+  }
+
+  if (contactId) {
+    const linkedApplicationId = candidates.applicationByContact.get(contactId);
+    if (linkedApplicationId) {
+      return { contactId, applicationId: linkedApplicationId, matchStatus: "auto" };
     }
   }
 
@@ -137,10 +169,32 @@ async function createInteractionFromEmailThreadIfMissing(
  * sync could never match later: the History API only returns threads with
  * *new* Gmail activity, so a contact added after the fact would never
  * trigger a re-look at a thread with no new messages.
+ *
+ * Also backfills the application link on threads that already auto/confirmed-
+ * matched a contact but have no applicationId yet — covers a contact being
+ * linked to an application (ApplicationContact) *after* their email already
+ * synced, which would otherwise never push through to that application.
  */
 async function rematchUnmatchedThreadsForUser(userId: string, candidates: MatchCandidates): Promise<number> {
-  const unmatched = await prisma.emailThread.findMany({ where: { userId, matchStatus: "unmatched" } });
+  const [unmatched, missingApplicationLink] = await Promise.all([
+    prisma.emailThread.findMany({ where: { userId, matchStatus: "unmatched" } }),
+    prisma.emailThread.findMany({
+      where: { userId, matchStatus: { in: ["auto", "confirmed"] }, matchedApplicationId: null, matchedContactId: { not: null } },
+    }),
+  ]);
   let rematched = 0;
+
+  for (const thread of missingApplicationLink) {
+    const applicationId = thread.matchedContactId ? candidates.applicationByContact.get(thread.matchedContactId) : undefined;
+    if (!applicationId) continue;
+
+    await prisma.emailThread.updateMany({ where: { id: thread.id, userId }, data: { matchedApplicationId: applicationId } });
+    await prisma.interaction.updateMany({
+      where: { emailThreadId: thread.id, userId, applicationId: null },
+      data: { applicationId },
+    });
+    rematched++;
+  }
 
   for (const thread of unmatched) {
     const match = matchThread(

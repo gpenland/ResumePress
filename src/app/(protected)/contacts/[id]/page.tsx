@@ -42,7 +42,14 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{contact.name}</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {contact.emails.join(", ")}
+            {contact.emails.map((email, idx) => (
+              <span key={email}>
+                {idx > 0 && ", "}
+                <a href={`mailto:${email}`} className="underline hover:text-foreground">
+                  {email}
+                </a>
+              </span>
+            ))}
             {contact.linkedinUrl && (
               <>
                 {contact.emails.length > 0 && " · "}

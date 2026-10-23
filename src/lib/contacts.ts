@@ -105,7 +105,7 @@ export async function getContactForUser(userId: string, contactId: string) {
     where: { id: contactId, userId },
     include: {
       company: true,
-      interactions: { orderBy: { occurredAt: "desc" } },
+      interactions: { orderBy: { occurredAt: "desc" }, include: { emailThread: true } },
       applications: {
         include: { application: { include: { company: true } } },
       },
