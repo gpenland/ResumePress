@@ -5,10 +5,9 @@ import { getUserId } from "@/lib/auth";
 import { listApplicationsForUser } from "@/lib/applications";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { deleteApplication, updateApplicationStatus, importApplicationsCsv } from "./actions";
+import { deleteApplication, updateApplicationStatus } from "./actions";
 import ApplicationsList from "@/components/applications/ApplicationsList";
 import ApplicationsKanban from "@/components/applications/ApplicationsKanban";
-import ImportCsvDialog from "@/components/applications/ImportCsvDialog";
 
 export default async function ApplicationsPage({
   searchParams,
@@ -45,10 +44,6 @@ export default async function ApplicationsPage({
               Kanban
             </Link>
           </div>
-          <a href="/api/applications/export" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            Export CSV
-          </a>
-          <ImportCsvDialog importApplicationsCsv={importApplicationsCsv} />
           <Link href="/applications/new" className={cn(buttonVariants())}>New Application</Link>
         </div>
       </div>

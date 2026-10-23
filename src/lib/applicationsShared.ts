@@ -6,19 +6,16 @@
 
 import type { Application, Company } from "@prisma/client";
 
-// Suggested statuses from PLAN.md §3. Stored as a free-form string column (not
-// an enum), so this list is a UI affordance, not a DB constraint — importers
-// and future custom statuses aren't blocked by it.
+// Suggested statuses from PLAN.md §3, trimmed per GitHub issue #17 (fewer
+// statuses; use status-history notes for anything finer-grained). Stored as a
+// free-form string column (not an enum), so this list is a UI affordance, not
+// a DB constraint — importers and future custom statuses aren't blocked by it.
 export const APPLICATION_STATUSES = [
-  "Wishlist",
-  "Preparing",
   "Applied",
-  "OA/Screen",
+  "OA",
   "Interviewing",
   "Offer",
-  "Accepted",
   "Rejected",
-  "Withdrawn",
   "Ghosted",
 ] as const;
 
@@ -38,12 +35,9 @@ export const APPLICATION_CSV_COLUMNS = [
   "term",
   "status",
   "appliedAt",
-  "deadline",
   "postingUrl",
   "location",
   "source",
-  "priority",
-  "nextFollowUpAt",
   "notes",
 ] as const;
 
@@ -69,12 +63,9 @@ export function applicationsToCsv(applications: ApplicationWithCompany[]): strin
       csvField(app.term),
       csvField(app.status),
       csvField(isoDate(app.appliedAt)),
-      csvField(isoDate(app.deadline)),
       csvField(app.postingUrl),
       csvField(app.location),
       csvField(app.source),
-      csvField(app.priority),
-      csvField(isoDate(app.nextFollowUpAt)),
       csvField(app.notes),
     ].join(",")
   );

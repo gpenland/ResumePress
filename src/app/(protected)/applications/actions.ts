@@ -6,6 +6,8 @@ import {
   createApplicationForUser,
   updateApplicationForUser,
   updateApplicationStatusForUser,
+  logApplicationUpdateForUser,
+  setApplicationHistoryNoteForUser,
   importApplicationCsvRowsForUser,
   parseApplicationsCsv,
   type ApplicationInput,
@@ -21,12 +23,9 @@ function inputFromFormData(formData: FormData): ApplicationInput {
     term: (formData.get("term") as string) || null,
     status: (formData.get("status") as string) || undefined,
     appliedAt: (formData.get("appliedAt") as string) || null,
-    deadline: (formData.get("deadline") as string) || null,
     postingUrl: (formData.get("postingUrl") as string) || null,
     location: (formData.get("location") as string) || null,
     source: (formData.get("source") as string) || null,
-    priority: (formData.get("priority") as string) || null,
-    nextFollowUpAt: (formData.get("nextFollowUpAt") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };
 }
@@ -56,6 +55,24 @@ export async function updateApplicationStatus(id: string, status: string) {
 
   revalidatePath("/applications");
   revalidatePath(`/applications/${id}`);
+}
+
+/** Logs a note-only history entry without changing status (issue #17). */
+export async function logApplicationUpdate(applicationId: string, note: string) {
+  const userId = await requireUserId();
+  const result = await logApplicationUpdateForUser(userId, applicationId, note);
+  if (!result.ok) notFound();
+
+  revalidatePath(`/applications/${applicationId}`);
+}
+
+/** Adds or edits the note on an existing status-history entry. */
+export async function setApplicationHistoryNote(applicationId: string, historyId: string, note: string) {
+  const userId = await requireUserId();
+  const result = await setApplicationHistoryNoteForUser(userId, historyId, note);
+  if (!result.ok) notFound();
+
+  revalidatePath(`/applications/${applicationId}`);
 }
 
 export async function deleteApplication(id: string) {

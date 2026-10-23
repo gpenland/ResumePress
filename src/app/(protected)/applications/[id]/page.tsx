@@ -9,8 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/applications/StatusBadge";
 import ResumeSection from "@/components/applications/ResumeSection";
+import StatusHistoryList from "@/components/applications/StatusHistoryList";
 import DeleteItemButton from "@/components/DeleteItemButton";
-import { deleteApplication } from "../actions";
+import { deleteApplication, logApplicationUpdate, setApplicationHistoryNote } from "../actions";
 
 function formatDate(d: Date | null): string | null {
   if (!d) return null;
@@ -27,10 +28,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     ["Term", application.term],
     ["Location", application.location],
     ["Applied", formatDate(application.appliedAt)],
-    ["Deadline", formatDate(application.deadline)],
-    ["Next follow-up", formatDate(application.nextFollowUpAt)],
     ["Source", application.source],
-    ["Priority", application.priority],
   ].filter(([, v]) => v) as Array<[string, string]>;
 
   return (
@@ -92,18 +90,12 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
           Status History
         </p>
-        <div className="space-y-1.5">
-          {application.statusHistory.map((h) => (
-            <div key={h.id} className="flex items-center gap-2 text-sm px-1">
-              <span className="text-muted-foreground text-xs w-32 shrink-0">
-                {new Date(h.changedAt).toLocaleString()}
-              </span>
-              <span>
-                {h.fromStatus ? `${h.fromStatus} → ${h.toStatus}` : `Created as ${h.toStatus}`}
-              </span>
-            </div>
-          ))}
-        </div>
+        <StatusHistoryList
+          applicationId={application.id}
+          history={application.statusHistory}
+          logUpdate={logApplicationUpdate}
+          setNote={setApplicationHistoryNote}
+        />
       </div>
     </div>
   );

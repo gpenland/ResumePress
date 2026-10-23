@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { APPLICATION_STATUSES, type ApplicationWithCompany } from "@/lib/applicationsShared";
 
 type Props = {
@@ -15,6 +17,10 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
+  // Empty columns are hidden by default (issue #17), but while a card is
+  // being dragged we show every status so there's always somewhere to drop
+  // it — including a status with nothing in it yet.
+  const [isDragging, setIsDragging] = useState(false);
 
   function handleDrop(status: string, e: React.DragEvent) {
     e.preventDefault();
@@ -27,9 +33,26 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
     });
   }
 
+  if (applications.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center py-16 text-center gap-3">
+          <p className="text-muted-foreground text-sm">No applications yet</p>
+          <Link href="/applications/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Add your first application
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const visibleStatuses = APPLICATION_STATUSES.filter(
+    (status) => isDragging || applications.some((a) => a.status === status)
+  );
+
   return (
     <div className="flex gap-4 overflow-x-auto pb-4" aria-busy={isPending}>
-      {APPLICATION_STATUSES.map((status) => {
+      {visibleStatuses.map((status) => {
         const columnApps = applications.filter((a) => a.status === status);
         return (
           <div
@@ -52,7 +75,11 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
               <Card
                 key={app.id}
                 draggable
-                onDragStart={(e) => e.dataTransfer.setData("text/application-id", app.id)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/application-id", app.id);
+                  setIsDragging(true);
+                }}
+                onDragEnd={() => setIsDragging(false)}
                 className="py-0 cursor-grab active:cursor-grabbing hover:bg-muted/40 transition-colors"
               >
                 <CardContent className="p-3">
