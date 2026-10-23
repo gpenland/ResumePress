@@ -10,6 +10,7 @@ import {
   type ContactInput,
 } from "@/lib/contacts";
 import { createInteractionForUser, deleteInteractionForUser } from "@/lib/interactions";
+import { ignoreEmailThreadMatchForUser } from "@/lib/emailThreads";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -81,7 +82,21 @@ export async function logInteraction(formData: FormData) {
   revalidatePath("/contacts");
 }
 
-/** Takes only the interaction's own id — looks up which contact/application to revalidate itself, so callers on either side (contact or application detail page) can pass it directly with no `.bind`. */
+/**
+ * Takes only the interaction's own id — looks up which contact/application
+ * to revalidate itself, so callers on either side (contact or application
+ * detail page) can pass it directly with no `.bind`.
+ *
+ * If this interaction was mirrored from a Gmail thread (has an
+ * emailThreadId), also severs that thread's match (-> "ignored", see
+ * ignoreEmailThreadMatchForUser) instead of leaving it "auto" with no
+ * visible trace. Otherwise deleting it here wouldn't actually remove the
+ * link: the thread would still say matchStatus "auto", and the next sync
+ * that happens to touch it would silently recreate the very interaction
+ * just deleted. Going through "ignored" also means it's not lost — it's
+ * findable and restorable from /triage, rather than this delete being a
+ * dead end with no undo.
+ */
 export async function deleteInteraction(interactionId: string) {
   const userId = await requireUserId();
   const interaction = await prisma.interaction.findFirst({ where: { id: interactionId, userId } });
@@ -89,6 +104,11 @@ export async function deleteInteraction(interactionId: string) {
 
   const result = await deleteInteractionForUser(userId, interactionId);
   if (!result.ok) notFound();
+
+  if (interaction.emailThreadId) {
+    await ignoreEmailThreadMatchForUser(userId, interaction.emailThreadId);
+    revalidatePath("/triage");
+  }
 
   if (interaction.contactId) revalidatePath(`/contacts/${interaction.contactId}`);
   if (interaction.applicationId) revalidatePath(`/applications/${interaction.applicationId}`);

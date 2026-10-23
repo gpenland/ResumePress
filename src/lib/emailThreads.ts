@@ -130,7 +130,44 @@ async function createInteractionFromEmailThreadIfMissing(
   });
 }
 
-export type SyncResult = { ok: true; threadsUpserted: number } | { ok: false; error: string };
+/**
+ * Re-checks already-synced-but-unmatched threads against the current
+ * contact/company list, using data already stored on EmailThread — no Gmail
+ * API call needed. Without this, a thread that didn't match on its first
+ * sync could never match later: the History API only returns threads with
+ * *new* Gmail activity, so a contact added after the fact would never
+ * trigger a re-look at a thread with no new messages.
+ */
+async function rematchUnmatchedThreadsForUser(userId: string, candidates: MatchCandidates): Promise<number> {
+  const unmatched = await prisma.emailThread.findMany({ where: { userId, matchStatus: "unmatched" } });
+  let rematched = 0;
+
+  for (const thread of unmatched) {
+    const match = matchThread(
+      { id: thread.gmailThreadId, subject: thread.subject, snippet: thread.snippet, participants: thread.participants, lastMessageAt: thread.lastMessageAt ?? new Date() },
+      candidates
+    );
+    if (match.matchStatus !== "auto" && match.applicationId === thread.matchedApplicationId) {
+      continue; // nothing new to persist — still unmatched, same (or no) suggested application
+    }
+
+    await prisma.emailThread.update({
+      where: { id: thread.id },
+      data: { matchedContactId: match.contactId, matchedApplicationId: match.applicationId, matchStatus: match.matchStatus },
+    });
+    rematched++;
+
+    if (match.matchStatus === "auto") {
+      await createInteractionFromEmailThreadIfMissing(userId, thread, match.contactId, match.applicationId);
+    }
+  }
+
+  return rematched;
+}
+
+export type SyncResult =
+  | { ok: true; threadsUpserted: number; rematched: number }
+  | { ok: false; error: string };
 
 /**
  * Manual "Sync now" (PLAN.md §4). Uses the History API when a baseline
@@ -156,6 +193,8 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   }
 
   const candidates = await loadMatchCandidates(userId);
+  const rematched = await rematchUnmatchedThreadsForUser(userId, candidates);
+
   const threadIds = new Set<string>();
 
   for (const labelId of account.syncLabelIds) {
@@ -235,7 +274,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     data: { historyId: newHistoryId, lastSyncAt: new Date() },
   });
 
-  return { ok: true, threadsUpserted: upserted };
+  return { ok: true, threadsUpserted: upserted, rematched };
 }
 
 export async function listTriageThreadsForUser(userId: string) {
@@ -247,6 +286,39 @@ export async function listTriageThreadsForUser(userId: string) {
     },
     orderBy: { lastMessageAt: "desc" },
   });
+}
+
+export async function listIgnoredThreadsForUser(userId: string) {
+  return prisma.emailThread.findMany({
+    where: { userId, matchStatus: "ignored" },
+    orderBy: { lastMessageAt: "desc" },
+  });
+}
+
+/** Un-ignores a thread back to "unmatched" so it reappears in triage for a fresh manual match — the undo path for ignoreEmailThreadMatchForUser. */
+export async function restoreEmailThreadMatchForUser(userId: string, emailThreadId: string): Promise<{ ok: boolean }> {
+  const { count } = await prisma.emailThread.updateMany({
+    where: { id: emailThreadId, userId },
+    data: { matchStatus: "unmatched", matchedContactId: null, matchedApplicationId: null },
+  });
+  return { ok: count > 0 };
+}
+
+/**
+ * Severs an email thread's link to a contact/application — used both by the
+ * triage queue's own "Ignore" and by deleteInteraction below, when the
+ * interaction being deleted came from a Gmail sync. Clears the match fields
+ * (not just the status) so the thread doesn't sit "ignored" while still
+ * displaying a stale matchedContact/matchedApplication, and so a future
+ * sync's rematch pass (which only touches "unmatched" threads) leaves it
+ * alone rather than silently relinking it.
+ */
+export async function ignoreEmailThreadMatchForUser(userId: string, emailThreadId: string): Promise<{ ok: boolean }> {
+  const { count } = await prisma.emailThread.updateMany({
+    where: { id: emailThreadId, userId },
+    data: { matchStatus: "ignored", matchedContactId: null, matchedApplicationId: null },
+  });
+  return { ok: count > 0 };
 }
 
 export async function confirmEmailThreadMatchForUser(
@@ -266,12 +338,4 @@ export async function confirmEmailThreadMatchForUser(
     await createInteractionFromEmailThreadIfMissing(userId, thread, contactId, applicationId);
   }
   return { ok: true };
-}
-
-export async function ignoreEmailThreadMatchForUser(userId: string, emailThreadId: string): Promise<{ ok: boolean }> {
-  const { count } = await prisma.emailThread.updateMany({
-    where: { id: emailThreadId, userId },
-    data: { matchStatus: "ignored" },
-  });
-  return { ok: count > 0 };
 }
