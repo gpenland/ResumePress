@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default async function Nav() {
   const session = await auth();
@@ -37,6 +38,7 @@ export default async function Nav() {
               <Input name="q" placeholder="Search..." className="h-8 w-40" />
             </form>
           )}
+          <ThemeToggle />
           {session?.user ? (
             <UserMenu
               user={session.user}
