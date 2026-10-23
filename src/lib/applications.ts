@@ -5,7 +5,6 @@ import {
   APPLICATION_STATUSES,
   type ApplicationStatus,
   type ApplicationWithCompany,
-  type ApplicationCsvRow,
 } from "@/lib/applicationsShared";
 import type { MappedApplicationRow } from "@/lib/notionImportShared";
 
@@ -213,30 +212,6 @@ export async function getApplicationForUser(userId: string, applicationId: strin
 }
 
 export type ApplicationHistoryEntry = ApplicationStatusHistory;
-
-export async function importApplicationCsvRowsForUser(
-  userId: string,
-  rows: ApplicationCsvRow[]
-): Promise<{ imported: number }> {
-  let imported = 0;
-  for (const row of rows) {
-    await createApplicationForUser(userId, {
-      companyName: row.company,
-      roleTitle: row.roleTitle,
-      term: row.term || null,
-      status: APPLICATION_STATUSES.includes(row.status as ApplicationStatus)
-        ? row.status
-        : "Applied",
-      appliedAt: row.appliedAt || null,
-      postingUrl: row.postingUrl || null,
-      location: row.location || null,
-      source: row.source || null,
-      notes: row.notes || null,
-    });
-    imported++;
-  }
-  return { imported };
-}
 
 /**
  * Commits a Notion-importer dry-run (PLAN.md §6 Phase 3). Idempotent on

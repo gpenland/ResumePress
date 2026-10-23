@@ -48,7 +48,7 @@ export function csvField(value: string | null | undefined): string {
 
 export type CsvTable = { headers: string[]; rows: string[][] };
 
-/** Splits raw CSV text into a header row and data rows, with no assumptions about column names — unlike parseApplicationsCsv, which expects this app's own fixed export format. */
+/** Splits raw CSV text into a header row and data rows, with no assumptions about column names — used by the Notion importer's column-mapping step, which can't assume a fixed format. */
 export function parseCsvTable(text: string): CsvTable {
   const lines = text.split(/\r\n|\n|\r/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
