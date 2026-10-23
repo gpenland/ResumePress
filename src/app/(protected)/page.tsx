@@ -48,7 +48,7 @@ export default async function HomePage() {
           ) : (
             <div className="space-y-2">
               {followUpContacts.slice(0, 5).map((c) => (
-                <Link key={c.id} href={`/contacts/${c.id}`}>
+                <Link key={c.id} href={`/contacts/${c.id}`} className="block">
                   <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <span className="text-sm font-medium">{c.name}</span>
@@ -75,7 +75,7 @@ export default async function HomePage() {
           {triageThreads.length === 0 ? (
             <EmptyState message="Nothing pending triage" />
           ) : (
-            <Link href="/triage">
+            <Link href="/triage" className="block">
               <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                 <CardContent className="flex items-center justify-between py-3 px-4">
                   <span className="text-sm">
@@ -102,7 +102,7 @@ export default async function HomePage() {
           ) : (
             <div className="space-y-2">
               {recentResumes.map((r) => (
-                <Link key={r.id} href={`/resumes/${r.id}`}>
+                <Link key={r.id} href={`/resumes/${r.id}`} className="block">
                   <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <span className="text-sm font-medium">{r.name}</span>
@@ -129,7 +129,7 @@ export default async function HomePage() {
           ) : (
             <div className="space-y-2">
               {recentEntries.map((e) => (
-                <Link key={e.id} href={`/entries/${e.id}/edit`}>
+                <Link key={e.id} href={`/entries/${e.id}/edit`} className="block">
                   <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                     <CardContent className="flex items-center justify-between py-3 px-4">
                       <div>

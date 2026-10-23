@@ -51,6 +51,8 @@ export default function ApplicationForm({ companies, application, action, submit
             defaultValue={application?.company.name ?? ""}
             required
             placeholder="e.g. Acme Corp"
+            autoComplete="off"
+            data-1p-ignore
           />
           <datalist id="company-suggestions">
             {companies.map((c) => (
