@@ -8,10 +8,7 @@ import {
   updateApplicationStatusForUser,
   logApplicationUpdateForUser,
   setApplicationHistoryNoteForUser,
-  importApplicationCsvRowsForUser,
-  parseApplicationsCsv,
   type ApplicationInput,
-  type ApplicationCsvRow,
 } from "@/lib/applications";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
@@ -82,22 +79,4 @@ export async function deleteApplication(id: string) {
 
   revalidatePath("/applications");
   redirect("/applications");
-}
-
-export type ImportCsvResult =
-  | { ok: true; imported: number }
-  | { ok: false; errors: string[] };
-
-/** Commits a dry-run-previewed CSV import. Re-parses server-side rather than
- * trusting the client's parse, since the client preview is just UX. */
-export async function importApplicationsCsv(csvText: string): Promise<ImportCsvResult> {
-  const userId = await requireUserId();
-  const { rows, errors } = parseApplicationsCsv(csvText);
-  if (errors.length > 0 && rows.length === 0) {
-    return { ok: false, errors };
-  }
-
-  const { imported } = await importApplicationCsvRowsForUser(userId, rows as ApplicationCsvRow[]);
-  revalidatePath("/applications");
-  return { ok: true, imported };
 }

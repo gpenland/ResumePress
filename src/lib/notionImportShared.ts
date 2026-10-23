@@ -1,8 +1,7 @@
 // Pure column-mapping logic for the Notion CSV importer (PLAN.md §6 Phase 3).
-// Unlike applicationsShared.ts's parseApplicationsCsv (which expects this
-// app's own fixed export column names), a Notion export's columns are
-// arbitrary — so this is a mapping step, not a fixed parser. No Prisma
-// import — safe for client components.
+// A Notion export's columns are arbitrary and won't match any fixed format,
+// so this is a mapping step, not a fixed parser. No Prisma import — safe for
+// client components.
 
 export { parseCsvTable } from "@/lib/csv";
 
