@@ -19,12 +19,9 @@ export type ApplicationInput = {
   term?: string | null;
   status?: string;
   appliedAt?: string | null;
-  deadline?: string | null;
   postingUrl?: string | null;
   location?: string | null;
   source?: string | null;
-  priority?: string | null;
-  nextFollowUpAt?: string | null;
   notes?: string | null;
 };
 
@@ -39,7 +36,7 @@ export async function createApplicationForUser(
   data: ApplicationInput
 ): Promise<Application> {
   const company = await findOrCreateCompanyForUser(userId, data.companyName);
-  const status = data.status || "Wishlist";
+  const status = data.status || "Applied";
 
   return prisma.$transaction(async (tx) => {
     const application = await tx.application.create({
@@ -49,12 +46,9 @@ export async function createApplicationForUser(
         term: data.term ?? null,
         status,
         appliedAt: toDate(data.appliedAt),
-        deadline: toDate(data.deadline),
         postingUrl: data.postingUrl ?? null,
         location: data.location ?? null,
         source: data.source ?? null,
-        priority: data.priority ?? null,
-        nextFollowUpAt: toDate(data.nextFollowUpAt),
         notes: data.notes ?? null,
         userId,
       },
@@ -93,12 +87,9 @@ export async function updateApplicationForUser(
         term: data.term ?? null,
         status,
         appliedAt: toDate(data.appliedAt),
-        deadline: toDate(data.deadline),
         postingUrl: data.postingUrl ?? null,
         location: data.location ?? null,
         source: data.source ?? null,
-        priority: data.priority ?? null,
-        nextFollowUpAt: toDate(data.nextFollowUpAt),
         notes: data.notes ?? null,
       },
     });
@@ -149,6 +140,47 @@ export async function updateApplicationStatusForUser(
   return { ok: true };
 }
 
+/**
+ * Adds a note-only history entry (fromStatus === toStatus === current status)
+ * without changing the application's status. GitHub issue #17: lets a user
+ * log an event ("2nd interview scheduled") without inventing a custom status.
+ */
+export async function logApplicationUpdateForUser(
+  userId: string,
+  applicationId: string,
+  note: string
+): Promise<{ ok: boolean }> {
+  const existing = await prisma.application.findFirst({
+    where: { id: applicationId, userId },
+  });
+  if (!existing) return { ok: false };
+
+  await prisma.applicationStatusHistory.create({
+    data: {
+      applicationId,
+      fromStatus: existing.status,
+      toStatus: existing.status,
+      note,
+      userId,
+    },
+  });
+
+  return { ok: true };
+}
+
+/** Adds or edits the note on an existing history entry after the fact. */
+export async function setApplicationHistoryNoteForUser(
+  userId: string,
+  historyId: string,
+  note: string
+): Promise<{ ok: boolean }> {
+  const { count } = await prisma.applicationStatusHistory.updateMany({
+    where: { id: historyId, userId },
+    data: { note: note || null },
+  });
+  return { ok: count > 0 };
+}
+
 export async function listApplicationsForUser(
   userId: string,
   opts?: { status?: string; companyId?: string }
@@ -189,14 +221,11 @@ export async function importApplicationCsvRowsForUser(
       term: row.term || null,
       status: APPLICATION_STATUSES.includes(row.status as ApplicationStatus)
         ? row.status
-        : "Wishlist",
+        : "Applied",
       appliedAt: row.appliedAt || null,
-      deadline: row.deadline || null,
       postingUrl: row.postingUrl || null,
       location: row.location || null,
       source: row.source || null,
-      priority: row.priority || null,
-      nextFollowUpAt: row.nextFollowUpAt || null,
       notes: row.notes || null,
     });
     imported++;

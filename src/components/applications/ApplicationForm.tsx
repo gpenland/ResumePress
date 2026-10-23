@@ -22,10 +22,14 @@ function toDateInputValue(d: Date | string | null | undefined): string {
   return date.toISOString().slice(0, 10);
 }
 
+function todayInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function ApplicationForm({ companies, application, action, submitLabel }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
-  const [status, setStatus] = useState(application?.status ?? "Wishlist");
+  const [status, setStatus] = useState(application?.status ?? "Applied");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -82,35 +86,25 @@ export default function ApplicationForm({ companies, application, action, submit
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="appliedAt">Applied</Label>
-          <Input id="appliedAt" name="appliedAt" type="date" defaultValue={toDateInputValue(application?.appliedAt)} />
+          <Input
+            id="appliedAt"
+            name="appliedAt"
+            type="date"
+            defaultValue={application ? toDateInputValue(application.appliedAt) : todayInputValue()}
+          />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="deadline">Deadline</Label>
-          <Input id="deadline" name="deadline" type="date" defaultValue={toDateInputValue(application?.deadline)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="nextFollowUpAt">Next follow-up</Label>
-          <Input id="nextFollowUpAt" name="nextFollowUpAt" type="date" defaultValue={toDateInputValue(application?.nextFollowUpAt)} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="postingUrl">Posting URL</Label>
           <Input id="postingUrl" name="postingUrl" type="url" placeholder="https://..." defaultValue={application?.postingUrl ?? ""} />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="source">Source</Label>
-          <Input id="source" name="source" placeholder="e.g. Career fair, referral" defaultValue={application?.source ?? ""} />
-        </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="priority">Priority</Label>
-        <Input id="priority" name="priority" placeholder="e.g. Target, Reach, Safety" defaultValue={application?.priority ?? ""} />
+        <Label htmlFor="source">Source</Label>
+        <Input id="source" name="source" placeholder="e.g. Career fair, referral" defaultValue={application?.source ?? ""} />
       </div>
 
       <div className="space-y-1.5">

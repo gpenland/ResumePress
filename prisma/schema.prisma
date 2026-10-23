@@ -148,41 +148,43 @@ model Company {
 }
 
 model Application {
-  id             String                     @id @default(cuid())
-  companyId      String
-  company        Company                    @relation(fields: [companyId], references: [id])
-  roleTitle      String
-  term           String? // e.g. "Summer 2027"
-  status         String                     @default("Wishlist") // free-form, not an enum — see PLAN.md "keep statuses configurable"
-  appliedAt      DateTime?
-  deadline       DateTime?
-  postingUrl     String?
-  location       String?
-  source         String?
-  priority       String?
-  resumeId       String?
-  resume         Resume?                    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  nextFollowUpAt DateTime?
-  notes          String? // markdown
-  externalId     String? // set by the CSV/Notion importer so re-imports are idempotent; not used elsewhere
-  userId         String
-  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  statusHistory  ApplicationStatusHistory[]
-  contacts       ApplicationContact[]
-  interactions   Interaction[]
-  emailThreads   EmailThread[]
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  id            String                     @id @default(cuid())
+  companyId     String
+  company       Company                    @relation(fields: [companyId], references: [id])
+  roleTitle     String
+  term          String? // e.g. "Summer 2027"
+  status        String                     @default("Applied") // free-form, not an enum — see PLAN.md "keep statuses configurable"
+  appliedAt     DateTime?
+  postingUrl    String?
+  location      String?
+  source        String?
+  resumeId      String?
+  resume        Resume?                    @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  notes         String? // markdown
+  externalId    String? // set by the CSV/Notion importer so re-imports are idempotent; not used elsewhere
+  userId        String
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statusHistory ApplicationStatusHistory[]
+  contacts      ApplicationContact[]
+  interactions  Interaction[]
+  emailThreads  EmailThread[]
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
 }
 
 // One row per status change, written automatically by the server action that
-// updates Application.status (same transaction) — never written directly by a user.
+// updates Application.status (same transaction), plus user-authored rows: a
+// note added/edited on an existing entry after the fact, or a manual
+// "log update" entry with the same from/to status and just a note (GitHub
+// issue #17 — covers things like "2nd interview scheduled" without adding a
+// custom status).
 model ApplicationStatusHistory {
   id            String      @id @default(cuid())
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   fromStatus    String?
   toStatus      String
+  note          String?
   changedAt     DateTime    @default(now())
   userId        String
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)

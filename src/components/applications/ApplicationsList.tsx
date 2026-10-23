@@ -98,8 +98,8 @@ export default function ApplicationsList({ applications, status, deleteApplicati
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {[app.term, app.location].filter(Boolean).join(" · ")}
-                      {formatDate(app.deadline) && (
-                        <span className="ml-2">Deadline {formatDate(app.deadline)}</span>
+                      {formatDate(app.appliedAt) && (
+                        <span className="ml-2">Applied {formatDate(app.appliedAt)}</span>
                       )}
                     </p>
                   </div>
