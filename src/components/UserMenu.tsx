@@ -42,6 +42,9 @@ export default function UserMenu({
         <DropdownMenuItem render={<Link href="/settings/gmail" />}>
           Gmail
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/triage" />}>
+          Email Triage
+        </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={() => {
