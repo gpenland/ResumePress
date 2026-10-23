@@ -5,18 +5,23 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
+import { createResumeSnapshotForUser } from "@/lib/resumes";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
+// Attaching (or re-attaching, e.g. via the "Refresh" action) always freezes
+// a fresh ResumeSnapshot — see createResumeSnapshotForUser. GitHub issue
+// #26: the application must keep pointing at the resume content as it was
+// at attach time, not drift if the resume's entries are edited afterward.
 export async function attachResumeToApplication(applicationId: string, resumeId: string) {
   const userId = await requireUserId();
 
-  const resume = await prisma.resume.findFirst({ where: { id: resumeId, userId } });
-  if (!resume) notFound();
+  const snapshot = await createResumeSnapshotForUser(userId, resumeId);
+  if (!snapshot) notFound();
 
   const { count } = await prisma.application.updateMany({
     where: { id: applicationId, userId },
-    data: { resumeId },
+    data: { resumeId, resumeSnapshotId: snapshot.id },
   });
   if (count === 0) notFound();
 
@@ -28,7 +33,7 @@ export async function detachResumeFromApplication(applicationId: string) {
 
   const { count } = await prisma.application.updateMany({
     where: { id: applicationId, userId },
-    data: { resumeId: null },
+    data: { resumeId: null, resumeSnapshotId: null },
   });
   if (count === 0) notFound();
 
