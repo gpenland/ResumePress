@@ -80,6 +80,7 @@ export default function ApplicationLinks({ contactId, linked, applicationOptions
           <select
             name="applicationId"
             required
+            aria-label="Application"
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             defaultValue=""
           >

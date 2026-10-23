@@ -90,7 +90,7 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
             <Input name="occurredAt" type="date" defaultValue={todayInputValue()} />
 
             {contactOptions.length > 0 && (
-              <select name="contactId" defaultValue="" className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm">
+              <select name="contactId" aria-label="Contact" defaultValue="" className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm">
                 <option value="">No contact</option>
                 {contactOptions.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -99,7 +99,7 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
             )}
 
             {applicationOptions.length > 0 && (
-              <select name="applicationId" defaultValue="" className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm">
+              <select name="applicationId" aria-label="Application" defaultValue="" className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm">
                 <option value="">No application</option>
                 {applicationOptions.map((a) => (
                   <option key={a.id} value={a.id}>{a.label}</option>

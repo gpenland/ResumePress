@@ -33,8 +33,15 @@ export function splitCsvLine(line: string): string[] {
   return fields;
 }
 
+// A leading '=', '+', '-', or '@' sign is a well-known CSV/formula-injection
+// vector: Excel/Sheets execute the cell as a formula on open. Prefixing with a
+// single quote defuses it while keeping the value visible — the standard
+// mitigation (flagged by the Phase 4 audit).
+const FORMULA_PREFIX = /^[=+\-@]/;
+
 export function csvField(value: string | null | undefined): string {
-  const v = value ?? "";
+  let v = value ?? "";
+  if (FORMULA_PREFIX.test(v)) v = `'${v}`;
   if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
   return v;
 }
