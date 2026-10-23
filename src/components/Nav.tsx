@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
@@ -31,6 +32,11 @@ export default async function Nav() {
               Categories
             </Link>
           </nav>
+          {session?.user && (
+            <form action="/search" method="GET" className="hidden sm:block shrink-0">
+              <Input name="q" placeholder="Search..." className="h-8 w-40" />
+            </form>
+          )}
           {session?.user ? (
             <UserMenu
               user={session.user}
