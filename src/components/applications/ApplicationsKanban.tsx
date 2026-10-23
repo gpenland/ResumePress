@@ -33,6 +33,13 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
     });
   }
 
+  function handleMoveTo(applicationId: string, status: string) {
+    startTransition(async () => {
+      await updateStatus(applicationId, status);
+      router.refresh();
+    });
+  }
+
   if (applications.length === 0) {
     return (
       <Card className="border-dashed">
@@ -82,12 +89,23 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
                 onDragEnd={() => setIsDragging(false)}
                 className="py-0 cursor-grab active:cursor-grabbing hover:bg-muted/40 transition-colors"
               >
-                <CardContent className="p-3">
+                <CardContent className="p-3 space-y-2">
                   <Link href={`/applications/${app.id}`} className="block min-w-0">
                     <p className="font-medium text-sm truncate">{app.roleTitle}</p>
                     <p className="text-xs text-muted-foreground truncate">{app.company.name}</p>
                     {app.term && <p className="text-xs text-muted-foreground mt-1">{app.term}</p>}
                   </Link>
+                  {/* Keyboard-operable alternative to drag-and-drop — found missing by the Phase 4 audit. */}
+                  <select
+                    value={app.status}
+                    onChange={(e) => handleMoveTo(app.id, e.target.value)}
+                    aria-label={`Move ${app.roleTitle} to status`}
+                    className="w-full h-7 rounded-md border border-input bg-transparent px-1.5 text-xs"
+                  >
+                    {APPLICATION_STATUSES.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
                 </CardContent>
               </Card>
             ))}

@@ -77,6 +77,7 @@ export default function ContactLinks({ applicationId, linked, contactOptions, li
           <select
             name="contactId"
             required
+            aria-label="Contact"
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             defaultValue=""
           >

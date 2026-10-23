@@ -11,7 +11,7 @@ import {
   getResumeForUser,
   listResumesForUser,
 } from "@/lib/resumes";
-import { compileResumeSchema } from "@/lib/schemas/resumeEntry";
+import { compileResumeSchema, entryCoreFieldsSchema, identitySchema } from "@/lib/schemas/resumeEntry";
 import { compileResumeToPdf, type EntriesByCategory } from "@/lib/resumeCompiler";
 
 function textResult(data: unknown) {
@@ -91,18 +91,13 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
     {
       description:
         "Create a new entry (work experience, education, project, skill, etc.) for this user.",
+      // Reuses entryCoreFieldsSchema's length caps (the same ones compile_resume
+      // enforces) instead of bare z.string() — found missing by the Phase 4 audit,
+      // since this path (unlike compile_resume) is DB-backed, not discard-after-use.
       inputSchema: {
-        title: z.string(),
-        categoryId: z.string(),
-        displayTitle: z.string().optional(),
-        organization: z.string().optional(),
-        location: z.string().optional(),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
-        description: z.string().optional(),
-        url: z.string().optional(),
-        bullets: z.array(z.string()).optional(),
-        tags: z.array(z.string()).optional(),
+        ...entryCoreFieldsSchema.shape,
+        categoryId: z.string().min(1).max(100),
+        displayTitle: z.string().max(200).optional(),
       },
     },
     async (data) => {
@@ -117,16 +112,9 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
     {
       description: "Create a new resume for this user.",
       inputSchema: {
-        name: z.string(),
-        templateId: z.string().optional(),
-        identity: z.object({
-          name: z.string(),
-          email: z.string(),
-          phone: z.string().optional(),
-          website: z.string().optional(),
-          linkedin: z.string().optional(),
-          github: z.string().optional(),
-        }),
+        name: z.string().min(1).max(200),
+        templateId: z.string().max(50).optional(),
+        identity: z.object(identitySchema.shape),
       },
     },
     async (data) => textResult(await createResumeForUser(userId, data))

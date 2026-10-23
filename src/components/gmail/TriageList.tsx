@@ -77,6 +77,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
           <select
             value={contactId}
             onChange={(e) => setContactId(e.target.value)}
+            aria-label="Contact"
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
             <option value="">No contact</option>
@@ -87,6 +88,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
           <select
             value={applicationId}
             onChange={(e) => setApplicationId(e.target.value)}
+            aria-label="Application"
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
             <option value="">No application</option>

@@ -151,8 +151,8 @@ async function rematchUnmatchedThreadsForUser(userId: string, candidates: MatchC
       continue; // nothing new to persist — still unmatched, same (or no) suggested application
     }
 
-    await prisma.emailThread.update({
-      where: { id: thread.id },
+    await prisma.emailThread.updateMany({
+      where: { id: thread.id, userId },
       data: { matchedContactId: match.contactId, matchedApplicationId: match.applicationId, matchStatus: match.matchStatus },
     });
     rematched++;
@@ -327,6 +327,20 @@ export async function confirmEmailThreadMatchForUser(
   contactId: string | null,
   applicationId: string | null
 ): Promise<{ ok: boolean }> {
+  // Ownership-check the caller-supplied ids before writing them in — this is
+  // the one place in the triage flow that takes a contact/application id
+  // straight from client input (the picker), unlike linkContactToApplicationForUser
+  // or createInteractionForUser, which already verify this. Found by the
+  // Phase 4 independent audit.
+  if (contactId) {
+    const contact = await prisma.contact.findFirst({ where: { id: contactId, userId } });
+    if (!contact) return { ok: false };
+  }
+  if (applicationId) {
+    const application = await prisma.application.findFirst({ where: { id: applicationId, userId } });
+    if (!application) return { ok: false };
+  }
+
   const { count } = await prisma.emailThread.updateMany({
     where: { id: emailThreadId, userId },
     data: { matchedContactId: contactId, matchedApplicationId: applicationId, matchStatus: "confirmed" },
