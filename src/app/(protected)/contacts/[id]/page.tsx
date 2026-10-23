@@ -114,7 +114,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         <LogInteractionForm contactId={contact.id} logInteraction={logInteraction} />
         <InteractionTimeline
           interactions={contact.interactions}
-          deleteInteraction={deleteInteraction.bind(null, contact.id)}
+          deleteInteraction={deleteInteraction}
         />
       </div>
     </div>

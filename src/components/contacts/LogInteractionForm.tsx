@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import InteractionTypeSelect from "@/components/contacts/InteractionTypeSelect";
 
 type Props = {
-  contactId: string;
+  contactId?: string;
+  applicationId?: string;
   logInteraction: (formData: FormData) => Promise<void>;
 };
 
@@ -14,7 +15,7 @@ function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function LogInteractionForm({ contactId, logInteraction }: Props) {
+export default function LogInteractionForm({ contactId, applicationId, logInteraction }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState("Email");
   const [isPending, startTransition] = useTransition();
@@ -31,7 +32,8 @@ export default function LogInteractionForm({ contactId, logInteraction }: Props)
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="contactId" value={contactId} />
+      {contactId && <input type="hidden" name="contactId" value={contactId} />}
+      {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
       <input type="hidden" name="type" value={type} />
       <div className="w-32">
         <InteractionTypeSelect value={type} onValueChange={setType} size="sm" />

@@ -5,15 +5,25 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
 import { listResumesForUser } from "@/lib/resumes";
+import { listContactOptionsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/applications/StatusBadge";
 import ResumeSection from "@/components/applications/ResumeSection";
+import ContactLinks from "@/components/applications/ContactLinks";
 import StatusHistoryList from "@/components/applications/StatusHistoryList";
+import InteractionTimeline from "@/components/contacts/InteractionTimeline";
+import LogInteractionForm from "@/components/contacts/LogInteractionForm";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import { deleteApplication, logApplicationUpdate, setApplicationHistoryNote } from "../actions";
 import { attachResumeToApplication, detachResumeFromApplication } from "../resumeActions";
+import {
+  linkContactToApplication,
+  unlinkContactFromApplication,
+  logInteraction,
+  deleteInteraction,
+} from "@/app/(protected)/contacts/actions";
 
 function formatDate(d: Date | null): string | null {
   if (!d) return null;
@@ -23,9 +33,10 @@ function formatDate(d: Date | null): string | null {
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
-  const [application, resumes] = await Promise.all([
+  const [application, resumes, contactOptions] = await Promise.all([
     getApplicationForUser(userId, id),
     listResumesForUser(userId),
+    listContactOptionsForUser(userId),
   ]);
   if (!application) notFound();
 
@@ -96,6 +107,27 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         attach={attachResumeToApplication}
         detach={detachResumeFromApplication}
       />
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Contacts</p>
+        <ContactLinks
+          applicationId={application.id}
+          linked={application.contacts.map((ac) => ({
+            contactId: ac.contactId,
+            role: ac.role,
+            name: ac.contact.name,
+          }))}
+          contactOptions={contactOptions}
+          link={linkContactToApplication}
+          unlink={unlinkContactFromApplication}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Interactions</p>
+        <LogInteractionForm applicationId={application.id} logInteraction={logInteraction} />
+        <InteractionTimeline interactions={application.interactions} deleteInteraction={deleteInteraction} />
+      </div>
 
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
