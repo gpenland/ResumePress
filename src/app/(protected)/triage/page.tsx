@@ -1,16 +1,18 @@
 export const dynamic = "force-dynamic";
 
 import { requireUserId } from "@/lib/auth";
-import { listTriageThreadsForUser } from "@/lib/emailThreads";
+import { listTriageThreadsForUser, listIgnoredThreadsForUser } from "@/lib/emailThreads";
 import { listContactOptionsForUser } from "@/lib/contacts";
 import { listApplicationOptionsForUser } from "@/lib/interactions";
 import TriageList from "@/components/gmail/TriageList";
-import { confirmEmailThreadMatch, ignoreEmailThreadMatch } from "./actions";
+import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
+import { confirmEmailThreadMatch, ignoreEmailThreadMatch, restoreEmailThreadMatch } from "./actions";
 
 export default async function TriagePage() {
   const userId = await requireUserId();
-  const [threads, contactOptions, applicationOptions] = await Promise.all([
+  const [threads, ignoredThreads, contactOptions, applicationOptions] = await Promise.all([
     listTriageThreadsForUser(userId),
+    listIgnoredThreadsForUser(userId),
     listContactOptionsForUser(userId),
     listApplicationOptionsForUser(userId),
   ]);
@@ -31,6 +33,8 @@ export default async function TriagePage() {
         confirmMatch={confirmEmailThreadMatch}
         ignoreMatch={ignoreEmailThreadMatch}
       />
+
+      <IgnoredThreadsList threads={ignoredThreads} restoreMatch={restoreEmailThreadMatch} />
     </div>
   );
 }

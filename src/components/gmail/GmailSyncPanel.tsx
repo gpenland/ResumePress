@@ -79,7 +79,9 @@ export default function GmailSyncPanel({ labels, selectedLabelIds, saveLabels, s
         </Button>
         {syncResult && (
           <p className={`text-xs ${syncResult.ok ? "text-muted-foreground" : "text-destructive"}`}>
-            {syncResult.ok ? `Synced ${syncResult.threadsUpserted} thread(s).` : syncResult.error}
+            {syncResult.ok
+              ? `Synced ${syncResult.threadsUpserted} thread(s)${syncResult.rematched > 0 ? `, rematched ${syncResult.rematched} previously unmatched` : ""}.`
+              : syncResult.error}
           </p>
         )}
       </div>
