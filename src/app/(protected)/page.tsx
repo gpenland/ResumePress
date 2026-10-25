@@ -3,18 +3,19 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
-import { listContactsForUser } from "@/lib/contacts";
+import { listApplicationsForUser } from "@/lib/applications";
 import { listTriageThreadsForUser } from "@/lib/emailThreads";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { entryLabel } from "@/lib/entries";
+import StatusBadge from "@/components/applications/StatusBadge";
 
 export default async function HomePage() {
   const userId = await getUserId();
 
-  const [recentResumes, recentEntries, followUpContacts, triageThreads] = userId
+  const [recentResumes, recentEntries, recentApplications, triageThreads] = userId
     ? await Promise.all([
         prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 5 }),
         prisma.entry.findMany({
@@ -23,7 +24,7 @@ export default async function HomePage() {
           take: 5,
           include: { category: true },
         }),
-        listContactsForUser(userId, { followUpDue: true }),
+        listApplicationsForUser(userId),
         listTriageThreadsForUser(userId),
       ])
     : [[], [], [], []];
@@ -38,25 +39,24 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Needs Follow-up</h2>
-            <Link href="/contacts?followUp=due" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+            <h2 className="font-semibold">Recent Applications</h2>
+            <Link href="/applications" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               See all
             </Link>
           </div>
-          {followUpContacts.length === 0 ? (
-            <EmptyState message="No contacts due for follow-up" />
+          {recentApplications.length === 0 ? (
+            <EmptyState message="No applications yet" action={{ label: "Add your first application", href: "/applications/new" }} />
           ) : (
             <div className="space-y-2">
-              {followUpContacts.slice(0, 5).map((c) => (
-                <Link key={c.id} href={`/contacts/${c.id}`} className="block">
+              {recentApplications.slice(0, 5).map((a) => (
+                <Link key={a.id} href={`/applications/${a.id}`} className="block">
                   <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
-                    <CardContent className="flex items-center justify-between py-3 px-4">
-                      <span className="text-sm font-medium">{c.name}</span>
-                      {c.nextFollowUpAt && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(c.nextFollowUpAt).toLocaleDateString()}
-                        </span>
-                      )}
+                    <CardContent className="flex items-center justify-between py-3 px-4 gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{a.company.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{a.roleTitle}</p>
+                      </div>
+                      <StatusBadge status={a.status} />
                     </CardContent>
                   </Card>
                 </Link>

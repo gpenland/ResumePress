@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquarePlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Plus, MessageSquarePlus, Briefcase, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -14,6 +14,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import InteractionTypeSelect from "@/components/contacts/InteractionTypeSelect";
 
 type Props = {
@@ -26,9 +33,10 @@ function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Mounted once in (protected)/layout.tsx so "Log interaction" is reachable
-// from anywhere (PLAN.md §4: "quick-add available everywhere"), via the
-// floating button or the "i" keyboard shortcut.
+// Mounted once in (protected)/layout.tsx so creating an Application, Entry, or
+// Interaction is reachable from anywhere (PLAN.md §4: "quick-add available
+// everywhere"), via the floating button's menu or — for Log Interaction
+// specifically, the most frequent of the three — the "i" keyboard shortcut.
 export default function GlobalQuickAdd({ contactOptions, applicationOptions, logInteraction }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -48,12 +56,6 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  if (contactOptions.length === 0 && applicationOptions.length === 0) {
-    // Nothing to link to yet (no contacts or applications at all) — the
-    // per-contact quick-add on the contact detail page still works once one exists.
-    return null;
-  }
-
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(formRef.current!);
@@ -67,15 +69,32 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Log interaction"
-        title='Log interaction ("i")'
-        className="fixed bottom-6 right-6 z-40 flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
-      >
-        <MessageSquarePlus className="size-5" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button
+              type="button"
+              aria-label="Create"
+              title="Create"
+              className="fixed bottom-6 right-6 z-40 flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="size-5" />
+            </button>
+          }
+        />
+        <DropdownMenuContent side="top" align="end" sideOffset={10}>
+          <DropdownMenuItem render={<Link href="/applications/new" />}>
+            <Briefcase /> New Application
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/entries/new" />}>
+            <FileText /> New Entry
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setOpen(true)}>
+            <MessageSquarePlus /> Log Interaction
+            <DropdownMenuShortcut>i</DropdownMenuShortcut>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="max-w-md">
