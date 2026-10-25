@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/applications/StatusBadge";
 import DeleteItemButton from "@/components/DeleteItemButton";
-import { APPLICATION_STATUSES, type ApplicationWithCompany } from "@/lib/applicationsShared";
+import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } from "@/lib/applicationsShared";
 
 type Props = {
   applications: ApplicationWithCompany[];
@@ -19,11 +19,6 @@ type Props = {
 function matchesQuery(app: ApplicationWithCompany, query: string): boolean {
   const haystacks = [app.company.name, app.roleTitle, app.term, app.location, app.notes];
   return haystacks.some((v) => v?.toLowerCase().includes(query));
-}
-
-function formatDate(d: Date | null): string | null {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function sortKey(app: ApplicationWithCompany): number {
@@ -116,8 +111,8 @@ export default function ApplicationsList({ applications, status, deleteApplicati
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {[app.term, app.location].filter(Boolean).join(" · ")}
-                      {formatDate(app.appliedAt) && (
-                        <span className="ml-2">Applied {formatDate(app.appliedAt)}</span>
+                      {formatShortDate(app.appliedAt) && (
+                        <span className="ml-2">Applied {formatShortDate(app.appliedAt)}</span>
                       )}
                     </p>
                   </div>

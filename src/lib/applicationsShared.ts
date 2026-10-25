@@ -22,3 +22,58 @@ export const APPLICATION_STATUSES = [
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 export type ApplicationWithCompany = Application & { company: Company };
+
+// Single source of truth for status color: each status maps to one semantic
+// tone, and that tone drives both StatusBadge's bg/text classes and
+// ApplicationStatusSankey's fill classes, so the two can't drift out of sync.
+type StatusTone = "slate" | "blue" | "violet" | "amber" | "emerald" | "destructive" | "muted";
+
+const STATUS_TONES: Record<string, StatusTone> = {
+  Applied: "blue",
+  OA: "violet",
+  Interviewing: "amber",
+  Offer: "emerald",
+  Rejected: "destructive",
+  Ghosted: "muted",
+};
+
+// Also used for the Sankey's synthetic "Start" node and any unrecognized status.
+const DEFAULT_TONE: StatusTone = "slate";
+
+const TONE_BADGE_CLASSES: Record<StatusTone, string> = {
+  slate: "bg-muted text-muted-foreground",
+  blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  destructive: "bg-destructive/10 text-destructive",
+  muted: "bg-muted text-muted-foreground",
+};
+
+const TONE_FILL_CLASSES: Record<StatusTone, string> = {
+  slate: "fill-slate-400 dark:fill-slate-500",
+  blue: "fill-blue-500 dark:fill-blue-400",
+  violet: "fill-violet-500 dark:fill-violet-400",
+  amber: "fill-amber-500 dark:fill-amber-400",
+  emerald: "fill-emerald-500 dark:fill-emerald-400",
+  destructive: "fill-destructive",
+  muted: "fill-muted-foreground",
+};
+
+function toneFor(status: string): StatusTone {
+  return STATUS_TONES[status] ?? DEFAULT_TONE;
+}
+
+export function statusBadgeClasses(status: string): string {
+  return TONE_BADGE_CLASSES[toneFor(status)];
+}
+
+export function statusFillClass(status: string): string {
+  return TONE_FILL_CLASSES[toneFor(status)];
+}
+
+// Shared date formatting for application dates (e.g. "Applied Jan 5, 2026").
+export function formatShortDate(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}

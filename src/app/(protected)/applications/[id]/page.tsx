@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
+import { formatShortDate } from "@/lib/applicationsShared";
 import { listResumesForUser } from "@/lib/resumes";
 import { listContactOptionsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
@@ -25,11 +26,6 @@ import {
   deleteInteraction,
 } from "@/app/(protected)/contacts/actions";
 
-function formatDate(d: Date | null): string | null {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
@@ -43,7 +39,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const details: Array<[string, string | null]> = [
     ["Term", application.term],
     ["Location", application.location],
-    ["Applied", formatDate(application.appliedAt)],
+    ["Applied", formatShortDate(application.appliedAt)],
     ["Source", application.source],
   ].filter(([, v]) => v) as Array<[string, string]>;
 

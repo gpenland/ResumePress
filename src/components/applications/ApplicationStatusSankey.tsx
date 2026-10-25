@@ -1,18 +1,6 @@
 import { cn } from "@/lib/utils";
-import { APPLICATION_STATUSES } from "@/lib/applicationsShared";
+import { APPLICATION_STATUSES, statusFillClass } from "@/lib/applicationsShared";
 import type { StatusFlowLink } from "@/lib/applications";
-
-// Same semantic colors as StatusBadge, as `fill-*` utilities instead of `bg-*`/`text-*`.
-const STATUS_FILL: Record<string, string> = {
-  Start: "fill-slate-400 dark:fill-slate-500",
-  Applied: "fill-blue-500 dark:fill-blue-400",
-  OA: "fill-violet-500 dark:fill-violet-400",
-  Interviewing: "fill-amber-500 dark:fill-amber-400",
-  Offer: "fill-emerald-500 dark:fill-emerald-400",
-  Rejected: "fill-destructive",
-  Ghosted: "fill-muted-foreground",
-};
-const DEFAULT_FILL = "fill-slate-400 dark:fill-slate-500";
 
 // Top-to-bottom node order within a column — mirrors the kanban board's
 // column order, with "Start" (the synthetic pre-application-history node)
@@ -183,7 +171,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
               <path
                 key={key}
                 d={path}
-                className={cn(STATUS_FILL[l.target] ?? DEFAULT_FILL, "opacity-25")}
+                className={cn(statusFillClass(l.target), "opacity-25")}
               >
                 <title>
                   {l.source} → {l.target}: {l.value}
@@ -200,7 +188,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
                 width={NODE_THICKNESS}
                 height={pos.y1 - pos.y0}
                 rx={3}
-                className={STATUS_FILL[name] ?? DEFAULT_FILL}
+                className={statusFillClass(name)}
               >
                 <title>
                   {name === "Start" ? "New application" : name}: {values.get(name)}
