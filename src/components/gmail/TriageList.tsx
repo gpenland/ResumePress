@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export type TriageThread = {
   id: string;
@@ -16,12 +26,15 @@ export type TriageThread = {
   matchedApplication: { id: string; roleTitle: string; company: { name: string } } | null;
 };
 
+type CreateContact = (name: string, email: string | null) => Promise<{ id: string; name: string }>;
+
 type Props = {
   threads: TriageThread[];
   contactOptions: { id: string; name: string }[];
   applicationOptions: { id: string; label: string }[];
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
+  createContact: CreateContact;
 };
 
 type RowProps = {
@@ -30,9 +43,76 @@ type RowProps = {
   applicationOptions: { id: string; label: string }[];
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
+  createContact: CreateContact;
 };
 
-function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, ignoreMatch }: RowProps) {
+function NewContactDialog({
+  thread,
+  createContact,
+  onCreated,
+}: {
+  thread: TriageThread;
+  createContact: CreateContact;
+  onCreated: (contact: { id: string; name: string }) => void;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState(thread.participants[0] ?? "");
+  const [isPending, startTransition] = useTransition();
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const name = nameRef.current?.value.trim();
+    if (!name) return;
+    startTransition(async () => {
+      const contact = await createContact(name, email || null);
+      onCreated(contact);
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+        New contact
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>New contact</AlertDialogTitle>
+          </AlertDialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <Input ref={nameRef} name="name" placeholder="Name" required autoFocus />
+            {thread.participants.length > 1 ? (
+              <select
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-label="Email"
+                className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              >
+                {thread.participants.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm text-muted-foreground px-0.5">{email || "No email found on this thread"}</p>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+              <AlertDialogAction type="submit" disabled={isPending}>
+                {isPending ? "Creating…" : "Create"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </form>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, ignoreMatch, createContact }: RowProps) {
   const router = useRouter();
   const [contactId, setContactId] = useState(thread.matchedContact?.id ?? "");
   const [applicationId, setApplicationId] = useState(thread.matchedApplication?.id ?? "");
@@ -102,13 +182,18 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
           <Button type="button" size="sm" variant="ghost" onClick={handleIgnore} disabled={isPending}>
             Ignore
           </Button>
+          <NewContactDialog
+            thread={thread}
+            createContact={createContact}
+            onCreated={(contact) => setContactId(contact.id)}
+          />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-export default function TriageList({ threads, contactOptions, applicationOptions, confirmMatch, ignoreMatch }: Props) {
+export default function TriageList({ threads, contactOptions, applicationOptions, confirmMatch, ignoreMatch, createContact }: Props) {
   if (threads.length === 0) {
     return (
       <Card className="border-dashed">
@@ -129,6 +214,7 @@ export default function TriageList({ threads, contactOptions, applicationOptions
           applicationOptions={applicationOptions}
           confirmMatch={confirmMatch}
           ignoreMatch={ignoreMatch}
+          createContact={createContact}
         />
       ))}
     </div>
