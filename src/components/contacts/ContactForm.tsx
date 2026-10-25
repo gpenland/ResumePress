@@ -40,7 +40,14 @@ export default function ContactForm({ companies, contact, action, submitLabel }:
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="name">Name *</Label>
-          <Input id="name" name="name" defaultValue={contact?.name ?? ""} required />
+          <Input
+            id="name"
+            name="name"
+            defaultValue={contact?.name ?? ""}
+            required
+            autoComplete="off"
+            data-1p-ignore
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="companyName">Company</Label>
