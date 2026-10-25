@@ -10,7 +10,7 @@ import { listContactOptionsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import StatusBadge from "@/components/applications/StatusBadge";
+import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
 import ResumeSection from "@/components/applications/ResumeSection";
 import ContactLinks from "@/components/applications/ContactLinks";
 import StatusHistoryList from "@/components/applications/StatusHistoryList";
@@ -22,6 +22,7 @@ import {
   logApplicationUpdate,
   setApplicationHistoryNote,
   deleteApplicationStatusHistoryEntry,
+  updateApplicationStatus,
 } from "../actions";
 import { attachResumeToApplication, detachResumeFromApplication } from "../resumeActions";
 import {
@@ -54,7 +55,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">{application.roleTitle}</h1>
-            <StatusBadge status={application.status} />
+            <EditableStatusBadge
+              applicationId={application.id}
+              status={application.status}
+              updateStatus={updateApplicationStatus}
+            />
           </div>
           <p className="text-muted-foreground text-sm mt-1">
             {application.company.name}
