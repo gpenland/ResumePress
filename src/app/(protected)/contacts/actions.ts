@@ -94,7 +94,7 @@ export async function logInteraction(formData: FormData) {
  * link: the thread would still say matchStatus "auto", and the next sync
  * that happens to touch it would silently recreate the very interaction
  * just deleted. Going through "ignored" also means it's not lost — it's
- * findable and restorable from /triage, rather than this delete being a
+ * findable and restorable from /email, rather than this delete being a
  * dead end with no undo.
  */
 export async function deleteInteraction(interactionId: string) {
@@ -107,7 +107,7 @@ export async function deleteInteraction(interactionId: string) {
 
   if (interaction.emailThreadId) {
     await ignoreEmailThreadMatchForUser(userId, interaction.emailThreadId);
-    revalidatePath("/triage");
+    revalidatePath("/email");
   }
 
   if (interaction.contactId) revalidatePath(`/contacts/${interaction.contactId}`);

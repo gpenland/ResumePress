@@ -100,6 +100,19 @@ export async function listContactOptionsForUser(userId: string) {
   });
 }
 
+/** contactId -> ids of applications explicitly linked to them (ApplicationContact), for narrowing an application picker once a contact is chosen. */
+export async function listApplicationIdsByContactForUser(userId: string): Promise<Record<string, string[]>> {
+  const links = await prisma.applicationContact.findMany({
+    where: { userId },
+    select: { contactId: true, applicationId: true },
+  });
+  const byContact: Record<string, string[]> = {};
+  for (const link of links) {
+    (byContact[link.contactId] ??= []).push(link.applicationId);
+  }
+  return byContact;
+}
+
 export async function getContactForUser(userId: string, contactId: string) {
   return prisma.contact.findFirst({
     where: { id: contactId, userId },
