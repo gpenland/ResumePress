@@ -297,14 +297,17 @@ function statusRank(status: string): number {
  * Powers the dashboard Statistics panel. "Active" means not Rejected/Ghosted
  * — an Offer still counts as active (there's no separate "accepted" status,
  * and the search isn't over until the user acts on the offer).
- * newThisWeek/newLastWeek are rolling 7-day windows off createdAt (not
- * calendar weeks), so the "vs last week" delta is always comparing two full
- * 7-day periods regardless of what day it is.
+ * newThisWeek/newLastWeek are rolling 7-day windows off appliedAt (not
+ * createdAt — when it was actually applied to, not when the row was logged
+ * into the tracker, and not calendar weeks), so the "vs last week" delta is
+ * always comparing two full 7-day periods regardless of what day it is.
+ * Applications with no appliedAt yet (tracked before applying) don't count
+ * toward either bucket.
  */
 export async function getApplicationPipelineStatsForUser(userId: string): Promise<ApplicationPipelineStats> {
   const applications = await prisma.application.findMany({
     where: { userId },
-    select: { status: true, createdAt: true },
+    select: { status: true, appliedAt: true },
   });
 
   const now = Date.now();
@@ -316,12 +319,13 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
   let newThisWeek = 0;
   let newLastWeek = 0;
 
-  for (const { status, createdAt } of applications) {
+  for (const { status, appliedAt } of applications) {
     counts.set(status, (counts.get(status) ?? 0) + 1);
     if (status !== "Rejected" && status !== "Ghosted") active++;
     if (status === "Offer") offers++;
 
-    const age = now - createdAt.getTime();
+    if (!appliedAt) continue;
+    const age = now - appliedAt.getTime();
     if (age < WEEK_MS) newThisWeek++;
     else if (age < 2 * WEEK_MS) newLastWeek++;
   }

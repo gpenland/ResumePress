@@ -92,7 +92,7 @@ export default function StatisticsPanel({
           hint={`${pipeline.offers} offer${pipeline.offers === 1 ? "" : "s"}`}
         />
         <StatTile
-          label="New this week"
+          label="Applied this week"
           value={pipeline.newThisWeek}
           hint={<WeekDelta thisWeek={pipeline.newThisWeek} lastWeek={pipeline.newLastWeek} />}
         />
