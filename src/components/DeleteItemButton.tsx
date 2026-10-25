@@ -16,9 +16,10 @@ import {
 type Props = {
   action: () => Promise<void>;
   itemName: string;
+  description?: string;
 };
 
-export default function DeleteItemButton({ action, itemName }: Props) {
+export default function DeleteItemButton({ action, itemName, description }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -51,7 +52,7 @@ export default function DeleteItemButton({ action, itemName }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete &ldquo;{itemName}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
-              This cannot be undone.
+              {description ?? "This cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -17,7 +17,13 @@ import StatusHistoryList from "@/components/applications/StatusHistoryList";
 import InteractionTimeline from "@/components/contacts/InteractionTimeline";
 import LogInteractionForm from "@/components/contacts/LogInteractionForm";
 import DeleteItemButton from "@/components/DeleteItemButton";
-import { deleteApplication, logApplicationUpdate, setApplicationHistoryNote, updateApplicationStatus } from "../actions";
+import {
+  deleteApplication,
+  logApplicationUpdate,
+  setApplicationHistoryNote,
+  deleteApplicationStatusHistoryEntry,
+  updateApplicationStatus,
+} from "../actions";
 import { attachResumeToApplication, detachResumeFromApplication } from "../resumeActions";
 import {
   linkContactToApplication,
@@ -139,6 +145,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           history={application.statusHistory}
           logUpdate={logApplicationUpdate}
           setNote={setApplicationHistoryNote}
+          deleteEntry={deleteApplicationStatusHistoryEntry}
         />
       </div>
     </div>

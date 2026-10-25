@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { APPLICATION_STATUSES, statusFillClass } from "@/lib/applicationsShared";
 import type { StatusFlowLink } from "@/lib/applications";
@@ -69,7 +72,38 @@ const PLOT_HEIGHT = 380;
 const MARGIN_TOP = 28;
 const MARGIN_BOTTOM = 12;
 
+type Tooltip = { x: number; y: number; label: string; value: number };
+
 export default function ApplicationStatusSankey({ links }: { links: StatusFlowLink[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+
+  // Native SVG <title> tooltips are unreliable across browsers (slow/absent
+  // delay, no keyboard-focus equivalent), so hover/focus is driven here
+  // instead and positioned against the outer (unscrolled) wrapper so it
+  // isn't clipped by the inner horizontal scroller.
+  function showAtPointer(e: React.PointerEvent, label: string, value: number) {
+    const bounds = containerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    setTooltip({ x: e.clientX - bounds.left, y: e.clientY - bounds.top, label, value });
+  }
+
+  function showAtElement(e: React.FocusEvent<SVGElement>, label: string, value: number) {
+    const bounds = containerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const target = e.currentTarget.getBoundingClientRect();
+    setTooltip({
+      x: target.left + target.width / 2 - bounds.left,
+      y: target.top - bounds.top,
+      label,
+      value,
+    });
+  }
+
+  function hideTooltip() {
+    setTooltip(null);
+  }
+
   if (links.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
@@ -145,66 +179,97 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
 
   return (
     <div className="rounded-lg border bg-card p-6">
-      <div className="overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${totalWidth} ${totalHeight}`}
-          width={totalWidth}
-          height={totalHeight}
-          className="min-w-full"
-          role="img"
-          aria-label="Flow of applications between statuses"
-        >
-          {links.map((l) => {
-            const key = `${l.source}\u0000${l.target}`;
-            const source = nodePos.get(l.source)!;
-            const target = nodePos.get(l.target)!;
-            const thickness = Math.max(l.value * scale, 1);
-            const x0 = source.x + NODE_THICKNESS;
-            const y0top = outOffset.get(key)!;
-            const y0bot = y0top + thickness;
-            const x1 = target.x;
-            const y1top = inOffset.get(key)!;
-            const y1bot = y1top + thickness;
-            const xi = (x0 + x1) / 2;
-            const path = `M${x0},${y0top} C${xi},${y0top} ${xi},${y1top} ${x1},${y1top} L${x1},${y1bot} C${xi},${y1bot} ${xi},${y0bot} ${x0},${y0bot} Z`;
-            return (
-              <path
-                key={key}
-                d={path}
-                className={cn(statusFillClass(l.target), "opacity-25")}
-              >
-                <title>
-                  {l.source} → {l.target}: {l.value}
-                </title>
-              </path>
-            );
-          })}
+      <div ref={containerRef} className="relative">
+        <div className="overflow-x-auto">
+          <svg
+            viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+            width={totalWidth}
+            height={totalHeight}
+            className="min-w-full"
+            role="img"
+            aria-label="Flow of applications between statuses"
+          >
+            {links.map((l) => {
+              const key = `${l.source}\u0000${l.target}`;
+              const source = nodePos.get(l.source)!;
+              const target = nodePos.get(l.target)!;
+              const thickness = Math.max(l.value * scale, 1);
+              const x0 = source.x + NODE_THICKNESS;
+              const y0top = outOffset.get(key)!;
+              const y0bot = y0top + thickness;
+              const x1 = target.x;
+              const y1top = inOffset.get(key)!;
+              const y1bot = y1top + thickness;
+              const xi = (x0 + x1) / 2;
+              const path = `M${x0},${y0top} C${xi},${y0top} ${xi},${y1top} ${x1},${y1top} L${x1},${y1bot} C${xi},${y1bot} ${xi},${y0bot} ${x0},${y0bot} Z`;
+              const label = `${l.source === "Start" ? "New" : l.source} → ${l.target}`;
+              return (
+                <path
+                  key={key}
+                  d={path}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${label}: ${l.value}`}
+                  className={cn(
+                    statusFillClass(l.target),
+                    "opacity-25 outline-none transition-opacity hover:opacity-50 focus-visible:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  )}
+                  onPointerEnter={(e) => showAtPointer(e, label, l.value)}
+                  onPointerMove={(e) => showAtPointer(e, label, l.value)}
+                  onPointerLeave={hideTooltip}
+                  onFocus={(e) => showAtElement(e, label, l.value)}
+                  onBlur={hideTooltip}
+                />
+              );
+            })}
 
-          {[...nodePos.entries()].map(([name, pos]) => (
-            <g key={name}>
-              <rect
-                x={pos.x}
-                y={pos.y0}
-                width={NODE_THICKNESS}
-                height={pos.y1 - pos.y0}
-                rx={3}
-                className={statusFillClass(name)}
-              >
-                <title>
-                  {name === "Start" ? "New application" : name}: {values.get(name)}
-                </title>
-              </rect>
-              <text
-                x={pos.x + NODE_THICKNESS / 2}
-                y={pos.y0 - 8}
-                textAnchor="middle"
-                className="fill-foreground text-[11px]"
-              >
-                {name === "Start" ? "New" : name} · {values.get(name)}
-              </text>
-            </g>
-          ))}
-        </svg>
+            {[...nodePos.entries()].map(([name, pos]) => {
+              const label = name === "Start" ? "New application" : name;
+              const value = values.get(name)!;
+              return (
+                <g key={name}>
+                  <rect
+                    x={pos.x}
+                    y={pos.y0}
+                    width={NODE_THICKNESS}
+                    height={pos.y1 - pos.y0}
+                    rx={3}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${label}: ${value}`}
+                    className={cn(
+                      statusFillClass(name),
+                      "outline-none transition-opacity hover:opacity-70 focus-visible:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    )}
+                    onPointerEnter={(e) => showAtPointer(e, label, value)}
+                    onPointerMove={(e) => showAtPointer(e, label, value)}
+                    onPointerLeave={hideTooltip}
+                    onFocus={(e) => showAtElement(e, label, value)}
+                    onBlur={hideTooltip}
+                  />
+                  <text
+                    x={pos.x + NODE_THICKNESS / 2}
+                    y={pos.y0 - 8}
+                    textAnchor="middle"
+                    className="fill-foreground text-[11px]"
+                  >
+                    {name === "Start" ? "New" : name} · {value}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {tooltip && (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+            style={{ left: tooltip.x, top: tooltip.y }}
+          >
+            <span className="font-medium">{tooltip.value}</span>{" "}
+            <span className="text-muted-foreground">{tooltip.label}</span>
+          </div>
+        )}
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
         Flow of applications between statuses, based on logged status changes. Hover a band or
