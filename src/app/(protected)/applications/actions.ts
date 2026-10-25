@@ -8,6 +8,7 @@ import {
   updateApplicationStatusForUser,
   logApplicationUpdateForUser,
   setApplicationHistoryNoteForUser,
+  deleteApplicationStatusHistoryEntryForUser,
   type ApplicationInput,
 } from "@/lib/applications";
 import { revalidatePath } from "next/cache";
@@ -69,6 +70,16 @@ export async function setApplicationHistoryNote(applicationId: string, historyId
   const result = await setApplicationHistoryNoteForUser(userId, historyId, note);
   if (!result.ok) notFound();
 
+  revalidatePath(`/applications/${applicationId}`);
+}
+
+/** Deletes the most recent status-history entry, reverting status if it was a real change. */
+export async function deleteApplicationStatusHistoryEntry(applicationId: string, historyId: string) {
+  const userId = await requireUserId();
+  const result = await deleteApplicationStatusHistoryEntryForUser(userId, applicationId, historyId);
+  if (!result.ok) notFound();
+
+  revalidatePath("/applications");
   revalidatePath(`/applications/${applicationId}`);
 }
 

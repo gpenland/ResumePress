@@ -183,6 +183,56 @@ export async function setApplicationHistoryNoteForUser(
   return { ok: count > 0 };
 }
 
+/**
+ * Deletes a status-history entry — but only the single most recent entry for
+ * its application, and never the creation entry (fromStatus === null).
+ * Deleting from the middle of the chain would leave the Application's live
+ * `status` out of sync with its own history tail, with no well-defined value
+ * to recompute it to, so this only ever "pops" the latest entry off the
+ * stack, reverting `status` back to that entry's fromStatus when it was a
+ * real status change (not a note-only log update).
+ *
+ * This is the intended fix for a misclicked status change: deleting the bad
+ * entry undoes it in place, instead of setting the status back by hand —
+ * which would log a *second*, reverse transition and show up as a
+ * backward-curving link in the Sankey flow view (see
+ * ApplicationStatusSankey.tsx / getApplicationStatusFlowForUser). Deleting
+ * repeatedly, most-recent-first, also cleans up a chain that already has
+ * this kind of flip-flop in it.
+ */
+export async function deleteApplicationStatusHistoryEntryForUser(
+  userId: string,
+  applicationId: string,
+  historyId: string
+): Promise<{ ok: boolean }> {
+  const entry = await prisma.applicationStatusHistory.findFirst({
+    where: { id: historyId, userId, applicationId },
+  });
+  if (!entry || entry.fromStatus === null) return { ok: false };
+  const fromStatus = entry.fromStatus;
+
+  const latest = await prisma.applicationStatusHistory.findFirst({
+    where: { applicationId, userId },
+    orderBy: { changedAt: "desc" },
+  });
+  if (!latest || latest.id !== entry.id) return { ok: false };
+
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.applicationStatusHistory.deleteMany({
+      where: { id: historyId, userId },
+    });
+    if (count === 0) return;
+    if (entry.toStatus !== fromStatus) {
+      await tx.application.updateMany({
+        where: { id: applicationId, userId },
+        data: { status: fromStatus },
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
 export async function listApplicationsForUser(
   userId: string,
   opts?: { status?: string; companyId?: string }

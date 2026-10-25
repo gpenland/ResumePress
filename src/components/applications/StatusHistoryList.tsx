@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import type { ApplicationStatusHistory } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DeleteItemButton from "@/components/DeleteItemButton";
 
 type Props = {
   applicationId: string;
   history: ApplicationStatusHistory[];
   logUpdate: (applicationId: string, note: string) => Promise<void>;
   setNote: (applicationId: string, historyId: string, note: string) => Promise<void>;
+  deleteEntry: (applicationId: string, historyId: string) => Promise<void>;
 };
 
 function describeChange(h: ApplicationStatusHistory): string {
@@ -19,12 +21,30 @@ function describeChange(h: ApplicationStatusHistory): string {
   return `${h.fromStatus} → ${h.toStatus}`;
 }
 
-export default function StatusHistoryList({ applicationId, history, logUpdate, setNote }: Props) {
+export default function StatusHistoryList({
+  applicationId,
+  history,
+  logUpdate,
+  setNote,
+  deleteEntry,
+}: Props) {
   const router = useRouter();
   const [newNote, setNewNote] = useState("");
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  // `history` is fetched newest-first (see the detail page's `orderBy:
+  // { changedAt: "desc" }`) — only that one, non-creation entry can be
+  // deleted, mirroring deleteApplicationStatusHistoryEntryForUser's rule.
+  const deletableId = history[0] && history[0].fromStatus !== null ? history[0].id : null;
+
+  function handleDelete(historyId: string) {
+    return async () => {
+      await deleteEntry(applicationId, historyId);
+      router.refresh();
+    };
+  }
 
   function handleLogUpdate(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +100,17 @@ export default function StatusHistoryList({ applicationId, history, logUpdate, s
                 >
                   {h.note ? "Edit note" : "Add note"}
                 </button>
+              )}
+              {h.id === deletableId && (
+                <DeleteItemButton
+                  action={handleDelete(h.id)}
+                  itemName={describeChange(h)}
+                  description={
+                    h.fromStatus !== h.toStatus
+                      ? `This also reverts the application's status back to "${h.fromStatus}".`
+                      : "This cannot be undone."
+                  }
+                />
               )}
             </div>
             {editingId === h.id ? (
