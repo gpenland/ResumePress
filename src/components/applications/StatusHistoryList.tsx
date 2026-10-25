@@ -87,8 +87,8 @@ export default function StatusHistoryList({
       <div className="space-y-2">
         {history.map((h) => (
           <div key={h.id} className="text-sm px-1 py-1.5 border-b last:border-0">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs w-32 shrink-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-muted-foreground text-xs shrink-0">
                 {new Date(h.changedAt).toLocaleString()}
               </span>
               <span>{describeChange(h)}</span>
@@ -114,7 +114,7 @@ export default function StatusHistoryList({
               )}
             </div>
             {editingId === h.id ? (
-              <div className="flex gap-2 mt-1 ml-32">
+              <div className="flex gap-2 mt-1">
                 <Input
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
@@ -129,7 +129,7 @@ export default function StatusHistoryList({
                 </Button>
               </div>
             ) : (
-              h.note && <p className="text-muted-foreground text-xs mt-0.5 ml-32">{h.note}</p>
+              h.note && <p className="text-muted-foreground text-xs mt-0.5">{h.note}</p>
             )}
           </div>
         ))}

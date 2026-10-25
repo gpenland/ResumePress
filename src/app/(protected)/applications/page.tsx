@@ -5,7 +5,12 @@ import { getUserId } from "@/lib/auth";
 import { listApplicationsForUser, getApplicationStatusFlowForUser } from "@/lib/applications";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { deleteApplication, updateApplicationStatus } from "./actions";
+import {
+  deleteApplication,
+  updateApplicationStatus,
+  bulkUpdateApplicationStatus,
+  bulkDeleteApplications,
+} from "./actions";
 import ApplicationsList from "@/components/applications/ApplicationsList";
 import ApplicationsKanban from "@/components/applications/ApplicationsKanban";
 import ApplicationStatusSankey from "@/components/applications/ApplicationStatusSankey";
@@ -70,6 +75,8 @@ export default async function ApplicationsPage({
           status={status}
           deleteApplication={deleteApplication}
           updateStatus={updateApplicationStatus}
+          bulkUpdateStatus={bulkUpdateApplicationStatus}
+          bulkDelete={bulkDeleteApplications}
         />
       )}
     </div>

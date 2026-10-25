@@ -90,7 +90,7 @@ export default function ResumeSection({
           </Button>
           {snapshot && (
             <span className="text-xs text-muted-foreground basis-full">
-              Pinned to the version attached on {new Date(snapshot.createdAt).toLocaleDateString()} — editing the
+              Pinned to the version from {new Date(snapshot.createdAt).toLocaleDateString()}. Editing the
               resume won&apos;t change this until you refresh the snapshot.
             </span>
           )}
@@ -117,9 +117,9 @@ export default function ResumeSection({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No resumes yet —{" "}
+          No resumes yet.{" "}
           <Link href="/resumes/new" className="underline hover:text-foreground">
-            create one
+            Create one
           </Link>{" "}
           to attach it here.
         </p>

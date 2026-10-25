@@ -33,7 +33,7 @@ export default async function HomePage() {
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">What needs your attention, and your resume entries and builds</p>
+        <p className="text-muted-foreground mt-1 text-sm">Your applications, resumes, and what&apos;s pending review</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Company } from "@prisma/client";
 
+export * from "./companiesShared";
+
 export async function listCompaniesForUser(userId: string): Promise<Company[]> {
   return prisma.company.findMany({
     where: { userId },
@@ -28,3 +30,4 @@ export async function findOrCreateCompanyForUser(userId: string, name: string): 
     data: { name: trimmed, userId },
   });
 }
+

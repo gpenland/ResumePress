@@ -9,13 +9,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function UserMenu({
   user,
   signOutAction,
+  triageCount = 0,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
   signOutAction: () => Promise<void>;
+  triageCount?: number;
 }) {
   const initial = (user.name || user.email || "?").charAt(0).toUpperCase();
 
@@ -41,6 +44,7 @@ export default function UserMenu({
         </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/email" />}>
           Email
+          {triageCount > 0 && <Badge variant="secondary">{triageCount}</Badge>}
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"

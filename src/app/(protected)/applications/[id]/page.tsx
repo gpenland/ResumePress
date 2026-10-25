@@ -84,6 +84,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         </div>
       </div>
 
+      <nav className="sticky top-14 z-10 -mx-4 flex items-center gap-4 border-b bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <a href="#resume" className="text-sm text-muted-foreground hover:text-foreground">Resume</a>
+        <a href="#contacts" className="text-sm text-muted-foreground hover:text-foreground">Contacts</a>
+        <a href="#interactions" className="text-sm text-muted-foreground hover:text-foreground">Interactions</a>
+        <a href="#status-history" className="text-sm text-muted-foreground hover:text-foreground">Status History</a>
+      </nav>
+
       {details.length > 0 && (
         <Card>
           <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-5">
@@ -106,16 +113,18 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         </Card>
       )}
 
-      <ResumeSection
-        applicationId={application.id}
-        resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
-        snapshot={application.resumeSnapshot ? { id: application.resumeSnapshot.id, createdAt: application.resumeSnapshot.createdAt } : null}
-        resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
-        attach={attachResumeToApplication}
-        detach={detachResumeFromApplication}
-      />
+      <div id="resume">
+        <ResumeSection
+          applicationId={application.id}
+          resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
+          snapshot={application.resumeSnapshot ? { id: application.resumeSnapshot.id, createdAt: application.resumeSnapshot.createdAt } : null}
+          resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
+          attach={attachResumeToApplication}
+          detach={detachResumeFromApplication}
+        />
+      </div>
 
-      <div className="space-y-2">
+      <div id="contacts" className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Contacts</p>
         <ContactLinks
           applicationId={application.id}
@@ -130,13 +139,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         />
       </div>
 
-      <div className="space-y-2">
+      <div id="interactions" className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Interactions</p>
         <LogInteractionForm applicationId={application.id} logInteraction={logInteraction} />
         <InteractionTimeline interactions={application.interactions} deleteInteraction={deleteInteraction} />
       </div>
 
-      <div className="space-y-2">
+      <div id="status-history" className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
           Status History
         </p>

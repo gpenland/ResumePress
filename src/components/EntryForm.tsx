@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
 
 type Props = {
@@ -32,12 +32,24 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const [description, setDescription] = useState(entry?.description ?? "");
   const [tags, setTags] = useState(entry?.tags.join(", ") ?? "");
   const [bullets, setBullets] = useState<string[]>(entry?.bullets.length ? entry.bullets : [""]);
+  const [draggedBulletIndex, setDraggedBulletIndex] = useState<number | null>(null);
+  const [dragOverBulletIndex, setDragOverBulletIndex] = useState<number | null>(null);
 
   function addBullet() { setBullets((p) => [...p, ""]); }
   function updateBullet(i: number, val: string) { setBullets((p) => p.map((b, idx) => idx === i ? val : b)); }
   function removeBullet(i: number) { setBullets((p) => p.filter((_, idx) => idx !== i)); }
   function moveBullet(i: number, dir: "up" | "down") {
     setBullets((p) => { const n = [...p], t = dir === "up" ? i - 1 : i + 1; [n[i], n[t]] = [n[t], n[i]]; return n; });
+  }
+  // Drag-and-drop reorder — alternative to the up/down chevrons, which stay as a fallback.
+  function reorderBullets(from: number, to: number) {
+    if (from === to) return;
+    setBullets((p) => {
+      const n = [...p];
+      const [moved] = n.splice(from, 1);
+      n.splice(to, 0, moved);
+      return n;
+    });
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -74,8 +86,7 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
             placeholder={title || "Same as above"}
           />
           <p className="text-xs text-muted-foreground">
-            Optional. Shown only in the ResumePress dashboard — use it to tell keyword-tailored duplicate
-            copies of this entry apart. Has no effect on the exported PDF.
+            Optional. Only shown in the dashboard, to tell copies of this entry apart. Doesn&apos;t affect the PDF.
           </p>
         </div>
 
@@ -124,7 +135,46 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
             </div>
             <div className="space-y-2">
               {bullets.map((bullet, i) => (
-                <div key={i} className="flex gap-1.5 items-start">
+                <div
+                  key={i}
+                  className={`flex gap-1.5 items-start rounded-md transition-opacity ${
+                    draggedBulletIndex === i ? "opacity-40" : ""
+                  } ${
+                    dragOverBulletIndex === i && draggedBulletIndex !== null && draggedBulletIndex !== i
+                      ? "ring-2 ring-primary/50"
+                      : ""
+                  }`}
+                  onDragOver={(e) => {
+                    if (draggedBulletIndex === null) return;
+                    e.preventDefault();
+                    if (dragOverBulletIndex !== i) setDragOverBulletIndex(i);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverBulletIndex === i) setDragOverBulletIndex(null);
+                  }}
+                  onDrop={(e) => {
+                    if (draggedBulletIndex === null) return;
+                    e.preventDefault();
+                    reorderBullets(draggedBulletIndex, i);
+                    setDraggedBulletIndex(null);
+                    setDragOverBulletIndex(null);
+                  }}
+                >
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedBulletIndex(i);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setDraggedBulletIndex(null);
+                      setDragOverBulletIndex(null);
+                    }}
+                    className="mt-1.5 shrink-0 cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+                    aria-hidden="true"
+                  >
+                    <GripVertical className="size-3.5" />
+                  </div>
                   <div className="flex flex-col mt-1.5 shrink-0">
                     <button type="button" onClick={() => moveBullet(i, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
                       <ChevronUp className="size-3.5" />

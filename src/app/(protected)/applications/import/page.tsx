@@ -9,9 +9,8 @@ export default function ImportApplicationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Import Applications</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Import a CSV export from Notion or any spreadsheet — map its columns to fields below, preview, then
-          confirm. One-time use, but safe to re-run if you map an ID column: matching rows update instead of
-          duplicating.
+          Import a CSV from Notion or any spreadsheet. Map the columns, preview, then confirm. Map an ID
+          column to make re-imports update existing rows instead of duplicating them.
         </p>
       </div>
       <NotionImportWizard importAction={importNotionApplications} />

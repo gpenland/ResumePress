@@ -7,9 +7,9 @@ import {
   listAvailableLabelsForUser,
   listTriageThreadsForUser,
   listIgnoredThreadsForUser,
+  listApplicationPickerOptionsForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
-import { listApplicationOptionsForUser } from "@/lib/interactions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import {
   ignoreEmailThreadMatch,
   restoreEmailThreadMatch,
   createContactFromTriage,
+  bulkConfirmEmailThreadMatches,
+  bulkIgnoreEmailThreadMatches,
 } from "./actions";
 
 export default async function EmailPage() {
@@ -39,24 +41,24 @@ export default async function EmailPage() {
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
   let contactOptions: Awaited<ReturnType<typeof listContactOptionsForUser>> = [];
-  let applicationOptions: Awaited<ReturnType<typeof listApplicationOptionsForUser>> = [];
+  let applications: Awaited<ReturnType<typeof listApplicationPickerOptionsForUser>> = [];
   let applicationIdsByContact: Record<string, string[]> = {};
 
   if (status.connected) {
-    const [account, threadsResult, ignoredResult, contactOptionsResult, applicationOptionsResult, applicationIdsByContactResult] =
+    const [account, threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
       await Promise.all([
         prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
         listTriageThreadsForUser(userId),
         listIgnoredThreadsForUser(userId),
         listContactOptionsForUser(userId),
-        listApplicationOptionsForUser(userId),
+        listApplicationPickerOptionsForUser(userId),
         listApplicationIdsByContactForUser(userId),
       ]);
     selectedLabelIds = account?.syncLabelIds ?? [];
     threads = threadsResult;
     ignoredThreads = ignoredResult;
     contactOptions = contactOptionsResult;
-    applicationOptions = applicationOptionsResult;
+    applications = applicationsResult;
     applicationIdsByContact = applicationIdsByContactResult;
 
     try {
@@ -71,9 +73,8 @@ export default async function EmailPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Email</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Connect Gmail to sync chosen labels, then confirm, reassign, or ignore how each thread
-          matches to a contact and application. Entirely optional — nothing elsewhere requires a
-          Gmail connection.
+          Connect Gmail to sync labels, then confirm, reassign, or ignore how each thread matches a
+          contact or application. Optional; nothing else requires it.
         </p>
       </div>
 
@@ -138,10 +139,12 @@ export default async function EmailPage() {
             <TriageList
               threads={threads}
               contactOptions={contactOptions}
-              applicationOptions={applicationOptions}
+              applications={applications}
               applicationIdsByContact={applicationIdsByContact}
               confirmMatch={confirmEmailThreadMatch}
               ignoreMatch={ignoreEmailThreadMatch}
+              bulkConfirmMatches={bulkConfirmEmailThreadMatches}
+              bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
               createContact={createContactFromTriage}
             />
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,6 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import ApplicationPicker from "@/components/gmail/ApplicationPicker";
+import type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
 
 export type TriageThread = {
   id: string;
@@ -28,24 +31,38 @@ export type TriageThread = {
 
 type CreateContact = (name: string, email: string | null) => Promise<{ id: string; name: string }>;
 
+// The in-progress contact/application pick for one triage row. Lifted up
+// into TriageList (keyed by thread id) so the bulk "Confirm selected" handler
+// can read every selected row's own current pick when building its batch
+// call, instead of each row owning this state in isolation.
+type Pick = { contactId: string; applicationId: string };
+
 type Props = {
   threads: TriageThread[];
   contactOptions: { id: string; name: string }[];
-  applicationOptions: { id: string; label: string }[];
+  applications: ApplicationPickerOption[];
   applicationIdsByContact: Record<string, string[]>;
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
+  bulkConfirmMatches: (
+    items: { threadId: string; contactId: string | null; applicationId: string | null }[]
+  ) => Promise<void>;
+  bulkIgnoreMatches: (threadIds: string[]) => Promise<void>;
   createContact: CreateContact;
 };
 
 type RowProps = {
   thread: TriageThread;
   contactOptions: { id: string; name: string }[];
-  applicationOptions: { id: string; label: string }[];
+  applications: ApplicationPickerOption[];
   applicationIdsByContact: Record<string, string[]>;
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
+  selected: boolean;
+  onToggleSelected: () => void;
+  pick: Pick;
+  onPickChange: (pick: Pick) => void;
 };
 
 function NewContactDialog({
@@ -114,27 +131,42 @@ function NewContactDialog({
   );
 }
 
-function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsByContact, confirmMatch, ignoreMatch, createContact }: RowProps) {
+function TriageRow({
+  thread,
+  contactOptions,
+  applications,
+  applicationIdsByContact,
+  confirmMatch,
+  ignoreMatch,
+  createContact,
+  selected,
+  onToggleSelected,
+  pick,
+  onPickChange,
+}: RowProps) {
   const router = useRouter();
-  const [contactId, setContactId] = useState(thread.matchedContact?.id ?? "");
-  const [applicationId, setApplicationId] = useState(thread.matchedApplication?.id ?? "");
   const [isPending, startTransition] = useTransition();
+  const { contactId, applicationId } = pick;
 
   // Once a contact is picked, narrow the application list down to just the
   // applications that contact is actually linked to (ApplicationContact) —
   // falls back to the full list when the contact has no linked applications.
+  // ApplicationPicker ranks/searches within whichever set this resolves to.
   const linkedApplicationIds = contactId ? applicationIdsByContact[contactId] : undefined;
-  const visibleApplicationOptions =
+  const visibleApplications =
     linkedApplicationIds && linkedApplicationIds.length > 0
-      ? applicationOptions.filter((a) => linkedApplicationIds.includes(a.id))
-      : applicationOptions;
+      ? applications.filter((a) => linkedApplicationIds.includes(a.id))
+      : applications;
 
   function handleContactChange(newContactId: string) {
-    setContactId(newContactId);
     const linked = newContactId ? applicationIdsByContact[newContactId] : undefined;
-    if (linked && linked.length > 0 && applicationId && !linked.includes(applicationId)) {
-      setApplicationId("");
-    }
+    const nextApplicationId =
+      linked && linked.length > 0 && applicationId && !linked.includes(applicationId) ? "" : applicationId;
+    onPickChange({ contactId: newContactId, applicationId: nextApplicationId });
+  }
+
+  function handleApplicationChange(newApplicationId: string) {
+    onPickChange({ contactId, applicationId: newApplicationId });
   }
 
   function handleConfirm() {
@@ -155,10 +187,20 @@ function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsB
     <Card>
       <CardContent className="py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{thread.subject || "(no subject)"}</p>
-            <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
-            {thread.snippet && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{thread.snippet}</p>}
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="mt-0.5 shrink-0" onClick={onToggleSelected}>
+              <Checkbox
+                checked={selected}
+                onCheckedChange={onToggleSelected}
+                aria-label="Select thread for bulk actions"
+                className="pointer-events-none"
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{thread.subject || "(no subject)"}</p>
+              <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
+              {thread.snippet && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{thread.snippet}</p>}
+            </div>
           </div>
           <div className="text-right shrink-0">
             {thread.lastMessageAt && (
@@ -184,17 +226,12 @@ function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsB
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <select
+          <ApplicationPicker
+            options={visibleApplications}
+            participants={thread.participants}
             value={applicationId}
-            onChange={(e) => setApplicationId(e.target.value)}
-            aria-label="Application"
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-          >
-            <option value="">No application</option>
-            {visibleApplicationOptions.map((a) => (
-              <option key={a.id} value={a.id}>{a.label}</option>
-            ))}
-          </select>
+            onChange={handleApplicationChange}
+          />
           <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
             Confirm
           </Button>
@@ -204,7 +241,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsB
           <NewContactDialog
             thread={thread}
             createContact={createContact}
-            onCreated={(contact) => setContactId(contact.id)}
+            onCreated={(contact) => onPickChange({ contactId: contact.id, applicationId })}
           />
         </div>
       </CardContent>
@@ -212,12 +249,82 @@ function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsB
   );
 }
 
-export default function TriageList({ threads, contactOptions, applicationOptions, applicationIdsByContact, confirmMatch, ignoreMatch, createContact }: Props) {
+export default function TriageList({
+  threads,
+  contactOptions,
+  applications,
+  applicationIdsByContact,
+  confirmMatch,
+  ignoreMatch,
+  bulkConfirmMatches,
+  bulkIgnoreMatches,
+  createContact,
+}: Props) {
+  const router = useRouter();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [picks, setPicks] = useState<Map<string, Pick>>(new Map());
+  const [isBulkPending, startBulkTransition] = useTransition();
+
+  function getPick(thread: TriageThread): Pick {
+    return (
+      picks.get(thread.id) ?? {
+        contactId: thread.matchedContact?.id ?? "",
+        applicationId: thread.matchedApplication?.id ?? "",
+      }
+    );
+  }
+
+  function setPick(threadId: string, pick: Pick) {
+    setPicks((prev) => {
+      const next = new Map(prev);
+      next.set(threadId, pick);
+      return next;
+    });
+  }
+
+  function toggleSelected(threadId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(threadId)) next.delete(threadId);
+      else next.add(threadId);
+      return next;
+    });
+  }
+
+  function handleBulkConfirm() {
+    const items = threads
+      .filter((t) => selectedIds.has(t.id))
+      .map((t) => {
+        const pick = getPick(t);
+        return {
+          threadId: t.id,
+          contactId: pick.contactId || null,
+          applicationId: pick.applicationId || null,
+        };
+      });
+    if (items.length === 0) return;
+    startBulkTransition(async () => {
+      await bulkConfirmMatches(items);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkIgnore() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    startBulkTransition(async () => {
+      await bulkIgnoreMatches(ids);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
   if (threads.length === 0) {
     return (
       <Card className="border-dashed">
         <CardContent className="flex flex-col items-center py-16 text-center gap-2">
-          <p className="text-muted-foreground text-sm">All caught up — nothing pending triage.</p>
+          <p className="text-muted-foreground text-sm">All caught up. Nothing pending triage.</p>
         </CardContent>
       </Card>
     );
@@ -225,16 +332,33 @@ export default function TriageList({ threads, contactOptions, applicationOptions
 
   return (
     <div className="space-y-3">
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+          <p className="text-sm text-muted-foreground">{selectedIds.size} selected</p>
+          <div className="ml-auto flex gap-2">
+            <Button type="button" size="sm" onClick={handleBulkConfirm} disabled={isBulkPending}>
+              Confirm selected
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={handleBulkIgnore} disabled={isBulkPending}>
+              Ignore selected
+            </Button>
+          </div>
+        </div>
+      )}
       {threads.map((thread) => (
         <TriageRow
           key={thread.id}
           thread={thread}
           contactOptions={contactOptions}
-          applicationOptions={applicationOptions}
+          applications={applications}
           applicationIdsByContact={applicationIdsByContact}
           confirmMatch={confirmMatch}
           ignoreMatch={ignoreMatch}
           createContact={createContact}
+          selected={selectedIds.has(thread.id)}
+          onToggleSelected={() => toggleSelected(thread.id)}
+          pick={getPick(thread)}
+          onPickChange={(pick) => setPick(thread.id, pick)}
         />
       ))}
     </div>

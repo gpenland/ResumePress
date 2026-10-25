@@ -12,7 +12,10 @@ import {
   type GmailLabel,
   type GmailThread,
 } from "@/lib/gmail";
+import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { EmailThread } from "@prisma/client";
+
+export type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
 
 const SYSTEM_LABEL_ALLOWLIST = new Set(["INBOX", "SENT", "STARRED", "IMPORTANT"]);
 
@@ -38,15 +41,6 @@ type MatchCandidates = {
   applicationByDomain: Map<string, string>;
   applicationByContact: Map<string, string>;
 };
-
-function extractDomain(url: string): string | null {
-  try {
-    const withProtocol = url.startsWith("http") ? url : `https://${url}`;
-    return new URL(withProtocol).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return null;
-  }
-}
 
 async function loadMatchCandidates(userId: string): Promise<MatchCandidates> {
   const [contacts, companies, applicationContacts] = await Promise.all([
@@ -342,6 +336,35 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   });
 
   return { ok: true, threadsUpserted: upserted, rematched };
+}
+
+/**
+ * Richer-than-`listApplicationOptionsForUser` application list for the
+ * triage picker (src/components/gmail/ApplicationPicker.tsx) — includes
+ * company domain and status so the client-side ranking helpers in
+ * emailThreadsShared.ts can surface the most plausible match first instead
+ * of a flat alphabetical/unordered dropdown of every application.
+ */
+export async function listApplicationPickerOptionsForUser(userId: string): Promise<ApplicationPickerOption[]> {
+  const applications = await prisma.application.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      roleTitle: true,
+      status: true,
+      updatedAt: true,
+      company: { select: { name: true, website: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  return applications.map((a) => ({
+    id: a.id,
+    roleTitle: a.roleTitle,
+    companyName: a.company.name,
+    companyDomain: a.company.website ? extractDomain(a.company.website) : null,
+    status: a.status,
+    updatedAt: a.updatedAt,
+  }));
 }
 
 export async function listTriageThreadsForUser(userId: string) {
