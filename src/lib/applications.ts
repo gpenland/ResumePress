@@ -198,6 +198,36 @@ export async function listApplicationsForUser(
   });
 }
 
+export type StatusFlowLink = { source: string; target: string; value: number };
+
+/**
+ * Aggregates every status transition across all of a user's applications into
+ * (source, target, count) edges for the Sankey flow view. Each
+ * ApplicationStatusHistory row already records one discrete transition, so no
+ * per-application chain-walking is needed — just drop note-only rows
+ * (fromStatus === toStatus, logged via logApplicationUpdateForUser) and
+ * aggregate the rest. A null fromStatus (the application's creation) becomes
+ * the synthetic "Start" source.
+ */
+export async function getApplicationStatusFlowForUser(userId: string): Promise<StatusFlowLink[]> {
+  const history = await prisma.applicationStatusHistory.findMany({
+    where: { userId },
+    select: { fromStatus: true, toStatus: true },
+  });
+
+  const counts = new Map<string, number>();
+  for (const { fromStatus, toStatus } of history) {
+    if (fromStatus === toStatus) continue;
+    const key = `${fromStatus ?? "Start"}\u0000${toStatus}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries()).map(([key, value]) => {
+    const [source, target] = key.split("\u0000");
+    return { source, target, value };
+  });
+}
+
 export async function getApplicationForUser(userId: string, applicationId: string) {
   return prisma.application.findFirst({
     where: { id: applicationId, userId },
