@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
@@ -98,7 +99,13 @@ export default function NotionImportWizard({ importAction }: Props) {
       <Card>
         <CardContent className="py-8 space-y-3 text-center">
           <p className="text-sm text-muted-foreground">Choose a CSV file to import.</p>
-          <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFile} className="mx-auto" />
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFile}
+            className="mx-auto w-auto"
+          />
           {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
         </CardContent>
       </Card>

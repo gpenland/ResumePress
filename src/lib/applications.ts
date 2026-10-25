@@ -1,12 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { findOrCreateCompanyForUser } from "@/lib/companies";
 import type { Application, ApplicationStatusHistory } from "@prisma/client";
-import {
-  APPLICATION_STATUSES,
-  type ApplicationStatus,
-  type ApplicationWithCompany,
-} from "@/lib/applicationsShared";
-import type { MappedApplicationRow } from "@/lib/notionImportShared";
+import { type ApplicationWithCompany } from "@/lib/applicationsShared";
+import { parseStatusHistory, type MappedApplicationRow } from "@/lib/notionImportShared";
 
 // Re-exported so server code (actions.ts) can import everything it needs from
 // this one module. Client components should import the shared module
@@ -18,6 +14,10 @@ export type ApplicationInput = {
   roleTitle: string;
   term?: string | null;
   status?: string;
+  // Ordered past→current statuses (oldest first), used by the CSV importer to seed
+  // full ApplicationStatusHistory transitions instead of a single null→status jump.
+  // Other callers omit this and get the existing single-entry history behavior.
+  statusHistory?: string[];
   appliedAt?: string | null;
   postingUrl?: string | null;
   location?: string | null;
@@ -37,7 +37,8 @@ export async function createApplicationForUser(
   data: ApplicationInput
 ): Promise<Application> {
   const company = await findOrCreateCompanyForUser(userId, data.companyName);
-  const status = data.status || "Applied";
+  const statusChain = data.statusHistory?.length ? data.statusHistory : [data.status || "Applied"];
+  const status = statusChain[statusChain.length - 1];
 
   return prisma.$transaction(async (tx) => {
     const application = await tx.application.create({
@@ -55,14 +56,13 @@ export async function createApplicationForUser(
         userId,
       },
     });
-    await tx.applicationStatusHistory.create({
-      data: {
-        applicationId: application.id,
-        fromStatus: null,
-        toStatus: status,
-        userId,
-      },
-    });
+    let fromStatus: string | null = null;
+    for (const toStatus of statusChain) {
+      await tx.applicationStatusHistory.create({
+        data: { applicationId: application.id, fromStatus, toStatus, userId },
+      });
+      fromStatus = toStatus;
+    }
     return application;
   });
 }
@@ -230,11 +230,20 @@ export async function importMappedApplicationsForUser(
   let updated = 0;
 
   for (const row of rows) {
+    // Notion exports a status property's full option history as a comma-separated
+    // list (e.g. "Applied, Rejected"), not just the current value — see
+    // parseStatusHistory's comment. Resolve to the last recognized entry rather
+    // than matching the raw string against APPLICATION_STATUSES, which would
+    // always miss and silently fall back to the "Applied" default.
+    const statusChain = parseStatusHistory(row.status);
+    const status = statusChain[statusChain.length - 1];
+
     const input: ApplicationInput = {
       companyName: row.companyName,
       roleTitle: row.roleTitle,
       term: row.term,
-      status: APPLICATION_STATUSES.includes(row.status as ApplicationStatus) ? row.status! : undefined,
+      status,
+      statusHistory: statusChain.length ? statusChain : undefined,
       appliedAt: row.appliedAt,
       postingUrl: row.postingUrl,
       location: row.location,

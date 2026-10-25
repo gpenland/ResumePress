@@ -26,14 +26,22 @@ function formatDate(d: Date | null): string | null {
   return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function sortKey(app: ApplicationWithCompany): number {
+  const date = app.appliedAt ?? app.createdAt;
+  return new Date(date).getTime();
+}
+
 export default function ApplicationsList({ applications, status, deleteApplication }: Props) {
   const [search, setSearch] = useState("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return applications;
-    return applications.filter((a) => matchesQuery(a, query));
-  }, [applications, search]);
+    const base = query ? applications.filter((a) => matchesQuery(a, query)) : applications;
+    return [...base].sort((a, b) =>
+      sortDir === "asc" ? sortKey(a) - sortKey(b) : sortKey(b) - sortKey(a)
+    );
+  }, [applications, search, sortDir]);
 
   return (
     <>
@@ -44,22 +52,32 @@ export default function ApplicationsList({ applications, status, deleteApplicati
         aria-label="Search applications"
       />
 
-      <div className="flex gap-2 flex-wrap">
-        <Link
-          href="/applications"
-          className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
-        >
-          All
-        </Link>
-        {APPLICATION_STATUSES.map((s) => (
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link
-            key={s}
-            href={`/applications?status=${encodeURIComponent(s)}`}
-            className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
+            href="/applications"
+            className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
           >
-            {s}
+            All
           </Link>
-        ))}
+          {APPLICATION_STATUSES.map((s) => (
+            <Link
+              key={s}
+              href={`/applications?status=${encodeURIComponent(s)}`}
+              className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
+            >
+              {s}
+            </Link>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          aria-label={`Sort by date, currently ${sortDir === "desc" ? "newest first" : "oldest first"}`}
+        >
+          Date {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
+        </button>
       </div>
 
       {filtered.length === 0 ? (
@@ -94,7 +112,7 @@ export default function ApplicationsList({ applications, status, deleteApplicati
                 <Link href={`/applications/${app.id}`} className="flex items-center justify-between flex-1 min-w-0 gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">
-                      {app.roleTitle} <span className="text-muted-foreground font-normal">@ {app.company.name}</span>
+                      {app.company.name} <span className="text-muted-foreground font-normal">— {app.roleTitle}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {[app.term, app.location].filter(Boolean).join(" · ")}
@@ -109,7 +127,7 @@ export default function ApplicationsList({ applications, status, deleteApplicati
                 </Link>
                 <DeleteItemButton
                   action={deleteApplication.bind(null, app.id)}
-                  itemName={`${app.roleTitle} @ ${app.company.name}`}
+                  itemName={`${app.company.name} — ${app.roleTitle}`}
                 />
               </CardContent>
             </Card>
