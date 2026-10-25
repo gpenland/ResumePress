@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Contact, Company } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { findNearDuplicateCompanyName } from "@/lib/companiesShared";
 
 type Props = {
   companies: Company[];
@@ -26,6 +27,22 @@ function toDateInputValue(d: Date | string | null | undefined): string {
 export default function ContactForm({ companies, contact, action, submitLabel }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [companySuggestion, setCompanySuggestion] = useState<string | null>(null);
+
+  function handleCompanyBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const typed = e.target.value;
+    if (!typed.trim()) {
+      setCompanySuggestion(null);
+      return;
+    }
+    setCompanySuggestion(findNearDuplicateCompanyName(typed, companies.map((c) => c.name)));
+  }
+
+  function acceptCompanySuggestion(name: string) {
+    const input = formRef.current?.elements.namedItem("companyName");
+    if (input instanceof HTMLInputElement) input.value = name;
+    setCompanySuggestion(null);
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -57,12 +74,28 @@ export default function ContactForm({ companies, contact, action, submitLabel }:
             list="company-suggestions"
             defaultValue={contact?.company?.name ?? ""}
             placeholder="e.g. Acme Corp"
+            autoComplete="off"
+            data-1p-ignore
+            onBlur={handleCompanyBlur}
           />
           <datalist id="company-suggestions">
             {companies.map((c) => (
               <option key={c.id} value={c.name} />
             ))}
           </datalist>
+          {companySuggestion && (
+            <p className="text-xs text-muted-foreground">
+              Did you mean{" "}
+              <button
+                type="button"
+                className="underline hover:text-foreground"
+                onClick={() => acceptCompanySuggestion(companySuggestion)}
+              >
+                &quot;{companySuggestion}&quot;
+              </button>
+              ?
+            </p>
+          )}
         </div>
       </div>
 

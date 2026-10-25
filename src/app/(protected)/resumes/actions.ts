@@ -86,6 +86,37 @@ export async function updateResumeEntries(
   revalidatePath(`/resumes/${resumeId}`);
 }
 
+export async function duplicateResume(id: string) {
+  const userId = await requireUserId();
+  const original = await prisma.resume.findFirst({
+    where: { id, userId },
+    include: { entries: true },
+  });
+  if (!original) notFound();
+
+  await prisma.$transaction(async (tx) => {
+    const copy = await tx.resume.create({
+      data: {
+        name: `${original.name} (copy)`,
+        templateId: original.templateId,
+        identity: original.identity ?? undefined,
+        userId,
+      },
+    });
+    if (original.entries.length > 0) {
+      await tx.resumeEntry.createMany({
+        data: original.entries.map((re) => ({
+          resumeId: copy.id,
+          entryId: re.entryId,
+          order: re.order,
+        })),
+      });
+    }
+  });
+
+  revalidatePath("/resumes");
+}
+
 export async function deleteResume(id: string) {
   const userId = await requireUserId();
   const { count } = await prisma.resume.deleteMany({ where: { id, userId } });

@@ -1,13 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
 import DeleteItemButton from "@/components/DeleteItemButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } from "@/lib/applicationsShared";
 
 type Props = {
@@ -15,6 +27,8 @@ type Props = {
   status?: string;
   deleteApplication: (id: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
+  bulkUpdateStatus: (ids: string[], status: string) => Promise<void>;
+  bulkDelete: (ids: string[]) => Promise<void>;
 };
 
 function matchesQuery(app: ApplicationWithCompany, query: string): boolean {
@@ -27,9 +41,20 @@ function sortKey(app: ApplicationWithCompany): number {
   return new Date(date).getTime();
 }
 
-export default function ApplicationsList({ applications, status, deleteApplication, updateStatus }: Props) {
+export default function ApplicationsList({
+  applications,
+  status,
+  deleteApplication,
+  updateStatus,
+  bulkUpdateStatus,
+  bulkDelete,
+}: Props) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -38,6 +63,52 @@ export default function ApplicationsList({ applications, status, deleteApplicati
       sortDir === "asc" ? sortKey(a) - sortKey(b) : sortKey(b) - sortKey(a)
     );
   }, [applications, search, sortDir]);
+
+  const selectedIds = useMemo(() => Array.from(selected), [selected]);
+  const allFilteredSelected = filtered.length > 0 && filtered.every((a) => selected.has(a.id));
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllFiltered() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        for (const a of filtered) next.delete(a.id);
+      } else {
+        for (const a of filtered) next.add(a.id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
+  function handleBulkStatusChange(next: string) {
+    if (!next || selectedIds.length === 0) return;
+    startTransition(async () => {
+      await bulkUpdateStatus(selectedIds, next);
+      clearSelection();
+      router.refresh();
+    });
+  }
+
+  function handleBulkDelete() {
+    startTransition(async () => {
+      await bulkDelete(selectedIds);
+      setConfirmingDelete(false);
+      clearSelection();
+      router.refresh();
+    });
+  }
 
   return (
     <>
@@ -76,6 +147,65 @@ export default function ApplicationsList({ applications, status, deleteApplicati
         </button>
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 flex-wrap rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <select
+            defaultValue=""
+            onChange={(e) => handleBulkStatusChange(e.target.value)}
+            disabled={isPending}
+            aria-label="Bulk change status"
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+          >
+            <option value="" disabled>
+              Change status to…
+            </option>
+            {APPLICATION_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            disabled={isPending}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-destructive hover:text-destructive")}
+          >
+            Delete selected
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={isPending}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selected.size} application{selected.size === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.stopPropagation(); handleBulkDelete(); }}
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {filtered.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center py-16 text-center gap-3">
@@ -102,9 +232,33 @@ export default function ApplicationsList({ applications, status, deleteApplicati
         </Card>
       ) : (
         <div className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <div onClick={toggleAllFiltered} className="cursor-pointer p-0.5">
+              <Checkbox
+                checked={allFilteredSelected}
+                onCheckedChange={toggleAllFiltered}
+                className="pointer-events-none"
+                aria-label={allFilteredSelected ? "Deselect all" : "Select all"}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {allFilteredSelected ? "Deselect all" : "Select all"}
+            </span>
+          </div>
           {filtered.map((app) => (
             <Card key={app.id} className="py-0 hover:bg-muted/30 transition-colors">
               <CardContent className="flex items-center gap-2 py-3 px-5">
+                <div
+                  onClick={(e) => { e.stopPropagation(); toggleOne(app.id); }}
+                  className="shrink-0 p-1"
+                >
+                  <Checkbox
+                    checked={selected.has(app.id)}
+                    onCheckedChange={() => toggleOne(app.id)}
+                    className="pointer-events-none"
+                    aria-label={`Select ${app.company.name} — ${app.roleTitle}`}
+                  />
+                </div>
                 <Link href={`/applications/${app.id}`} className="flex-1 min-w-0">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">

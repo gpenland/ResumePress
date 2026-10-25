@@ -7,8 +7,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { deleteResume } from "./actions";
+import { deleteResume, duplicateResume } from "./actions";
 import DeleteItemButton from "@/components/DeleteItemButton";
+import CloneItemButton from "@/components/CloneItemButton";
 
 export default async function ResumesPage() {
   const userId = await getUserId();
@@ -47,10 +48,16 @@ export default async function ResumesPage() {
                 <Link href={`/resumes/${resume.id}`} className="flex-1 min-w-0">
                   <CardTitle className="text-base truncate">{resume.name}</CardTitle>
                 </Link>
-                <DeleteItemButton
-                  action={deleteResume.bind(null, resume.id)}
-                  itemName={resume.name}
-                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <CloneItemButton
+                    action={duplicateResume.bind(null, resume.id)}
+                    itemName={resume.name}
+                  />
+                  <DeleteItemButton
+                    action={deleteResume.bind(null, resume.id)}
+                    itemName={resume.name}
+                  />
+                </div>
               </CardHeader>
               <Link href={`/resumes/${resume.id}`}>
                 <CardContent className="space-y-2">

@@ -54,6 +54,28 @@ export async function ignoreEmailThreadMatch(threadId: string) {
   revalidatePath("/email");
 }
 
+// Bulk triage actions — each loops the same per-item, ownership-checked
+// functions the single-row actions above use, so every item still gets its
+// own contact/application ownership verification; only the revalidate is
+// batched to once per call instead of once per row.
+export async function bulkConfirmEmailThreadMatches(
+  items: { threadId: string; contactId: string | null; applicationId: string | null }[]
+) {
+  const userId = await requireUserId();
+  for (const item of items) {
+    await confirmEmailThreadMatchForUser(userId, item.threadId, item.contactId, item.applicationId);
+  }
+  revalidatePath("/email");
+}
+
+export async function bulkIgnoreEmailThreadMatches(threadIds: string[]) {
+  const userId = await requireUserId();
+  for (const threadId of threadIds) {
+    await ignoreEmailThreadMatchForUser(userId, threadId);
+  }
+  revalidatePath("/email");
+}
+
 export async function restoreEmailThreadMatch(threadId: string) {
   const userId = await requireUserId();
   const result = await restoreEmailThreadMatchForUser(userId, threadId);

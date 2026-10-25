@@ -1,13 +1,27 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
 import ThemeToggle from "@/components/ThemeToggle";
+import NavLinks from "@/components/NavLinks";
+import { listTriageThreadsForUser } from "@/lib/emailThreads";
+
+const NAV_LINKS = [
+  { href: "/applications", label: "Applications" },
+  { href: "/contacts", label: "Contacts" },
+  { href: "/entries", label: "Entries" },
+  { href: "/resumes", label: "Resumes" },
+  { href: "/categories", label: "Categories" },
+];
 
 export default async function Nav() {
   const session = await auth();
+  const triageCount = session?.user?.id
+    ? (await listTriageThreadsForUser(session.user.id)).length
+    : 0;
 
   return (
     <header className="bg-background sticky top-0 z-50">
@@ -16,32 +30,26 @@ export default async function Nav() {
           ResumePress
         </Link>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <nav className="flex items-center gap-3 sm:gap-6 text-sm text-muted-foreground overflow-x-auto min-w-0">
-            <Link href="/applications" className="hover:text-foreground transition-colors shrink-0">
-              Applications
-            </Link>
-            <Link href="/contacts" className="hover:text-foreground transition-colors shrink-0">
-              Contacts
-            </Link>
-            <Link href="/entries" className="hover:text-foreground transition-colors shrink-0">
-              Entries
-            </Link>
-            <Link href="/resumes" className="hover:text-foreground transition-colors shrink-0">
-              Resumes
-            </Link>
-            <Link href="/categories" className="hover:text-foreground transition-colors shrink-0">
-              Categories
-            </Link>
-          </nav>
+          <NavLinks links={NAV_LINKS} />
           {session?.user && (
-            <form action="/search" method="GET" className="hidden sm:block shrink-0">
-              <Input name="q" placeholder="Search..." className="h-8 w-40" />
-            </form>
+            <>
+              <form action="/search" method="GET" className="hidden sm:block shrink-0">
+                <Input name="q" placeholder="Search..." className="h-8 w-40" />
+              </form>
+              <Link
+                href="/search"
+                aria-label="Search"
+                className="sm:hidden shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Search className="size-3.5" />
+              </Link>
+            </>
           )}
           <ThemeToggle />
           {session?.user ? (
             <UserMenu
               user={session.user}
+              triageCount={triageCount}
               signOutAction={async () => {
                 "use server";
                 await signOut({ redirectTo: "/" });

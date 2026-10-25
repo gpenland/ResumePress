@@ -54,7 +54,7 @@ export default function TokenCreateForm() {
           <AlertDialogHeader>
             <AlertDialogTitle>Token created</AlertDialogTitle>
             <AlertDialogDescription>
-              Copy this token now — you won&apos;t be able to see it again.
+              Copy this token now. You won&apos;t be able to see it again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs">

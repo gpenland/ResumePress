@@ -4,7 +4,7 @@ import { getAllowedUserId } from "@/lib/auth";
 import { compileResumeToPdf } from "@/lib/resumeCompiler";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ resumeId: string }> }
 ) {
   const userId = await getAllowedUserId();
@@ -59,11 +59,18 @@ export async function GET(
 
     const safeName = resume.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
 
+    // Opt-in inline mode (?inline=1) renders the PDF in-page (e.g. an <iframe> preview)
+    // instead of forcing a browser download. Default stays "attachment" since this
+    // route is also hit by a plain file download elsewhere.
+    const { searchParams } = new URL(req.url);
+    const inline = searchParams.get("inline") === "1";
+    const disposition = inline ? "inline" : "attachment";
+
     return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safeName}.pdf"`,
+        "Content-Disposition": `${disposition}; filename="${safeName}.pdf"`,
       },
     });
   } catch (err) {

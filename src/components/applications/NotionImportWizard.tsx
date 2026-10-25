@@ -41,7 +41,7 @@ export default function NotionImportWizard({ importAction }: Props) {
     const text = await file.text();
     const table = parseCsvTable(text);
     if (table.headers.length === 0) {
-      setUploadError("Couldn't read any columns from that file — is it a CSV?");
+      setUploadError("Couldn't read any columns from that file. Is it a CSV?");
       return;
     }
     setUploadError(null);

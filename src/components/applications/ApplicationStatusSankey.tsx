@@ -107,7 +107,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
   if (links.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
-        No status history yet — this fills in as applications move through statuses.
+        No status history yet. It fills in as applications change status.
       </div>
     );
   }

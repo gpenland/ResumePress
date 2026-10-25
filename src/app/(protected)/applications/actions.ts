@@ -91,3 +91,44 @@ export async function deleteApplication(id: string) {
   revalidatePath("/applications");
   redirect("/applications");
 }
+
+/**
+ * Bulk status change for the applications list's multi-select action bar.
+ * Mirrors updateApplicationStatusForUser (src/lib/applications.ts) per id:
+ * ownership-checked read, skip no-ops, update + history write in one
+ * transaction. Ids not owned by the caller (or already missing) are
+ * silently skipped rather than failing the whole batch.
+ */
+export async function bulkUpdateApplicationStatus(ids: string[], status: string) {
+  const userId = await requireUserId();
+
+  for (const id of ids) {
+    const existing = await prisma.application.findFirst({ where: { id, userId } });
+    if (!existing || existing.status === status) continue;
+
+    await prisma.$transaction([
+      prisma.application.updateMany({
+        where: { id, userId },
+        data: { status },
+      }),
+      prisma.applicationStatusHistory.create({
+        data: {
+          applicationId: id,
+          fromStatus: existing.status,
+          toStatus: status,
+          userId,
+        },
+      }),
+    ]);
+  }
+
+  revalidatePath("/applications");
+}
+
+/** Bulk delete for the applications list's multi-select action bar. */
+export async function bulkDeleteApplications(ids: string[]) {
+  const userId = await requireUserId();
+  await prisma.application.deleteMany({ where: { id: { in: ids }, userId } });
+
+  revalidatePath("/applications");
+}

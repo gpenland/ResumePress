@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { Category, Entry, ResumeEntry } from "@prisma/client";
 import { updateResumeEntries } from "@/app/(protected)/resumes/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, GripVertical, X } from "lucide-react";
 
 type EntryWithCategory = Entry & { category: Category };
 
@@ -27,16 +27,27 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
 
   const [saving, startSave] = useTransition();
   const [downloading, startDownload] = useTransition();
+  const [previewing, startPreview] = useTransition();
   const [saved, setSaved] = useState(false);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const selectedSet = new Set(selectedOrder);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
 
   function toggle(entryId: string) {
     setSelectedOrder((prev) => {
       if (prev.includes(entryId)) return prev.filter((id) => id !== entryId);
       return [...prev, entryId];
     });
-    setSaved(false);
   }
 
   // Move entryId up or down among the selected entries within its category
@@ -60,12 +71,37 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
       [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
       return next;
     });
-    setSaved(false);
+  }
+
+  // Drag-and-drop reorder: move draggedEntryId to targetEntryId's position,
+  // within the subset of selected entries belonging to categoryId.
+  function reorderInCategory(categoryId: string, draggedEntryId: string, targetEntryId: string) {
+    if (draggedEntryId === targetEntryId) return;
+    setSelectedOrder((prev) => {
+      const catIds = new Set(
+        allEntries.filter((e) => e.categoryId === categoryId).map((e) => e.id)
+      );
+      const selectedInCat = prev.filter((id) => catIds.has(id));
+      const fromIdx = selectedInCat.indexOf(draggedEntryId);
+      const toIdx = selectedInCat.indexOf(targetEntryId);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+
+      const reordered = [...selectedInCat];
+      reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, draggedEntryId);
+
+      // Splice the reordered within-category sequence back into the full list,
+      // leaving every other category's entries untouched in place.
+      let catPtr = 0;
+      return prev.map((id) => (catIds.has(id) ? reordered[catPtr++] : id));
+    });
   }
 
   async function persistSelection() {
     await updateResumeEntries(resumeId, selectedOrder);
     setSaved(true);
+    if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    savedTimeoutRef.current = setTimeout(() => setSaved(false), 2500);
   }
 
   function handleSave() {
@@ -80,7 +116,20 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
     });
   }
 
-  const isBusy = saving || downloading;
+  function handlePreview() {
+    startPreview(async () => {
+      await persistSelection();
+      // Inline mode asks the PDF route for Content-Disposition: inline so it can
+      // render in an <iframe> instead of triggering a browser download.
+      setPreviewUrl(`/api/pdf/${resumeId}?inline=1&t=${Date.now()}`);
+    });
+  }
+
+  function closePreview() {
+    setPreviewUrl(null);
+  }
+
+  const isBusy = saving || downloading || previewing;
 
   const entriesByCategory = categories
     .map((cat) => ({
@@ -103,11 +152,32 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
           <Button variant="outline" size="sm" onClick={handleSave} disabled={isBusy}>
             {saving ? "Saving..." : "Save"}
           </Button>
+          <Button variant="outline" size="sm" onClick={handlePreview} disabled={isBusy}>
+            {previewing ? "Compiling..." : "Preview"}
+          </Button>
           <Button size="sm" onClick={handleDownload} disabled={isBusy}>
             {downloading ? "Generating..." : "Download PDF"}
           </Button>
         </div>
       </div>
+
+      {previewUrl && (
+        <Card className="py-0">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <p className="text-sm font-medium">PDF Preview</p>
+              <Button variant="ghost" size="sm" onClick={closePreview} aria-label="Close preview">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <iframe
+              src={previewUrl}
+              title="Resume PDF preview"
+              className="h-[80vh] w-full"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {entriesByCategory.length === 0 ? (
         <Card className="border-dashed">
@@ -154,9 +224,49 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
                       isSelected
                         ? "bg-muted/60 border-primary/30"
                         : "hover:bg-muted/30 border-border cursor-pointer"
+                    } ${draggedId === entry.id ? "opacity-40" : ""} ${
+                      isSelected && dragOverId === entry.id && draggedId && draggedId !== entry.id
+                        ? "ring-2 ring-primary/50"
+                        : ""
                     }`}
                     onClick={!isSelected ? () => toggle(entry.id) : undefined}
+                    onDragOver={(e) => {
+                      if (!isSelected || !draggedId) return;
+                      e.preventDefault();
+                      if (dragOverId !== entry.id) setDragOverId(entry.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverId === entry.id) setDragOverId(null);
+                    }}
+                    onDrop={(e) => {
+                      if (!isSelected || !draggedId) return;
+                      e.preventDefault();
+                      reorderInCategory(category.id, draggedId, entry.id);
+                      setDraggedId(null);
+                      setDragOverId(null);
+                    }}
                   >
+                    {/* Drag handle — only for selected entries, chevrons remain as fallback */}
+                    {isSelected && (
+                      <div
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          setDraggedId(entry.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDraggedId(null);
+                          setDragOverId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-0.5 shrink-0 cursor-grab touch-none self-center text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+                        aria-hidden="true"
+                      >
+                        <GripVertical className="size-4" />
+                      </div>
+                    )}
+
                     {/* Checkbox */}
                     <div
                       className="mt-0.5 shrink-0"
