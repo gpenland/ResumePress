@@ -86,7 +86,15 @@ function NewContactDialog({
             <AlertDialogTitle>New contact</AlertDialogTitle>
           </AlertDialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
-            <Input ref={nameRef} name="name" placeholder="Name" required autoFocus />
+            <Input
+              ref={nameRef}
+              name="name"
+              placeholder="Name"
+              required
+              autoFocus
+              autoComplete="off"
+              data-1p-ignore
+            />
             {thread.participants.length > 1 ? (
               <select
                 value={email}
