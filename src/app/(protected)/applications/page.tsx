@@ -65,7 +65,12 @@ export default async function ApplicationsPage({
       ) : isKanban ? (
         <ApplicationsKanban applications={applications} updateStatus={updateApplicationStatus} />
       ) : (
-        <ApplicationsList applications={applications} status={status} deleteApplication={deleteApplication} />
+        <ApplicationsList
+          applications={applications}
+          status={status}
+          deleteApplication={deleteApplication}
+          updateStatus={updateApplicationStatus}
+        />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import StatusBadge from "@/components/applications/StatusBadge";
+import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } from "@/lib/applicationsShared";
 
@@ -14,6 +14,7 @@ type Props = {
   applications: ApplicationWithCompany[];
   status?: string;
   deleteApplication: (id: string) => Promise<void>;
+  updateStatus: (id: string, status: string) => Promise<void>;
 };
 
 function matchesQuery(app: ApplicationWithCompany, query: string): boolean {
@@ -26,7 +27,7 @@ function sortKey(app: ApplicationWithCompany): number {
   return new Date(date).getTime();
 }
 
-export default function ApplicationsList({ applications, status, deleteApplication }: Props) {
+export default function ApplicationsList({ applications, status, deleteApplication, updateStatus }: Props) {
   const [search, setSearch] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -104,7 +105,7 @@ export default function ApplicationsList({ applications, status, deleteApplicati
           {filtered.map((app) => (
             <Card key={app.id} className="py-0 hover:bg-muted/30 transition-colors">
               <CardContent className="flex items-center gap-2 py-3 px-5">
-                <Link href={`/applications/${app.id}`} className="flex items-center justify-between flex-1 min-w-0 gap-3">
+                <Link href={`/applications/${app.id}`} className="flex-1 min-w-0">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">
                       {app.company.name} <span className="text-muted-foreground font-normal">— {app.roleTitle}</span>
@@ -116,10 +117,10 @@ export default function ApplicationsList({ applications, status, deleteApplicati
                       )}
                     </p>
                   </div>
-                  <div className="shrink-0">
-                    <StatusBadge status={app.status} />
-                  </div>
                 </Link>
+                <div className="shrink-0">
+                  <EditableStatusBadge applicationId={app.id} status={app.status} updateStatus={updateStatus} />
+                </div>
                 <DeleteItemButton
                   action={deleteApplication.bind(null, app.id)}
                   itemName={`${app.company.name} — ${app.roleTitle}`}
