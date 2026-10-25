@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { findOrCreateCompanyForUser } from "@/lib/companies";
 import type { Application, ApplicationStatusHistory } from "@prisma/client";
-import { type ApplicationWithCompany } from "@/lib/applicationsShared";
+import { APPLICATION_STATUSES, type ApplicationStatus, type ApplicationWithCompany } from "@/lib/applicationsShared";
 import { parseStatusHistory, type MappedApplicationRow } from "@/lib/notionImportShared";
 
 // Re-exported so server code (actions.ts) can import everything it needs from
@@ -276,6 +276,69 @@ export async function getApplicationStatusFlowForUser(userId: string): Promise<S
     const [source, target] = key.split("\u0000");
     return { source, target, value };
   });
+}
+
+export type ApplicationPipelineStats = {
+  total: number;
+  active: number;
+  offers: number;
+  offerRate: number | null;
+  newThisWeek: number;
+  newLastWeek: number;
+  byStatus: { status: string; count: number }[];
+};
+
+function statusRank(status: string): number {
+  const i = APPLICATION_STATUSES.indexOf(status as ApplicationStatus);
+  return i === -1 ? APPLICATION_STATUSES.length : i;
+}
+
+/**
+ * Powers the dashboard Statistics panel. "Active" means not Rejected/Ghosted
+ * — an Offer still counts as active (there's no separate "accepted" status,
+ * and the search isn't over until the user acts on the offer).
+ * newThisWeek/newLastWeek are rolling 7-day windows off createdAt (not
+ * calendar weeks), so the "vs last week" delta is always comparing two full
+ * 7-day periods regardless of what day it is.
+ */
+export async function getApplicationPipelineStatsForUser(userId: string): Promise<ApplicationPipelineStats> {
+  const applications = await prisma.application.findMany({
+    where: { userId },
+    select: { status: true, createdAt: true },
+  });
+
+  const now = Date.now();
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+  const counts = new Map<string, number>();
+  let active = 0;
+  let offers = 0;
+  let newThisWeek = 0;
+  let newLastWeek = 0;
+
+  for (const { status, createdAt } of applications) {
+    counts.set(status, (counts.get(status) ?? 0) + 1);
+    if (status !== "Rejected" && status !== "Ghosted") active++;
+    if (status === "Offer") offers++;
+
+    const age = now - createdAt.getTime();
+    if (age < WEEK_MS) newThisWeek++;
+    else if (age < 2 * WEEK_MS) newLastWeek++;
+  }
+
+  const byStatus = Array.from(counts.entries())
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.status.localeCompare(b.status));
+
+  return {
+    total: applications.length,
+    active,
+    offers,
+    offerRate: applications.length === 0 ? null : offers / applications.length,
+    newThisWeek,
+    newLastWeek,
+    byStatus,
+  };
 }
 
 export async function getApplicationForUser(userId: string, applicationId: string) {

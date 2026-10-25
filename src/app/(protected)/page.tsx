@@ -3,19 +3,20 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
-import { listApplicationsForUser } from "@/lib/applications";
-import { listTriageThreadsForUser } from "@/lib/emailThreads";
+import { listApplicationsForUser, getApplicationPipelineStatsForUser } from "@/lib/applications";
+import { listTriageThreadsForUser, getEmailSyncStatsForUser } from "@/lib/emailThreads";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { entryLabel } from "@/lib/entries";
 import StatusBadge from "@/components/applications/StatusBadge";
+import StatisticsPanel from "@/components/dashboard/StatisticsPanel";
 
 export default async function HomePage() {
   const userId = await getUserId();
 
-  const [recentResumes, recentEntries, recentApplications, triageThreads] = userId
+  const [recentResumes, recentEntries, recentApplications, triageThreads, pipelineStats, emailStats] = userId
     ? await Promise.all([
         prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 5 }),
         prisma.entry.findMany({
@@ -26,8 +27,10 @@ export default async function HomePage() {
         }),
         listApplicationsForUser(userId),
         listTriageThreadsForUser(userId),
+        getApplicationPipelineStatsForUser(userId),
+        getEmailSyncStatsForUser(userId),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], null, null];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
@@ -35,6 +38,8 @@ export default async function HomePage() {
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1 text-sm">Your applications, resumes, and what&apos;s pending review</p>
       </div>
+
+      {pipelineStats && emailStats && <StatisticsPanel pipeline={pipelineStats} email={emailStats} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <section className="space-y-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -19,6 +20,7 @@ type Props = {
 };
 
 const STALE_STATUSES = new Set(["Rejected", "Ghosted"]);
+const PANEL_WIDTH = 320;
 
 /**
  * Searchable, ranked replacement for a plain <select> of every application —
@@ -31,7 +33,15 @@ export default function ApplicationPicker({ options, participants, value, onChan
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Position of the dropdown panel, computed from the trigger button's
+  // viewport rect. The panel is rendered through a portal into document.body
+  // (not inline here) because this picker lives inside a Card, and Card uses
+  // overflow-hidden for its rounded corners — an inline absolutely-positioned
+  // panel gets silently clipped at the card's edge instead of floating above
+  // the page.
+  const [panelRect, setPanelRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -42,16 +52,41 @@ export default function ApplicationPicker({ options, participants, value, onChan
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // The panel is `position: fixed` against the viewport, so it goes stale if
+  // the page scrolls or resizes while open — close rather than let it drift
+  // away from the trigger button.
   useEffect(() => {
     if (!open) return;
+    function close() {
+      setOpen(false);
+    }
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPanelRect({
+        top: rect.bottom + 4,
+        left: Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8),
+        width: PANEL_WIDTH,
+      });
+    }
     setQuery("");
     setHighlight(0);
     const id = requestAnimationFrame(() => inputRef.current?.focus());
@@ -103,8 +138,12 @@ export default function ApplicationPicker({ options, participants, value, onChan
         <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
 
-      {open && (
-        <div className="absolute z-20 mt-1 w-80 rounded-lg border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+      {open && panelRect && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: "fixed", top: panelRect.top, left: panelRect.left, width: panelRect.width }}
+          className="z-50 rounded-lg border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10"
+        >
           <div className="flex items-center gap-1.5 border-b px-2.5 py-1.5">
             <Search className="size-3.5 text-muted-foreground shrink-0" />
             <input
@@ -170,7 +209,8 @@ export default function ApplicationPicker({ options, participants, value, onChan
               );
             })}
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -367,6 +367,33 @@ export async function listApplicationPickerOptionsForUser(userId: string): Promi
   }));
 }
 
+export type EmailSyncStats = {
+  connected: boolean;
+  lastSyncAt: Date | null;
+  needsReview: number;
+  matched: number; // auto + confirmed
+  total: number;
+};
+
+/** Powers the dashboard Statistics panel's email-sync tiles. */
+export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyncStats> {
+  const [account, grouped] = await Promise.all([
+    prisma.gmailAccount.findUnique({ where: { userId }, select: { lastSyncAt: true } }),
+    prisma.emailThread.groupBy({ by: ["matchStatus"], where: { userId }, _count: true }),
+  ]);
+
+  let needsReview = 0;
+  let matched = 0;
+  let total = 0;
+  for (const { matchStatus, _count } of grouped) {
+    total += _count;
+    if (matchStatus === "unmatched") needsReview += _count;
+    else if (matchStatus === "auto" || matchStatus === "confirmed") matched += _count;
+  }
+
+  return { connected: !!account, lastSyncAt: account?.lastSyncAt ?? null, needsReview, matched, total };
+}
+
 export async function listTriageThreadsForUser(userId: string) {
   return prisma.emailThread.findMany({
     where: { userId, matchStatus: "unmatched" },

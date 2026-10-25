@@ -60,6 +60,18 @@ const TONE_FILL_CLASSES: Record<StatusTone, string> = {
   muted: "fill-muted-foreground",
 };
 
+// Solid-background counterpart of TONE_FILL_CLASSES, for HTML (not SVG) bars —
+// see the dashboard Statistics panel's status-breakdown chart.
+const TONE_BAR_CLASSES: Record<StatusTone, string> = {
+  slate: "bg-slate-400 dark:bg-slate-500",
+  blue: "bg-blue-500 dark:bg-blue-400",
+  violet: "bg-violet-500 dark:bg-violet-400",
+  amber: "bg-amber-500 dark:bg-amber-400",
+  emerald: "bg-emerald-500 dark:bg-emerald-400",
+  destructive: "bg-destructive",
+  muted: "bg-muted-foreground",
+};
+
 function toneFor(status: string): StatusTone {
   return STATUS_TONES[status] ?? DEFAULT_TONE;
 }
@@ -70,6 +82,10 @@ export function statusBadgeClasses(status: string): string {
 
 export function statusFillClass(status: string): string {
   return TONE_FILL_CLASSES[toneFor(status)];
+}
+
+export function statusBarClass(status: string): string {
+  return TONE_BAR_CLASSES[toneFor(status)];
 }
 
 // Shared date formatting for application dates (e.g. "Applied Jan 5, 2026").
