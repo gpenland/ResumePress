@@ -4,6 +4,7 @@
 // client components.
 
 export { parseCsvTable } from "@/lib/csv";
+import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/applicationsShared";
 
 export const APPLICATION_IMPORT_FIELDS = [
   { key: "companyName", label: "Company", required: true },
@@ -85,4 +86,20 @@ export function applyColumnMapping(rows: string[][], mapping: ColumnMapping): Ma
   });
 
   return { rows: mapped, errors };
+}
+
+/**
+ * Notion's status property exports its full option history as a comma-separated
+ * list (e.g. "Applied, Rejected") rather than just the current value. Splits that
+ * into the ordered list of recognized statuses, oldest first, so the importer can
+ * both set the *current* status to the last entry and seed ApplicationStatusHistory
+ * with the transitions in between, instead of silently keeping the default "Applied".
+ * Unrecognized entries (free-form notes Notion users sometimes mix in) are dropped.
+ */
+export function parseStatusHistory(raw: string | null): ApplicationStatus[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is ApplicationStatus => (APPLICATION_STATUSES as readonly string[]).includes(s));
 }

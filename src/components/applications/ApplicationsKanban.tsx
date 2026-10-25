@@ -91,8 +91,8 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
               >
                 <CardContent className="p-3 space-y-2">
                   <Link href={`/applications/${app.id}`} className="block min-w-0">
-                    <p className="font-medium text-sm truncate">{app.roleTitle}</p>
-                    <p className="text-xs text-muted-foreground truncate">{app.company.name}</p>
+                    <p className="font-medium text-sm truncate">{app.company.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{app.roleTitle}</p>
                     {app.term && <p className="text-xs text-muted-foreground mt-1">{app.term}</p>}
                   </Link>
                   {/* Keyboard-operable alternative to drag-and-drop — found missing by the Phase 4 audit. */}
