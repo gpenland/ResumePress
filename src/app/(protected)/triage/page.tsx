@@ -6,7 +6,12 @@ import { listContactOptionsForUser } from "@/lib/contacts";
 import { listApplicationOptionsForUser } from "@/lib/interactions";
 import TriageList from "@/components/gmail/TriageList";
 import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
-import { confirmEmailThreadMatch, ignoreEmailThreadMatch, restoreEmailThreadMatch } from "./actions";
+import {
+  confirmEmailThreadMatch,
+  ignoreEmailThreadMatch,
+  restoreEmailThreadMatch,
+  createContactFromTriage,
+} from "./actions";
 
 export default async function TriagePage() {
   const userId = await requireUserId();
@@ -32,6 +37,7 @@ export default async function TriagePage() {
         applicationOptions={applicationOptions}
         confirmMatch={confirmEmailThreadMatch}
         ignoreMatch={ignoreEmailThreadMatch}
+        createContact={createContactFromTriage}
       />
 
       <IgnoredThreadsList threads={ignoredThreads} restoreMatch={restoreEmailThreadMatch} />

@@ -6,6 +6,7 @@ import {
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
 } from "@/lib/emailThreads";
+import { createContactForUser } from "@/lib/contacts";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
@@ -35,4 +36,17 @@ export async function restoreEmailThreadMatch(threadId: string) {
   if (!result.ok) notFound();
 
   revalidatePath("/triage");
+}
+
+// Barebones contact creation from an unmatched triage thread — name + the one
+// sender email picked from the thread's participants, nothing else. Doesn't
+// confirm the thread's match itself; the caller still picks the new contact
+// in the row's select and hits Confirm, same as any other match.
+export async function createContactFromTriage(name: string, email: string | null) {
+  const userId = await requireUserId();
+  const contact = await createContactForUser(userId, { name, emails: email ? [email] : [] });
+
+  revalidatePath("/triage");
+  revalidatePath("/contacts");
+  return { id: contact.id, name: contact.name };
 }
