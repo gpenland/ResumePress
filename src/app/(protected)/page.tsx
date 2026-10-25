@@ -67,15 +67,15 @@ export default async function HomePage() {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Email Triage</h2>
-            <Link href="/triage" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+            <h2 className="font-semibold">Email</h2>
+            <Link href="/email" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
               See all
             </Link>
           </div>
           {triageThreads.length === 0 ? (
             <EmptyState message="Nothing pending triage" />
           ) : (
-            <Link href="/triage" className="block">
+            <Link href="/email" className="block">
               <Card className="hover:bg-muted/40 transition-colors cursor-pointer py-0">
                 <CardContent className="flex items-center justify-between py-3 px-4">
                   <span className="text-sm">

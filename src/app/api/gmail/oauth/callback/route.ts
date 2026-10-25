@@ -87,7 +87,7 @@ export async function GET(req: Request) {
     scopes: (tokens.scope ?? "").split(" ").filter(Boolean),
   });
 
-  const response = NextResponse.redirect(new URL("/settings/gmail", origin));
+  const response = NextResponse.redirect(new URL("/email", origin));
   response.cookies.delete(STATE_COOKIE);
   return response;
 }

@@ -32,6 +32,7 @@ type Props = {
   threads: TriageThread[];
   contactOptions: { id: string; name: string }[];
   applicationOptions: { id: string; label: string }[];
+  applicationIdsByContact: Record<string, string[]>;
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
@@ -41,6 +42,7 @@ type RowProps = {
   thread: TriageThread;
   contactOptions: { id: string; name: string }[];
   applicationOptions: { id: string; label: string }[];
+  applicationIdsByContact: Record<string, string[]>;
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
@@ -112,11 +114,28 @@ function NewContactDialog({
   );
 }
 
-function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, ignoreMatch, createContact }: RowProps) {
+function TriageRow({ thread, contactOptions, applicationOptions, applicationIdsByContact, confirmMatch, ignoreMatch, createContact }: RowProps) {
   const router = useRouter();
   const [contactId, setContactId] = useState(thread.matchedContact?.id ?? "");
   const [applicationId, setApplicationId] = useState(thread.matchedApplication?.id ?? "");
   const [isPending, startTransition] = useTransition();
+
+  // Once a contact is picked, narrow the application list down to just the
+  // applications that contact is actually linked to (ApplicationContact) —
+  // falls back to the full list when the contact has no linked applications.
+  const linkedApplicationIds = contactId ? applicationIdsByContact[contactId] : undefined;
+  const visibleApplicationOptions =
+    linkedApplicationIds && linkedApplicationIds.length > 0
+      ? applicationOptions.filter((a) => linkedApplicationIds.includes(a.id))
+      : applicationOptions;
+
+  function handleContactChange(newContactId: string) {
+    setContactId(newContactId);
+    const linked = newContactId ? applicationIdsByContact[newContactId] : undefined;
+    if (linked && linked.length > 0 && applicationId && !linked.includes(applicationId)) {
+      setApplicationId("");
+    }
+  }
 
   function handleConfirm() {
     startTransition(async () => {
@@ -156,7 +175,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={contactId}
-            onChange={(e) => setContactId(e.target.value)}
+            onChange={(e) => handleContactChange(e.target.value)}
             aria-label="Contact"
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
@@ -172,7 +191,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
             <option value="">No application</option>
-            {applicationOptions.map((a) => (
+            {visibleApplicationOptions.map((a) => (
               <option key={a.id} value={a.id}>{a.label}</option>
             ))}
           </select>
@@ -193,7 +212,7 @@ function TriageRow({ thread, contactOptions, applicationOptions, confirmMatch, i
   );
 }
 
-export default function TriageList({ threads, contactOptions, applicationOptions, confirmMatch, ignoreMatch, createContact }: Props) {
+export default function TriageList({ threads, contactOptions, applicationOptions, applicationIdsByContact, confirmMatch, ignoreMatch, createContact }: Props) {
   if (threads.length === 0) {
     return (
       <Card className="border-dashed">
@@ -212,6 +231,7 @@ export default function TriageList({ threads, contactOptions, applicationOptions
           thread={thread}
           contactOptions={contactOptions}
           applicationOptions={applicationOptions}
+          applicationIdsByContact={applicationIdsByContact}
           confirmMatch={confirmMatch}
           ignoreMatch={ignoreMatch}
           createContact={createContact}

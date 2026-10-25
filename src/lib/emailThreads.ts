@@ -176,13 +176,26 @@ async function createInteractionFromEmailThreadIfMissing(
  * synced, which would otherwise never push through to that application.
  */
 async function rematchUnmatchedThreadsForUser(userId: string, candidates: MatchCandidates): Promise<number> {
+  // A thread can lose both its contact and application link (e.g. the matched
+  // Contact or Application was deleted — EmailThread.matchedContactId/
+  // matchedApplicationId are onDelete: SetNull) while its matchStatus stays
+  // "auto"/"confirmed". Left alone, that thread is stuck forever: it's not
+  // "unmatched" so it never shows in Triage, and it's not "ignored" so it
+  // never shows there either — and the loop below only re-evaluates
+  // "unmatched" threads. Demote it back to "unmatched" so it resurfaces for a
+  // fresh manual match.
+  const { count: resurfaced } = await prisma.emailThread.updateMany({
+    where: { userId, matchStatus: { in: ["auto", "confirmed"] }, matchedContactId: null, matchedApplicationId: null },
+    data: { matchStatus: "unmatched" },
+  });
+
   const [unmatched, missingApplicationLink] = await Promise.all([
     prisma.emailThread.findMany({ where: { userId, matchStatus: "unmatched" } }),
     prisma.emailThread.findMany({
       where: { userId, matchStatus: { in: ["auto", "confirmed"] }, matchedApplicationId: null, matchedContactId: { not: null } },
     }),
   ]);
-  let rematched = 0;
+  let rematched = resurfaced;
 
   for (const thread of missingApplicationLink) {
     const applicationId = thread.matchedContactId ? candidates.applicationByContact.get(thread.matchedContactId) : undefined;
