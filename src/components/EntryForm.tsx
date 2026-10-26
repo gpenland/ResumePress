@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
+import { EMPHASIS_CONTENT_SOURCE } from "@/lib/richTextMarkers";
 
 type Props = {
   category: Category;
@@ -317,9 +318,16 @@ function Ghost({ children }: { children: React.ReactNode }) {
   return <span className="text-muted-foreground/40 italic font-normal">{children}</span>;
 }
 
-// Parse **bold** and *italic* markers for the preview
+const RICH_SPLIT_RE = new RegExp(
+  String.raw`(\*\*${EMPHASIS_CONTENT_SOURCE}\*\*|\*${EMPHASIS_CONTENT_SOURCE}\*)`,
+  "g"
+);
+
+// Parse **bold** and *italic* markers for the preview — mirrors jake.ts's
+// applyFormatting() exactly (shared EMPHASIS_CONTENT_SOURCE) so what the
+// preview shows always matches what the compiled PDF renders.
 function renderRich(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  const parts = text.split(RICH_SPLIT_RE);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**"))
       return <strong key={i}>{part.slice(2, -2)}</strong>;

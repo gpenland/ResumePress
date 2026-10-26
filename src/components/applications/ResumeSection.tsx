@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn, nativeSelectClassName } from "@/lib/utils";
+import { fetchResumePdf, triggerBlobDownload } from "@/lib/pdfDownloadClient";
 
 // Extension point for Module D (Resume integration, docs/MIGRATION_PLAN.md §5).
 // Rendered from applications/[id]/page.tsx (Module A). Do not add contact/
@@ -28,6 +29,20 @@ export default function ResumeSection({
   const [picking, setPicking] = useState(false);
   const [selectedId, setSelectedId] = useState(resumes[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [isDownloading, startDownload] = useTransition();
+
+  function handleDownload(url: string) {
+    startDownload(async () => {
+      setDownloadError(null);
+      const result = await fetchResumePdf(url);
+      if (!result.ok) {
+        setDownloadError(result.error);
+        return;
+      }
+      triggerBlobDownload(result.blobUrl, result.filename);
+    });
+  }
 
   function handleAttach(resumeId?: string) {
     const id = resumeId ?? selectedId;
@@ -58,14 +73,15 @@ export default function ResumeSection({
           <Link href={`/resumes/${resume.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Open
           </Link>
-          <a
-            href={snapshot ? `/api/pdf/snapshot/${snapshot.id}` : `/api/pdf/${resume.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload(snapshot ? `/api/pdf/snapshot/${snapshot.id}` : `/api/pdf/${resume.id}`)}
+            disabled={isDownloading}
           >
-            Download PDF
-          </a>
+            {isDownloading ? "Generating…" : "Download PDF"}
+          </Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => setPicking(true)}>
             Change
           </Button>
@@ -88,6 +104,9 @@ export default function ResumeSection({
           >
             Remove
           </Button>
+          {downloadError && (
+            <span className="text-xs text-destructive basis-full">{downloadError}</span>
+          )}
           {snapshot && (
             <span className="text-xs text-muted-foreground basis-full">
               Pinned to the version from {new Date(snapshot.createdAt).toLocaleDateString()}. Editing the
