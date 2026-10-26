@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { listAllGmailAccountUserIds } from "@/lib/gmailAccount";
-import { syncGmailForUser, type SyncResult } from "@/lib/emailThreads";
+import { runTrackedGmailSyncForUser, type SyncResult } from "@/lib/emailThreads";
 
 function isAuthorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -20,8 +20,10 @@ function isAuthorized(req: Request): boolean {
 /**
  * Triggered on a schedule by a Sevalla `cron` process (see CLAUDE.md "Gmail
  * sync") instead of a user clicking "Sync now". Loops every connected
- * GmailAccount and runs the same `syncGmailForUser` the manual action uses;
- * one account's failure never aborts the rest of the batch.
+ * GmailAccount and runs the same tracked sync the manual action uses
+ * (`runTrackedGmailSyncForUser`) — the shared syncStatus guard means a cron
+ * run and a manual "Sync now" can never race each other into a double
+ * sync; one account's failure never aborts the rest of the batch.
  */
 export async function POST(req: Request) {
   if (!isAuthorized(req)) {
@@ -33,7 +35,7 @@ export async function POST(req: Request) {
 
   for (const userId of userIds) {
     try {
-      results[userId] = await syncGmailForUser(userId);
+      results[userId] = await runTrackedGmailSyncForUser(userId);
     } catch (err) {
       results[userId] = { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
     }

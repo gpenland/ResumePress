@@ -1,24 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 import { cn, nativeSelectClassName } from "@/lib/utils";
-import type { SyncResult } from "@/lib/emailThreads";
+import type { GmailSyncStatus } from "@/lib/emailThreads";
 import type { GmailLabel } from "@/lib/gmail";
 
 type ConnectedProps = {
   connected: true;
   email: string;
   connectedAt: Date;
-  lastSyncAt: Date | null;
+  initialSyncStatus: GmailSyncStatus;
   labels: GmailLabel[];
   labelsError: string | null;
   overrideLabelId: string | null;
   saveOverrideLabel: (labelId: string | null) => Promise<void>;
-  syncNow: () => Promise<SyncResult>;
+  startSync: () => Promise<{ started: boolean; error?: string }>;
+  getSyncStatus: () => Promise<GmailSyncStatus>;
   clearUnmatched: () => Promise<{ cleared: number }>;
   disconnect: () => Promise<void>;
 };
@@ -27,10 +28,26 @@ type DisconnectedProps = { connected: false };
 
 type Props = ConnectedProps | DisconnectedProps;
 
+const POLL_INTERVAL_MS = 1500;
+
 // Collapsed by default — connecting/reconfiguring Gmail is a rare, one-time
 // chore, so the default view is a one-line status plus the one action
 // (Sync now) worth surfacing on every visit. Expanding reveals the
-// connected-since timestamp and disconnect, unchanged.
+// connected-since timestamp, the label override, and disconnect.
+//
+// Sync UX: a sync runs in the background on the server (see
+// startGmailSyncInBackgroundForUser in emailThreads.ts) rather than as a
+// single request this component awaits — it can run for minutes, far
+// longer than a browser request (or any proxy in front of it) should be
+// expected to survive. This component instead polls getSyncStatus while a
+// sync is running, whether that sync was started by this click, by another
+// tab, or by the scheduled cron job — so opening /email mid-sync (from any
+// source) shows live progress immediately rather than a stale "idle" state
+// that silently catches up later. A first-ever sync (no prior lastSyncAt)
+// gets more reassuring copy, since scanning a whole inbox for the first
+// time is the slowest, least-familiar case; later syncs show the same
+// progress UI with lighter wording, since the user already knows what to
+// expect.
 export default function GmailConnectionPanel(props: Props) {
   if (!props.connected) {
     return (
@@ -46,31 +63,83 @@ export default function GmailConnectionPanel(props: Props) {
   const {
     email,
     connectedAt,
-    lastSyncAt,
+    initialSyncStatus,
     labels,
     labelsError,
     overrideLabelId,
     saveOverrideLabel,
-    syncNow,
+    startSync,
+    getSyncStatus,
     clearUnmatched,
     disconnect,
   } = props;
 
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const [isSyncing, startSyncing] = useTransition();
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncStatus, setSyncStatus] = useState<GmailSyncStatus>(initialSyncStatus);
+  // Captured once, when a sync starts being observed — not re-derived from
+  // syncStatus.lastSyncAt (which only updates once the sync finishes) — so
+  // "is this the first sync" can't flip partway through its own run.
+  const [isFirstSync, setIsFirstSync] = useState(initialSyncStatus.lastSyncAt === null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isStarting, startStarting] = useTransition();
   const [selectedLabelId, setSelectedLabelId] = useState(overrideLabelId ?? "");
   const [isSavingLabel, startSavingLabel] = useTransition();
   const [isClearing, startClearing] = useTransition();
   const [clearResult, setClearResult] = useState<string | null>(null);
 
+  const isRunning = syncStatus.status === "running";
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasRunningRef = useRef(isRunning);
+
+  useEffect(() => {
+    function stopPolling() {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+
+    if (!isRunning) {
+      stopPolling();
+      // Just finished (was running on the previous render, isn't now) —
+      // refresh the page's own server data once so the triage list catches
+      // up, instead of requiring a manual reload.
+      if (wasRunningRef.current) router.refresh();
+      wasRunningRef.current = false;
+      return;
+    }
+
+    wasRunningRef.current = true;
+    let cancelled = false;
+
+    async function poll() {
+      const next = await getSyncStatus();
+      if (cancelled) return;
+      setSyncStatus(next);
+      if (next.status === "running") {
+        pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    }
+
+    pollTimeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning]);
+
   function handleSync() {
-    setSyncResult(null);
-    startSyncing(async () => {
-      const result = await syncNow();
-      setSyncResult(result);
-      router.refresh();
+    setStartError(null);
+    setIsFirstSync(syncStatus.lastSyncAt === null);
+    startStarting(async () => {
+      const result = await startSync();
+      if (!result.started) {
+        setStartError(result.error ?? "Could not start sync.");
+        return;
+      }
+      // Optimistic: reflect "running" immediately rather than waiting for
+      // the first poll tick, so the button disables right away.
+      setSyncStatus((prev) => ({ ...prev, status: "running", total: null, done: 0, error: null }));
     });
   }
 
@@ -91,18 +160,28 @@ export default function GmailConnectionPanel(props: Props) {
     });
   }
 
+  const progressPct =
+    syncStatus.total && syncStatus.total > 0 ? Math.min(100, ((syncStatus.done ?? 0) / syncStatus.total) * 100) : null;
+
+  function statusLine(): string {
+    if (isRunning) {
+      if (isFirstSync) return "Running your first sync…";
+      return "Syncing…";
+    }
+    if (syncStatus.status === "error") return "Last sync failed";
+    return syncStatus.lastSyncAt ? `Synced ${syncStatus.lastSyncAt.toLocaleDateString()}` : "Never synced";
+  }
+
   return (
     <div className="rounded-lg border px-4 py-3 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{email}</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {lastSyncAt ? `Synced ${lastSyncAt.toLocaleDateString()}` : "Never synced"}
-          </p>
+          <p className="text-xs text-muted-foreground truncate">{statusLine()}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Button type="button" size="sm" onClick={handleSync} disabled={isSyncing}>
-            {isSyncing ? "Syncing…" : "Sync now"}
+          <Button type="button" size="sm" onClick={handleSync} disabled={isRunning || isStarting}>
+            {isRunning || isStarting ? "Syncing…" : "Sync now"}
           </Button>
           <button
             type="button"
@@ -114,13 +193,34 @@ export default function GmailConnectionPanel(props: Props) {
         </div>
       </div>
 
-      {syncResult && (
-        <p className={`text-xs ${syncResult.ok ? "text-muted-foreground" : "text-destructive"}`}>
-          {syncResult.ok
-            ? `Synced ${syncResult.threadsUpserted} thread(s)${syncResult.rematched > 0 ? `, rematched ${syncResult.rematched} previously unmatched` : ""}.`
-            : syncResult.error}
-        </p>
+      {isRunning && (
+        <div className="space-y-1.5">
+          {isFirstSync && (
+            <p className="text-xs text-muted-foreground">
+              Scanning your whole inbox for the first time — this can take a few minutes. Feel free to leave this
+              page; progress picks back up when you return.
+            </p>
+          )}
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            {progressPct !== null ? (
+              <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+            ) : (
+              <div className="h-full w-2/5 bg-primary/50 animate-pulse rounded-full" />
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {progressPct !== null ? `${syncStatus.done} of ${syncStatus.total} threads checked` : "Finding emails to check…"}
+          </p>
+        </div>
       )}
+
+      {!isRunning && syncStatus.status === "error" && (
+        <p className="text-xs text-destructive">{syncStatus.error}</p>
+      )}
+      {!isRunning && !syncStatus.error && syncStatus.total !== null && (
+        <p className="text-xs text-muted-foreground">Checked {syncStatus.total} thread(s) on the last sync.</p>
+      )}
+      {startError && <p className="text-xs text-destructive">{startError}</p>}
 
       {expanded && (
         <div className="space-y-3 border-t pt-3">
@@ -158,7 +258,13 @@ export default function GmailConnectionPanel(props: Props) {
               Deletes every unmatched thread (not confirmed/ignored ones) so the next sync re-fetches and
               re-classifies them from scratch — for testing a clean resync.
             </p>
-            <Button type="button" variant="outline" size="sm" onClick={handleClearUnmatched} disabled={isClearing}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClearUnmatched}
+              disabled={isClearing || isRunning}
+            >
               {isClearing ? "Clearing…" : "Clear unmatched emails"}
             </Button>
             {clearResult && <p className="text-xs text-muted-foreground">{clearResult}</p>}

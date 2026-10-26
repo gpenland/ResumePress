@@ -9,6 +9,7 @@ import {
   listRecentMatchedThreadsForUser,
   listIgnoredThreadsForUser,
   listApplicationPickerOptionsForUser,
+  getGmailSyncStatusForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
 import { updateApplicationStatus } from "@/app/(protected)/applications/actions";
@@ -20,7 +21,8 @@ import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
 import {
   disconnectGmail,
   saveOverrideLabel,
-  syncGmailNow,
+  startGmailSync,
+  getGmailSyncStatus,
   clearUnmatchedThreads,
   confirmEmailThreadMatch,
   ignoreEmailThreadMatch,
@@ -39,6 +41,14 @@ export default async function EmailPage() {
   let labels: Awaited<ReturnType<typeof listAvailableLabelsForUser>> = [];
   let labelsError: string | null = null;
   let overrideLabelId: string | null = null;
+  let syncStatus: Awaited<ReturnType<typeof getGmailSyncStatusForUser>> = {
+    status: "idle",
+    startedAt: null,
+    total: null,
+    done: null,
+    error: null,
+    lastSyncAt: null,
+  };
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
@@ -47,16 +57,25 @@ export default async function EmailPage() {
   let applicationIdsByContact: Record<string, string[]> = {};
 
   if (status.connected) {
-    const [account, threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
-      await Promise.all([
-        prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
-        listTriageThreadsForUser(userId),
-        listIgnoredThreadsForUser(userId),
-        listContactOptionsForUser(userId),
-        listApplicationPickerOptionsForUser(userId),
-        listApplicationIdsByContactForUser(userId),
-      ]);
+    const [
+      account,
+      syncStatusResult,
+      threadsResult,
+      ignoredResult,
+      contactOptionsResult,
+      applicationsResult,
+      applicationIdsByContactResult,
+    ] = await Promise.all([
+      prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
+      getGmailSyncStatusForUser(userId),
+      listTriageThreadsForUser(userId),
+      listIgnoredThreadsForUser(userId),
+      listContactOptionsForUser(userId),
+      listApplicationPickerOptionsForUser(userId),
+      listApplicationIdsByContactForUser(userId),
+    ]);
     overrideLabelId = account?.syncLabelIds[0] ?? null;
+    syncStatus = syncStatusResult;
     threads = threadsResult;
     ignoredThreads = ignoredResult;
     contactOptions = contactOptionsResult;
@@ -90,12 +109,13 @@ export default async function EmailPage() {
           connected
           email={status.email}
           connectedAt={status.connectedAt}
-          lastSyncAt={status.lastSyncAt}
+          initialSyncStatus={syncStatus}
           labels={labels}
           labelsError={labelsError}
           overrideLabelId={overrideLabelId}
           saveOverrideLabel={saveOverrideLabel}
-          syncNow={syncGmailNow}
+          startSync={startGmailSync}
+          getSyncStatus={getGmailSyncStatus}
           clearUnmatched={clearUnmatchedThreads}
           disconnect={disconnectGmail}
         />

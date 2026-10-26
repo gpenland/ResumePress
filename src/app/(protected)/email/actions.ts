@@ -3,14 +3,15 @@
 import { requireUserId } from "@/lib/auth";
 import { disconnectGmailAccount } from "@/lib/gmailAccount";
 import {
-  syncGmailForUser,
+  startGmailSyncInBackgroundForUser,
+  getGmailSyncStatusForUser,
   updateSyncLabelsForUser,
   clearUnmatchedThreadsForUser,
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
   suggestMatchForThreadForUser,
-  type SyncResult,
+  type GmailSyncStatus,
   type SuggestedMatch,
 } from "@/lib/emailThreads";
 import { createContactForUser } from "@/lib/contacts";
@@ -31,11 +32,23 @@ export async function saveOverrideLabel(labelId: string | null) {
   revalidatePath("/email");
 }
 
-export async function syncGmailNow(): Promise<SyncResult> {
+// Kicks off a sync and returns immediately — doesn't wait for it to finish.
+// A sync over hundreds of threads can run for minutes, far longer than a
+// single request/response (and any reverse proxy in front of it) should be
+// expected to survive; the client polls getGmailSyncStatus instead. See
+// "Gmail sync" in CLAUDE.md and startGmailSyncInBackgroundForUser's own doc
+// comment for the full rationale.
+export async function startGmailSync(): Promise<{ started: boolean; error?: string }> {
   const userId = await requireUserId();
-  const result = await syncGmailForUser(userId);
+  const result = await startGmailSyncInBackgroundForUser(userId);
   revalidatePath("/email");
   return result;
+}
+
+/** Polled by the client while a sync is running, to drive the progress UI. */
+export async function getGmailSyncStatus(): Promise<GmailSyncStatus> {
+  const userId = await requireUserId();
+  return getGmailSyncStatusForUser(userId);
 }
 
 /** Debug tool: deletes unmatched EmailThread rows so the next sync re-fetches and re-classifies them from scratch. Doesn't touch confirmed/ignored threads. */
