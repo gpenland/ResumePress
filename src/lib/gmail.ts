@@ -52,25 +52,32 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token;
 }
 
-// Every currently-unread thread in the inbox, regardless of label — paginated
-// (Gmail caps a single /messages?q= page at 500; most inboxes are well under
-// that, but this walks nextPageToken rather than silently truncating).
-// Re-run on every sync rather than tracked incrementally: unlike a label's
-// full history, "currently unread" is a self-pruning set that shrinks as the
-// user reads mail, so there's no large backlog to avoid re-scanning.
-export async function listUnreadInboxThreadIds(accessToken: string): Promise<string[]> {
+// Every thread in the inbox, read or unread, regardless of label — paginated
+// (Gmail caps a single /messages?q= page at 500), capped at
+// INBOX_SCAN_LIMIT total threads. Unlike "currently unread" (a self-pruning
+// set that only shrinks), the full inbox only grows, so re-scanning it in
+// full every sync has no natural ceiling — the cap is the ceiling. Gmail's
+// list endpoint returns messages newest-first with no explicit sort param
+// needed, so capping here means "the N most recently active threads," not
+// an arbitrary truncation.
+const INBOX_SCAN_LIMIT = 1000;
+
+export async function listInboxThreadIds(accessToken: string): Promise<string[]> {
   const threadIds = new Set<string>();
   let pageToken: string | undefined;
 
   do {
-    const params = new URLSearchParams({ q: "is:unread in:inbox", maxResults: "500" });
+    const params = new URLSearchParams({ q: "in:inbox", maxResults: "500" });
     if (pageToken) params.set("pageToken", pageToken);
     const data = (await gmailFetch(`/messages?${params}`, accessToken)) as {
       messages?: { id: string; threadId: string }[];
       nextPageToken?: string;
     };
-    for (const m of data.messages ?? []) threadIds.add(m.threadId);
-    pageToken = data.nextPageToken;
+    for (const m of data.messages ?? []) {
+      if (threadIds.size >= INBOX_SCAN_LIMIT) break;
+      threadIds.add(m.threadId);
+    }
+    pageToken = threadIds.size >= INBOX_SCAN_LIMIT ? undefined : data.nextPageToken;
   } while (pageToken);
 
   return [...threadIds];

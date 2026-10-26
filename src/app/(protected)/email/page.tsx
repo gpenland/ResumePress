@@ -65,7 +65,7 @@ export default async function EmailPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight font-heading">Email</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Connect Gmail to scan unread inbox mail, then confirm, reassign, or ignore how each thread
+          Connect Gmail to scan your inbox, then confirm, reassign, or ignore how each thread
           matches a contact or application. Optional; nothing else requires it.
         </p>
       </div>

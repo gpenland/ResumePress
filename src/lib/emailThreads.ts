@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import {
   refreshAccessToken,
-  listUnreadInboxThreadIds,
+  listInboxThreadIds,
   getThreadBodyText,
   getThread,
   gmailThreadUrl,
@@ -222,7 +222,7 @@ const THREAD_SYNC_CONCURRENCY = 8;
 // Runs `fn` over `items` with at most `limit` in flight at once. Each thread
 // below is fetched/classified/upserted independently (keyed by its own
 // userId+gmailThreadId), so this is safe to parallelize instead of
-// processing the whole unread inbox one thread at a time.
+// processing the whole inbox scan one thread at a time.
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
@@ -432,12 +432,12 @@ async function classifyThreadForTriage(
 }
 
 /**
- * Manual "Sync now". Scans every currently-unread inbox thread, regardless
- * of label (see gmail.ts's listUnreadInboxThreadIds) — replaces the earlier
- * label-picker + History-API-incremental design. Re-scanned fresh each
- * sync rather than tracked incrementally: "currently unread" is a
- * self-pruning set that shrinks as mail gets read, unlike a label's full
- * history, so there's no backlog to avoid re-scanning.
+ * Manual "Sync now". Scans the inbox — read and unread, regardless of label
+ * (see gmail.ts's listInboxThreadIds) — replacing the earlier label-picker +
+ * History-API-incremental design. Capped at INBOX_SCAN_LIMIT (1000) most
+ * recently active threads per sync; re-scanned fresh each time rather than
+ * tracked incrementally, so that cap is the only thing bounding cost on a
+ * large or long-lived inbox.
  *
  * For each thread, eagerly runs Jev classification (see
  * classifyThreadForTriage) so the triage queue arrives pre-filled with
@@ -478,7 +478,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
 
   let threadIds: string[];
   try {
-    threadIds = await listUnreadInboxThreadIds(accessToken);
+    threadIds = await listInboxThreadIds(accessToken);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to list Gmail messages." };
   }

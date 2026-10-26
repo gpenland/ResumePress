@@ -32,7 +32,7 @@ export function registerEmailTools(server: McpServer, userId: string): void {
     "sync_gmail_now",
     {
       description:
-        "Trigger a Gmail sync: scans every currently-unread inbox thread regardless of label, matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
+        "Trigger a Gmail sync: scans the inbox (read and unread, regardless of label, capped at the 1000 most recently active threads), matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
       inputSchema: {},
     },
     async () => {
