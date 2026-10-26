@@ -265,10 +265,12 @@ export default function ApplicationsList({
                       {app.company.name} <span className="text-muted-foreground font-normal">— {app.roleTitle}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {[app.term, app.location].filter(Boolean).join(" · ")}
-                      {formatShortDate(app.appliedAt) && (
-                        <span className="ml-2">Applied {formatShortDate(app.appliedAt)}</span>
-                      )}
+                      {[
+                        [app.term, app.location].filter(Boolean).join(" · "),
+                        formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
+                      ]
+                        .filter(Boolean)
+                        .join("  ")}
                     </p>
                   </div>
                 </Link>
