@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import NavLinks from "@/components/NavLinks";
 import { listTriageThreadsForUser } from "@/lib/emailThreads";
+import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/applications", label: "Applications" },
@@ -32,9 +34,9 @@ export default async function Nav() {
             <Link
               href="/search"
               aria-label="Search"
-              className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "text-muted-foreground")}
             >
-              <Search className="size-3.5" />
+              <Search className="size-4" />
             </Link>
           )}
           <ThemeToggle />

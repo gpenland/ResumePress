@@ -33,7 +33,7 @@ export default function ThemeToggle() {
       size="icon"
       onClick={toggle}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="shrink-0"
+      className="shrink-0 text-muted-foreground"
     >
       {isDark === null ? (
         <span className="size-4" />
