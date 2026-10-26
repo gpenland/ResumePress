@@ -49,3 +49,9 @@ export async function getDecryptedRefreshToken(userId: string): Promise<string |
 export async function disconnectGmailAccount(userId: string): Promise<void> {
   await prisma.gmailAccount.deleteMany({ where: { userId } });
 }
+
+/** Every connected user, for the cron-triggered sync (`/api/cron/gmail-sync`) to loop over. */
+export async function listAllGmailAccountUserIds(): Promise<string[]> {
+  const accounts = await prisma.gmailAccount.findMany({ select: { userId: true } });
+  return accounts.map((a) => a.userId);
+}
