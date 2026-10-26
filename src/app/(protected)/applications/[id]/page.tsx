@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
+import SuggestStatusButton from "@/components/applications/SuggestStatusButton";
 import ResumeSection from "@/components/applications/ResumeSection";
 import ContactLinks from "@/components/applications/ContactLinks";
 import StatusHistoryList from "@/components/applications/StatusHistoryList";
@@ -23,6 +24,7 @@ import {
   setApplicationHistoryNote,
   deleteApplicationStatusHistoryEntry,
   updateApplicationStatus,
+  suggestApplicationStatus,
 } from "../actions";
 import { attachResumeToApplication, detachResumeFromApplication } from "../resumeActions";
 import {
@@ -72,6 +74,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
               </>
             )}
           </p>
+          <div className="mt-2">
+            <SuggestStatusButton
+              applicationId={application.id}
+              suggestStatus={suggestApplicationStatus}
+              updateStatus={updateApplicationStatus}
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/applications/${application.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
