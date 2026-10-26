@@ -5,6 +5,7 @@ import { disconnectGmailAccount } from "@/lib/gmailAccount";
 import {
   syncGmailForUser,
   updateSyncLabelsForUser,
+  clearUnmatchedThreadsForUser,
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
@@ -33,6 +34,14 @@ export async function saveOverrideLabel(labelId: string | null) {
 export async function syncGmailNow(): Promise<SyncResult> {
   const userId = await requireUserId();
   const result = await syncGmailForUser(userId);
+  revalidatePath("/email");
+  return result;
+}
+
+/** Debug tool: deletes unmatched EmailThread rows so the next sync re-fetches and re-classifies them from scratch. Doesn't touch confirmed/ignored threads. */
+export async function clearUnmatchedThreads(): Promise<{ cleared: number }> {
+  const userId = await requireUserId();
+  const result = await clearUnmatchedThreadsForUser(userId);
   revalidatePath("/email");
   return result;
 }

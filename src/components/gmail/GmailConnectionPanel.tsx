@@ -19,6 +19,7 @@ type ConnectedProps = {
   overrideLabelId: string | null;
   saveOverrideLabel: (labelId: string | null) => Promise<void>;
   syncNow: () => Promise<SyncResult>;
+  clearUnmatched: () => Promise<{ cleared: number }>;
   disconnect: () => Promise<void>;
 };
 
@@ -42,8 +43,18 @@ export default function GmailConnectionPanel(props: Props) {
     );
   }
 
-  const { email, connectedAt, lastSyncAt, labels, labelsError, overrideLabelId, saveOverrideLabel, syncNow, disconnect } =
-    props;
+  const {
+    email,
+    connectedAt,
+    lastSyncAt,
+    labels,
+    labelsError,
+    overrideLabelId,
+    saveOverrideLabel,
+    syncNow,
+    clearUnmatched,
+    disconnect,
+  } = props;
 
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
@@ -51,6 +62,8 @@ export default function GmailConnectionPanel(props: Props) {
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [selectedLabelId, setSelectedLabelId] = useState(overrideLabelId ?? "");
   const [isSavingLabel, startSavingLabel] = useTransition();
+  const [isClearing, startClearing] = useTransition();
+  const [clearResult, setClearResult] = useState<string | null>(null);
 
   function handleSync() {
     setSyncResult(null);
@@ -65,6 +78,15 @@ export default function GmailConnectionPanel(props: Props) {
     setSelectedLabelId(value);
     startSavingLabel(async () => {
       await saveOverrideLabel(value || null);
+      router.refresh();
+    });
+  }
+
+  function handleClearUnmatched() {
+    setClearResult(null);
+    startClearing(async () => {
+      const result = await clearUnmatched();
+      setClearResult(`Cleared ${result.cleared} unmatched thread${result.cleared === 1 ? "" : "s"} — Sync now to re-fetch them.`);
       router.refresh();
     });
   }
@@ -128,6 +150,18 @@ export default function GmailConnectionPanel(props: Props) {
                 ))}
               </select>
             )}
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t">
+            <p className="text-sm font-medium">Debug: clear unmatched emails</p>
+            <p className="text-xs text-muted-foreground">
+              Deletes every unmatched thread (not confirmed/ignored ones) so the next sync re-fetches and
+              re-classifies them from scratch — for testing a clean resync.
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={handleClearUnmatched} disabled={isClearing}>
+              {isClearing ? "Clearing…" : "Clear unmatched emails"}
+            </Button>
+            {clearResult && <p className="text-xs text-muted-foreground">{clearResult}</p>}
           </div>
 
           <form action={disconnect} className="pt-2 border-t">

@@ -7,6 +7,7 @@ import {
   syncGmailForUser,
   listAvailableLabelsForUser,
   updateSyncLabelsForUser,
+  clearUnmatchedThreadsForUser,
   getEmailSyncStatsForUser,
   listTriageThreadsForUser,
   listIgnoredThreadsForUser,
@@ -74,6 +75,16 @@ export function registerEmailTools(server: McpServer, userId: string): void {
       if (!result.ok) return errorResult(result.error);
       return textResult(result);
     }
+  );
+
+  server.registerTool(
+    "clear_unmatched_threads",
+    {
+      description:
+        "Debug tool: deletes every unmatched email thread so the next sync re-fetches and re-classifies them from scratch. Doesn't touch confirmed/ignored threads.",
+      inputSchema: {},
+    },
+    async () => textResult(await clearUnmatchedThreadsForUser(userId))
   );
 
   server.registerTool(
