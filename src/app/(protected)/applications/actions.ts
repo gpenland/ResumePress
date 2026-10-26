@@ -11,7 +11,9 @@ import {
   deleteApplicationStatusHistoryEntryForUser,
   bulkUpdateApplicationStatusForUser,
   bulkDeleteApplicationsForUser,
+  suggestApplicationStatusForUser,
   type ApplicationInput,
+  type SuggestedStatus,
 } from "@/lib/applications";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
@@ -55,6 +57,11 @@ export async function updateApplicationStatus(id: string, status: string) {
 
   revalidatePath("/applications");
   revalidatePath(`/applications/${id}`);
+}
+
+export async function suggestApplicationStatus(id: string): Promise<SuggestedStatus> {
+  const userId = await requireUserId();
+  return suggestApplicationStatusForUser(userId, id);
 }
 
 /** Logs a note-only history entry without changing status (issue #17). */

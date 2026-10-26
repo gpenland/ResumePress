@@ -15,10 +15,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { X } from "lucide-react";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
 import type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
-import { confidenceWord } from "@/lib/jev";
 
 export type TriageThread = {
   id: string;
@@ -160,29 +160,27 @@ function TriageRow({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSuggesting, startSuggestTransition] = useTransition();
-  const [suggestionNote, setSuggestionNote] = useState<string | null>(null);
+  // true once a suggestion has been applied to the pick and not yet overridden
+  // manually — while true, the suggest button stands in as the confirm action
+  // for that pick, so one click to suggest + one click to confirm is enough.
+  const [hasSuggestion, setHasSuggestion] = useState(false);
+  const [suggestFailed, setSuggestFailed] = useState(false);
   const { contactId, applicationId } = pick;
 
   function handleSuggest() {
-    setSuggestionNote(null);
+    setSuggestFailed(false);
     startSuggestTransition(async () => {
       const result = await suggestMatch(thread.id);
-      if (!result.ok) {
-        setSuggestionNote(result.error);
+      if (!result.ok || (!result.contactId && !result.applicationId)) {
+        setHasSuggestion(false);
+        setSuggestFailed(true);
         return;
       }
       onPickChange({
         contactId: result.contactId ?? contactId,
         applicationId: result.applicationId ?? applicationId,
       });
-      const notes: string[] = [];
-      if (result.contactId && result.contactConfidence !== null) {
-        notes.push(`contact: ${confidenceWord(result.contactConfidence)}`);
-      }
-      if (result.applicationId && result.applicationConfidence !== null) {
-        notes.push(`application: ${confidenceWord(result.applicationConfidence)}`);
-      }
-      setSuggestionNote(notes.length > 0 ? `Suggested — ${notes.join(", ")}` : "No confident suggestion found.");
+      setHasSuggestion(true);
     });
   }
 
@@ -196,7 +194,12 @@ function TriageRow({
       ? applications.filter((a) => linkedApplicationIds.includes(a.id))
       : applications;
 
+  // A manual pick change always overrides whatever suggestion was showing —
+  // the suggest button reverts to its idle state rather than staying labeled
+  // as confirming a suggestion that's no longer what's picked.
   function handleContactChange(newContactId: string) {
+    setHasSuggestion(false);
+    setSuggestFailed(false);
     const linked = newContactId ? applicationIdsByContact[newContactId] : undefined;
     const nextApplicationId =
       linked && linked.length > 0 && applicationId && !linked.includes(applicationId) ? "" : applicationId;
@@ -204,6 +207,8 @@ function TriageRow({
   }
 
   function handleApplicationChange(newApplicationId: string) {
+    setHasSuggestion(false);
+    setSuggestFailed(false);
     onPickChange({ contactId, applicationId: newApplicationId });
   }
 
@@ -270,22 +275,36 @@ function TriageRow({
             value={applicationId}
             onChange={handleApplicationChange}
           />
-          <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
-            Confirm
-          </Button>
+          {hasSuggestion ? (
+            <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
+              Confirm suggestion
+            </Button>
+          ) : (
+            <>
+              <Button type="button" size="sm" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
+                {isSuggesting ? "Suggesting…" : "Suggest match"}
+              </Button>
+              {suggestFailed && (
+                <X className="size-3.5 text-muted-foreground" aria-label="No confident match found" />
+              )}
+              <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
+                Confirm
+              </Button>
+            </>
+          )}
           <Button type="button" size="sm" variant="ghost" onClick={handleIgnore} disabled={isPending}>
             Ignore
           </Button>
           <NewContactDialog
             thread={thread}
             createContact={createContact}
-            onCreated={(contact) => onPickChange({ contactId: contact.id, applicationId })}
+            onCreated={(contact) => {
+              setHasSuggestion(false);
+              setSuggestFailed(false);
+              onPickChange({ contactId: contact.id, applicationId });
+            }}
           />
-          <Button type="button" size="sm" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
-            {isSuggesting ? "Suggesting…" : "Suggest match"}
-          </Button>
         </div>
-        {suggestionNote && <p className="text-xs text-muted-foreground">{suggestionNote}</p>}
       </CardContent>
     </Card>
   );

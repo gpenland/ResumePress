@@ -3,6 +3,7 @@ import { findOrCreateCompanyForUser } from "@/lib/companies";
 import type { Application, ApplicationStatusHistory } from "@prisma/client";
 import { APPLICATION_STATUSES, type ApplicationStatus, type ApplicationWithCompany } from "@/lib/applicationsShared";
 import { parseStatusHistory, type MappedApplicationRow } from "@/lib/notionImportShared";
+import { askJev } from "@/lib/jev";
 
 // Re-exported so server code (actions.ts) can import everything it needs from
 // this one module. Client components should import the shared module
@@ -140,6 +141,62 @@ export async function updateApplicationStatusForUser(
   ]);
 
   return { ok: true };
+}
+
+const STATUS_DESCRIPTIONS: Record<ApplicationStatus, string> = {
+  Applied: "Submitted the application; no response yet",
+  OA: "Received an online assessment or coding test to complete",
+  Interviewing: "In the interview process (phone screen, onsite, etc.)",
+  Offer: "Received a job offer",
+  Rejected: "Rejected, or explicitly turned down",
+  Ghosted: "No response for a long time after applying or interviewing",
+};
+
+export type SuggestedStatus =
+  | { ok: true; status: ApplicationStatus | null; confidence: number | null }
+  | { ok: false; error: string };
+
+// On-demand only (user-clicked) — never run automatically. The suggestion
+// only ever feeds the existing status-change action when the user explicitly
+// clicks Apply; nothing here writes anything.
+export async function suggestApplicationStatusForUser(userId: string, applicationId: string): Promise<SuggestedStatus> {
+  const application = await getApplicationForUser(userId, applicationId);
+  if (!application) return { ok: false, error: "Application not found." };
+
+  const emailInteractions = application.interactions
+    .filter((i) => i.emailThread)
+    .slice(0, 3);
+  if (emailInteractions.length === 0) {
+    return { ok: true, status: null, confidence: null };
+  }
+
+  const state = emailInteractions
+    .map((i) => {
+      const thread = i.emailThread!;
+      return [thread.subject ? `Subject: ${thread.subject}` : null, thread.snippet ? `Snippet: ${thread.snippet}` : null]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+
+  const result = await askJev(state, {
+    status: {
+      type: "choice",
+      instructions: "Based on these recent emails, what is the most likely current status of this job application?",
+      criteria: Object.fromEntries(APPLICATION_STATUSES.map((s) => [s, STATUS_DESCRIPTIONS[s]])),
+    },
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const answer = result.answers.status;
+  if (answer.type !== "choice") return { ok: false, error: "Unexpected response from Jev." };
+
+  const suggested = APPLICATION_STATUSES.includes(answer.choice as ApplicationStatus) ? (answer.choice as ApplicationStatus) : null;
+  if (!suggested || suggested === application.status) {
+    return { ok: true, status: null, confidence: null };
+  }
+
+  return { ok: true, status: suggested, confidence: answer.confidence };
 }
 
 /**
