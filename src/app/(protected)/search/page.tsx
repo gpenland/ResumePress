@@ -18,7 +18,7 @@ export default async function SearchPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Search</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading">Search</h1>
         {q && <p className="text-muted-foreground text-sm mt-1">{totalCount} result(s) for &ldquo;{q}&rdquo;</p>}
       </div>
 

@@ -56,7 +56,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">{application.roleTitle}</h1>
+            <h1 className="text-2xl font-bold tracking-tight font-heading">{application.roleTitle}</h1>
             <EditableStatusBadge
               applicationId={application.id}
               status={application.status}
@@ -122,7 +122,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         </Card>
       )}
 
-      <div id="resume">
+      <div id="resume" className="scroll-mt-24">
         <ResumeSection
           applicationId={application.id}
           resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
@@ -133,7 +133,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         />
       </div>
 
-      <div id="contacts" className="space-y-2">
+      <div id="contacts" className="space-y-2 scroll-mt-24">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Contacts</p>
         <ContactLinks
           applicationId={application.id}
@@ -148,13 +148,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         />
       </div>
 
-      <div id="interactions" className="space-y-2">
+      <div id="interactions" className="space-y-2 scroll-mt-24">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Interactions</p>
         <LogInteractionForm applicationId={application.id} logInteraction={logInteraction} />
         <InteractionTimeline interactions={application.interactions} deleteInteraction={deleteInteraction} />
       </div>
 
-      <div id="status-history" className="space-y-2">
+      <div id="status-history" className="space-y-2 scroll-mt-24">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
           Status History
         </p>

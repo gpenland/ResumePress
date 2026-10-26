@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { nativeSelectClassName } from "@/lib/utils";
 
 export type LinkedContact = { contactId: string; role: string; name: string };
 export type ContactOption = { id: string; name: string };
@@ -78,7 +79,7 @@ export default function ContactLinks({ applicationId, linked, contactOptions, li
             name="contactId"
             required
             aria-label="Contact"
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            className={nativeSelectClassName()}
             defaultValue=""
           >
             <option value="" disabled>

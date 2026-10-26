@@ -40,7 +40,7 @@ export default async function EditEntryPage({
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">Edit Entry</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">Edit Entry</h1>
           <Badge variant="secondary">{entry.category.name}</Badge>
         </div>
         <div className="flex items-center gap-2">

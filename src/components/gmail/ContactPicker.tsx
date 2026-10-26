@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Search, Check, ChevronDown, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -291,7 +291,7 @@ function NewContactDialog({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               aria-label="Email"
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={cn(nativeSelectClassName(), "w-full")}
             >
               {participants.map((p) => (
                 <option key={p} value={p}>{p}</option>

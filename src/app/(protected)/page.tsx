@@ -35,7 +35,7 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading">Dashboard</h1>
         <p className="text-muted-foreground mt-1 text-sm">Your applications, resumes, and what&apos;s pending review</p>
       </div>
 
@@ -103,7 +103,7 @@ export default async function HomePage() {
             </Link>
           </div>
           {recentResumes.length === 0 ? (
-            <EmptyState message="No resumes yet" action={{ label: "Create your first resume", href: "/resumes/new" }} />
+            <EmptyState message="No resumes yet" action={{ label: "Add your first resume", href: "/resumes/new" }} />
           ) : (
             <div className="space-y-2">
               {recentResumes.map((r) => (

@@ -12,7 +12,7 @@ export default async function NewContactPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">New Contact</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading">New Contact</h1>
         <p className="text-muted-foreground text-sm mt-1">Track a recruiter, referrer, or anyone else in your network</p>
       </div>
       <ContactForm companies={companies} action={createContact} submitLabel="Create Contact" />

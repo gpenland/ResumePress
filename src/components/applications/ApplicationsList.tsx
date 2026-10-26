@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import {
@@ -155,7 +155,7 @@ export default function ApplicationsList({
             onChange={(e) => handleBulkStatusChange(e.target.value)}
             disabled={isPending}
             aria-label="Bulk change status"
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+            className={nativeSelectClassName()}
           >
             <option value="" disabled>
               Change status to…

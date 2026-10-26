@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 import { APPLICATION_STATUSES, type ApplicationWithCompany } from "@/lib/applicationsShared";
 
 type Props = {
@@ -100,7 +100,7 @@ export default function ApplicationsKanban({ applications, updateStatus }: Props
                     value={app.status}
                     onChange={(e) => handleMoveTo(app.id, e.target.value)}
                     aria-label={`Move ${app.roleTitle} to status`}
-                    className="w-full h-7 rounded-md border border-input bg-transparent px-1.5 text-xs"
+                    className={cn(nativeSelectClassName("sm"), "w-full")}
                   >
                     {APPLICATION_STATUSES.map((status) => (
                       <option key={status} value={status}>{status}</option>
