@@ -13,17 +13,14 @@ import {
 } from "@/lib/resumes";
 import { compileResumeSchema, entryCoreFieldsSchema, identitySchema } from "@/lib/schemas/resumeEntry";
 import { compileResumeToPdf, type EntriesByCategory } from "@/lib/resumeCompiler";
-
-function textResult(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
-}
-
-function errorResult(message: string) {
-  return {
-    content: [{ type: "text" as const, text: message }],
-    isError: true as const,
-  };
-}
+import { textResult, errorResult } from "@/lib/mcp/shared";
+import { registerEntryManagementTools } from "@/lib/mcp/entryTools";
+import { registerResumeManagementTools } from "@/lib/mcp/resumeTools";
+import { registerCompanyApplicationTools } from "@/lib/mcp/applicationTools";
+import { registerContactTools } from "@/lib/mcp/contactTools";
+import { registerInteractionTools } from "@/lib/mcp/interactionTools";
+import { registerEmailTools } from "@/lib/mcp/emailTools";
+import { registerSearchTools } from "@/lib/mcp/searchTools";
 
 export function registerResumePressTools(server: McpServer, userId: string): void {
   server.registerTool(
@@ -159,4 +156,12 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
       }
     }
   );
+
+  registerEntryManagementTools(server, userId);
+  registerResumeManagementTools(server, userId);
+  registerCompanyApplicationTools(server, userId);
+  registerContactTools(server, userId);
+  registerInteractionTools(server, userId);
+  registerEmailTools(server, userId);
+  registerSearchTools(server, userId);
 }

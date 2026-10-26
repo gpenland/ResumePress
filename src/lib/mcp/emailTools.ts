@@ -1,0 +1,196 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import { getGmailConnectionStatus, disconnectGmailAccount } from "@/lib/gmailAccount";
+import { createContactForUser } from "@/lib/contacts";
+import {
+  listAvailableLabelsForUser,
+  updateSyncLabelsForUser,
+  syncGmailForUser,
+  getEmailSyncStatsForUser,
+  listTriageThreadsForUser,
+  listIgnoredThreadsForUser,
+  confirmEmailThreadMatchForUser,
+  ignoreEmailThreadMatchForUser,
+  restoreEmailThreadMatchForUser,
+} from "@/lib/emailThreads";
+import { textResult, errorResult } from "./shared";
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Gmail connection + sync + triage. Mirrors /email's actions.ts exactly;
+ * "connect" itself isn't exposed here since it's a browser OAuth redirect
+ * that can't run over a bearer-token MCP call. This is the least-proven
+ * module in the codebase (see CLAUDE.md "Gmail sync") — treat tool results
+ * accordingly.
+ */
+export function registerEmailTools(server: McpServer, userId: string): void {
+  server.registerTool(
+    "get_gmail_connection_status",
+    { description: "Check whether Gmail is connected, and when it last synced.", inputSchema: {} },
+    async () => textResult(await getGmailConnectionStatus(userId))
+  );
+
+  server.registerTool(
+    "list_gmail_labels",
+    {
+      description: "List the Gmail labels available to sync from (requires Gmail to be connected).",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return textResult(await listAvailableLabelsForUser(userId));
+      } catch (err) {
+        return errorResult(errMessage(err));
+      }
+    }
+  );
+
+  server.registerTool(
+    "save_gmail_sync_labels",
+    {
+      description: "Set which Gmail label ids to sync from.",
+      inputSchema: { labelIds: z.array(z.string()).max(50) },
+    },
+    async ({ labelIds }) => {
+      await updateSyncLabelsForUser(userId, labelIds);
+      return textResult({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "sync_gmail_now",
+    {
+      description:
+        "Trigger a Gmail sync: fetches new/changed threads for the configured labels, matches them to contacts/applications, and re-checks previously unmatched threads. Requires Gmail connected and at least one sync label configured.",
+      inputSchema: {},
+    },
+    async () => {
+      const result = await syncGmailForUser(userId);
+      if (!result.ok) return errorResult(result.error);
+      return textResult(result);
+    }
+  );
+
+  server.registerTool(
+    "disconnect_gmail",
+    { description: "Disconnect the connected Gmail account.", inputSchema: {} },
+    async () => {
+      await disconnectGmailAccount(userId);
+      return textResult({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "get_email_sync_stats",
+    { description: "Email sync stats: connection status, last sync time, and needs-review/matched/total thread counts.", inputSchema: {} },
+    async () => textResult(await getEmailSyncStatsForUser(userId))
+  );
+
+  server.registerTool(
+    "list_triage_threads",
+    { description: "List unmatched email threads awaiting manual triage.", inputSchema: {} },
+    async () => textResult(await listTriageThreadsForUser(userId))
+  );
+
+  server.registerTool(
+    "list_ignored_threads",
+    { description: "List email threads that were ignored (dismissed from triage).", inputSchema: {} },
+    async () => textResult(await listIgnoredThreadsForUser(userId))
+  );
+
+  server.registerTool(
+    "confirm_email_thread_match",
+    {
+      description: "Confirm an email thread's contact/application match, mirroring it onto that contact's/application's interaction timeline.",
+      inputSchema: {
+        threadId: z.string(),
+        contactId: z.string().nullable(),
+        applicationId: z.string().nullable(),
+      },
+    },
+    async ({ threadId, contactId, applicationId }) => {
+      const result = await confirmEmailThreadMatchForUser(userId, threadId, contactId, applicationId);
+      if (!result.ok) return errorResult(`Thread ${threadId} not found, or contact/application not owned by this user`);
+      return textResult(result);
+    }
+  );
+
+  server.registerTool(
+    "ignore_email_thread_match",
+    {
+      description: "Dismiss an email thread from triage, clearing any match. Restorable via restore_email_thread_match.",
+      inputSchema: { threadId: z.string() },
+    },
+    async ({ threadId }) => {
+      const result = await ignoreEmailThreadMatchForUser(userId, threadId);
+      if (!result.ok) return errorResult(`Thread ${threadId} not found`);
+      return textResult(result);
+    }
+  );
+
+  server.registerTool(
+    "restore_email_thread_match",
+    {
+      description: "Undo ignore_email_thread_match: moves a thread back to unmatched so it reappears in triage.",
+      inputSchema: { threadId: z.string() },
+    },
+    async ({ threadId }) => {
+      const result = await restoreEmailThreadMatchForUser(userId, threadId);
+      if (!result.ok) return errorResult(`Thread ${threadId} not found`);
+      return textResult(result);
+    }
+  );
+
+  server.registerTool(
+    "bulk_confirm_email_thread_matches",
+    {
+      description: "Confirm matches for multiple email threads at once.",
+      inputSchema: {
+        items: z
+          .array(
+            z.object({
+              threadId: z.string(),
+              contactId: z.string().nullable(),
+              applicationId: z.string().nullable(),
+            })
+          )
+          .max(200),
+      },
+    },
+    async ({ items }) => {
+      for (const item of items) {
+        await confirmEmailThreadMatchForUser(userId, item.threadId, item.contactId, item.applicationId);
+      }
+      return textResult({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "bulk_ignore_email_thread_matches",
+    {
+      description: "Dismiss multiple email threads from triage at once.",
+      inputSchema: { threadIds: z.array(z.string()).max(200) },
+    },
+    async ({ threadIds }) => {
+      for (const threadId of threadIds) {
+        await ignoreEmailThreadMatchForUser(userId, threadId);
+      }
+      return textResult({ ok: true });
+    }
+  );
+
+  server.registerTool(
+    "create_contact_from_triage",
+    {
+      description: "Create a bare-bones contact (name + one email) from an unmatched triage thread's sender. Doesn't confirm the thread's match itself.",
+      inputSchema: { name: z.string().min(1).max(200), email: z.string().max(200).nullable().optional() },
+    },
+    async ({ name, email }) => {
+      const contact = await createContactForUser(userId, { name, emails: email ? [email] : [] });
+      return textResult({ id: contact.id, name: contact.name });
+    }
+  );
+}
