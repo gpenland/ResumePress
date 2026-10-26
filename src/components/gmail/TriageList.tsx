@@ -1,22 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { X } from "lucide-react";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
+import ContactPicker from "@/components/gmail/ContactPicker";
 import type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
 
@@ -68,80 +58,6 @@ type RowProps = {
   pick: Pick;
   onPickChange: (pick: Pick) => void;
 };
-
-function NewContactDialog({
-  thread,
-  createContact,
-  onCreated,
-}: {
-  thread: TriageThread;
-  createContact: CreateContact;
-  onCreated: (contact: { id: string; name: string }) => void;
-}) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState(thread.participants[0] ?? "");
-  const [isPending, startTransition] = useTransition();
-  const nameRef = useRef<HTMLInputElement>(null);
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const name = nameRef.current?.value.trim();
-    if (!name) return;
-    startTransition(async () => {
-      const contact = await createContact(name, email || null);
-      onCreated(contact);
-      setOpen(false);
-      router.refresh();
-    });
-  }
-
-  return (
-    <>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
-        New contact
-      </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>New contact</AlertDialogTitle>
-          </AlertDialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <Input
-              ref={nameRef}
-              name="name"
-              placeholder="Name"
-              required
-              autoFocus
-              autoComplete="off"
-              data-1p-ignore
-            />
-            {thread.participants.length > 1 ? (
-              <select
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-label="Email"
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-              >
-                {thread.participants.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            ) : (
-              <p className="text-sm text-muted-foreground px-0.5">{email || "No email found on this thread"}</p>
-            )}
-            <AlertDialogFooter>
-              <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
-              <AlertDialogAction type="submit" disabled={isPending}>
-                {isPending ? "Creating…" : "Create"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </form>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
 
 function TriageRow({
   thread,
@@ -257,18 +173,14 @@ function TriageRow({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <select
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+          <ContactPicker
+            options={contactOptions}
             value={contactId}
-            onChange={(e) => handleContactChange(e.target.value)}
-            aria-label="Contact"
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-          >
-            <option value="">No contact</option>
-            {contactOptions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={handleContactChange}
+            participants={thread.participants}
+            createContact={createContact}
+          />
           <ApplicationPicker
             options={visibleApplications}
             participants={thread.participants}
@@ -281,12 +193,16 @@ function TriageRow({
             </Button>
           ) : (
             <>
-              <Button type="button" size="sm" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
-                {isSuggesting ? "Suggesting…" : "Suggest match"}
+              <Button
+                type="button"
+                size="sm"
+                variant={suggestFailed ? "ghost" : "outline"}
+                className={suggestFailed ? "text-muted-foreground" : undefined}
+                onClick={handleSuggest}
+                disabled={isSuggesting || suggestFailed}
+              >
+                {isSuggesting ? "Suggesting…" : suggestFailed ? "No match found" : "Suggest match"}
               </Button>
-              {suggestFailed && (
-                <X className="size-3.5 text-muted-foreground" aria-label="No confident match found" />
-              )}
               <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
                 Confirm
               </Button>
@@ -295,15 +211,6 @@ function TriageRow({
           <Button type="button" size="sm" variant="ghost" onClick={handleIgnore} disabled={isPending}>
             Ignore
           </Button>
-          <NewContactDialog
-            thread={thread}
-            createContact={createContact}
-            onCreated={(contact) => {
-              setHasSuggestion(false);
-              setSuggestFailed(false);
-              onPickChange({ contactId: contact.id, applicationId });
-            }}
-          />
         </div>
       </CardContent>
     </Card>
