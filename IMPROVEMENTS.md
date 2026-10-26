@@ -169,3 +169,14 @@ habit. A short "Decisions" section (or just consistently landing the
 *rationale* in the commit/PR body, as several already do) would keep this
 from costing the same thrash twice — directly in service of the "consistent
 design" goal, not a process nicety for its own sake.
+
+## Also found: global search was completely unreachable
+
+Not part of the original 10 — found when asked to verify search worked.
+`Nav.tsx`'s search control had been collapsed to a bare icon `<Link
+href="/search">` across today's nav redesign churn, with no form anywhere
+left to submit a query string, and the `/search` page itself never had an
+input of its own. `globalSearch()` (the backend) was never broken — this
+was a pure missing-entry-point bug, and a vivid example of exactly the kind
+of drift #10 above is about. Fixed directly on the `/search` page itself
+(see PR #79) rather than reworking `Nav.tsx` again.
