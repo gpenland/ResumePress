@@ -4,11 +4,13 @@ import { useRef, useState, useTransition } from "react";
 import type { Category, Entry } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
+import { scoreBulletText } from "@/app/(protected)/entries/actions";
 
 type Props = {
   category: Category;
@@ -16,6 +18,30 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
 };
+
+type BulletScoreResult = { score: number; confidence: number; legend: Record<string, string> };
+type BulletScoreState = BulletScoreResult | { error: string };
+
+const XYZ_LEVEL_LABELS = ["Needs XYZ", "Partial XYZ", "Full XYZ"] as const;
+const XYZ_LEVEL_VARIANTS = ["destructive", "secondary", "default"] as const;
+
+function confidenceWord(confidence: number): string {
+  if (confidence > 0.9) return "clear read";
+  if (confidence >= 0.5) return "rough read";
+  return "uncertain";
+}
+
+function BulletScoreBadge({ result }: { result: BulletScoreResult }) {
+  const level = Math.min(2, Math.max(0, Math.round(result.score)));
+  return (
+    <div className="flex items-center gap-2 text-xs flex-wrap">
+      <Badge variant={XYZ_LEVEL_VARIANTS[level]}>{XYZ_LEVEL_LABELS[level]}</Badge>
+      <span className="text-muted-foreground">
+        {result.legend[String(level)]} · {confidenceWord(result.confidence)}
+      </span>
+    </div>
+  );
+}
 
 export default function EntryForm({ category, entry, action, submitLabel }: Props) {
   const cfg = getFieldConfig(category.slug);
@@ -34,6 +60,24 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const [bullets, setBullets] = useState<string[]>(entry?.bullets.length ? entry.bullets : [""]);
   const [draggedBulletIndex, setDraggedBulletIndex] = useState<number | null>(null);
   const [dragOverBulletIndex, setDragOverBulletIndex] = useState<number | null>(null);
+  const [bulletScores, setBulletScores] = useState<Record<number, BulletScoreState>>({});
+  const [scoringIndices, setScoringIndices] = useState<Set<number>>(new Set());
+
+  async function handleScore(i: number) {
+    setScoringIndices((prev) => new Set(prev).add(i));
+    const result = await scoreBulletText(bullets[i]);
+    setBulletScores((prev) => ({
+      ...prev,
+      [i]: result.ok
+        ? { score: result.score, confidence: result.confidence, legend: result.legend }
+        : { error: result.error },
+    }));
+    setScoringIndices((prev) => {
+      const next = new Set(prev);
+      next.delete(i);
+      return next;
+    });
+  }
 
   function addBullet() { setBullets((p) => [...p, ""]); }
   function updateBullet(i: number, val: string) { setBullets((p) => p.map((b, idx) => idx === i ? val : b)); }
@@ -134,62 +178,85 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
               <Button type="button" variant="ghost" size="sm" onClick={addBullet}>Add bullet</Button>
             </div>
             <div className="space-y-2">
-              {bullets.map((bullet, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-1.5 items-start rounded-md transition-opacity ${
-                    draggedBulletIndex === i ? "opacity-40" : ""
-                  } ${
-                    dragOverBulletIndex === i && draggedBulletIndex !== null && draggedBulletIndex !== i
-                      ? "ring-2 ring-primary/50"
-                      : ""
-                  }`}
-                  onDragOver={(e) => {
-                    if (draggedBulletIndex === null) return;
-                    e.preventDefault();
-                    if (dragOverBulletIndex !== i) setDragOverBulletIndex(i);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverBulletIndex === i) setDragOverBulletIndex(null);
-                  }}
-                  onDrop={(e) => {
-                    if (draggedBulletIndex === null) return;
-                    e.preventDefault();
-                    reorderBullets(draggedBulletIndex, i);
-                    setDraggedBulletIndex(null);
-                    setDragOverBulletIndex(null);
-                  }}
-                >
+              {bullets.map((bullet, i) => {
+                const scoreResult = bulletScores[i];
+                return (
+                <div key={i} className="space-y-1">
                   <div
-                    draggable
-                    onDragStart={(e) => {
-                      setDraggedBulletIndex(i);
-                      e.dataTransfer.effectAllowed = "move";
+                    className={`flex gap-1.5 items-start rounded-md transition-opacity ${
+                      draggedBulletIndex === i ? "opacity-40" : ""
+                    } ${
+                      dragOverBulletIndex === i && draggedBulletIndex !== null && draggedBulletIndex !== i
+                        ? "ring-2 ring-primary/50"
+                        : ""
+                    }`}
+                    onDragOver={(e) => {
+                      if (draggedBulletIndex === null) return;
+                      e.preventDefault();
+                      if (dragOverBulletIndex !== i) setDragOverBulletIndex(i);
                     }}
-                    onDragEnd={() => {
+                    onDragLeave={() => {
+                      if (dragOverBulletIndex === i) setDragOverBulletIndex(null);
+                    }}
+                    onDrop={(e) => {
+                      if (draggedBulletIndex === null) return;
+                      e.preventDefault();
+                      reorderBullets(draggedBulletIndex, i);
                       setDraggedBulletIndex(null);
                       setDragOverBulletIndex(null);
                     }}
-                    className="mt-1.5 shrink-0 cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
-                    aria-hidden="true"
                   >
-                    <GripVertical className="size-3.5" />
+                    <div
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedBulletIndex(i);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => {
+                        setDraggedBulletIndex(null);
+                        setDragOverBulletIndex(null);
+                      }}
+                      className="mt-1.5 shrink-0 cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+                      aria-hidden="true"
+                    >
+                      <GripVertical className="size-3.5" />
+                    </div>
+                    <div className="flex flex-col mt-1.5 shrink-0">
+                      <button type="button" onClick={() => moveBullet(i, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+                        <ChevronUp className="size-3.5" />
+                      </button>
+                      <button type="button" onClick={() => moveBullet(i, "down")} disabled={i === bullets.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+                        <ChevronDown className="size-3.5" />
+                      </button>
+                    </div>
+                    <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
+                    <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleScore(i)}
+                      disabled={!bullet.trim() || scoringIndices.has(i)}
+                      className="mt-1 text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      {scoringIndices.has(i) ? "Scoring…" : "Score"}
+                    </Button>
+                    {bullets.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
+                    )}
                   </div>
-                  <div className="flex flex-col mt-1.5 shrink-0">
-                    <button type="button" onClick={() => moveBullet(i, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
-                      <ChevronUp className="size-3.5" />
-                    </button>
-                    <button type="button" onClick={() => moveBullet(i, "down")} disabled={i === bullets.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
-                      <ChevronDown className="size-3.5" />
-                    </button>
-                  </div>
-                  <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
-                  <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
-                  {bullets.length > 1 && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
+                  {scoreResult && (
+                    <div className="pl-8 pr-2">
+                      {"error" in scoreResult ? (
+                        <p className="text-xs text-destructive">{scoreResult.error}</p>
+                      ) : (
+                        <BulletScoreBadge result={scoreResult} />
+                      )}
+                    </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
 import { createEntryForUser, getEntryForUser, updateEntryForUser } from "@/lib/entries";
+import { askJev } from "@/lib/jev";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -89,6 +90,32 @@ export async function deleteEntry(id: string) {
   revalidatePath("/entries");
   revalidatePath("/");
   redirect("/entries");
+}
+
+export async function scoreBulletText(
+  text: string
+): Promise<{ ok: true; score: number; confidence: number; legend: Record<string, string> } | { ok: false; error: string }> {
+  await requireUserId();
+
+  const result = await askJev(text, {
+    xyz: {
+      type: "score",
+      instructions:
+        "Rate this resume bullet point on the XYZ framework (Accomplished X, as measured by Y, by doing Z).",
+      criteria: [
+        "No measurable outcome and no specific method — a generic duty description",
+        "Has either a quantified/measurable result OR a specific method/mechanism, but not both",
+        "Full XYZ: a quantified or clearly measurable outcome AND the specific method used to achieve it",
+      ],
+    },
+  });
+
+  if (!result.ok) return result;
+
+  const { xyz } = result.answers;
+  if (xyz.type !== "score") return { ok: false, error: "Unexpected response from Jev." };
+
+  return { ok: true, score: xyz.score, confidence: xyz.confidence, legend: xyz.legend };
 }
 
 function parseBullets(raw: string | null): string[] {
