@@ -4,11 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
 import ContactPicker from "@/components/gmail/ContactPicker";
-import type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
+import { applicationOptionLabel, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
+import { confidenceWord } from "@/lib/jev";
 
 export type TriageThread = {
   id: string;
@@ -19,9 +22,20 @@ export type TriageThread = {
   gmailUrl: string | null;
   matchedContact: { id: string; name: string } | null;
   matchedApplication: { id: string; roleTitle: string; company: { name: string } } | null;
+  jevRecruitingLikely: boolean | null;
+  jevRecruitingConfidence: number | null;
+  jevSuggestedContactId: string | null;
+  jevSuggestedContactConf: number | null;
+  jevSuggestedApplicationId: string | null;
+  jevSuggestedApplicationConf: number | null;
+  jevSuggestedNewCompany: string | null;
+  jevSuggestedNewRole: string | null;
+  jevSuggestedStatus: string | null;
+  jevSuggestedStatusConf: number | null;
 };
 
 type CreateContact = (name: string, email: string | null) => Promise<{ id: string; name: string }>;
+type CreateApplication = (companyName: string, roleTitle: string) => Promise<{ id: string; roleTitle: string; companyName: string }>;
 
 // The in-progress contact/application pick for one triage row. Lifted up
 // into TriageList (keyed by thread id) so the bulk "Confirm selected" handler
@@ -41,6 +55,8 @@ type Props = {
   ) => Promise<void>;
   bulkIgnoreMatches: (threadIds: string[]) => Promise<void>;
   createContact: CreateContact;
+  createApplication: CreateApplication;
+  updateApplicationStatus: (applicationId: string, status: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
 };
 
@@ -52,6 +68,8 @@ type RowProps = {
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
+  createApplication: CreateApplication;
+  updateApplicationStatus: (applicationId: string, status: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
   selected: boolean;
   onToggleSelected: () => void;
@@ -67,6 +85,8 @@ function TriageRow({
   confirmMatch,
   ignoreMatch,
   createContact,
+  createApplication,
+  updateApplicationStatus,
   suggestMatch,
   selected,
   onToggleSelected,
@@ -82,6 +102,40 @@ function TriageRow({
   const [hasSuggestion, setHasSuggestion] = useState(false);
   const [suggestFailed, setSuggestFailed] = useState(false);
   const { contactId, applicationId } = pick;
+
+  // New-opportunity quick-create: editable prefill from Jev's deterministic
+  // company guess + subject-disambiguated role, shown only while nothing's
+  // picked yet — creating one just fills the application picker, same as
+  // ContactPicker's own "+ New contact"; Confirm is still a separate step.
+  const [newCompany, setNewCompany] = useState(thread.jevSuggestedNewCompany ?? "");
+  const [newRole, setNewRole] = useState(thread.jevSuggestedNewRole ?? "");
+  const [isCreatingApplication, startCreateApplicationTransition] = useTransition();
+
+  function handleCreateApplication() {
+    if (!newCompany.trim() || !newRole.trim()) return;
+    startCreateApplicationTransition(async () => {
+      const application = await createApplication(newCompany.trim(), newRole.trim());
+      onPickChange({ contactId, applicationId: application.id });
+      router.refresh();
+    });
+  }
+
+  // Status-change suggestion (e.g. a rejection for an app marked Applied) —
+  // dismissible, applies via the same action the application detail page's
+  // own "Suggest status" button uses. Only ever shown once; Dismiss or
+  // Apply both end it for this render (no "ask again" loop here).
+  const [statusDismissed, setStatusDismissed] = useState(false);
+  const [isApplyingStatus, startApplyStatusTransition] = useTransition();
+  const suggestedStatusApplicationId = applicationId || thread.matchedApplication?.id || null;
+
+  function handleApplyStatus() {
+    if (!thread.jevSuggestedStatus || !suggestedStatusApplicationId) return;
+    startApplyStatusTransition(async () => {
+      await updateApplicationStatus(suggestedStatusApplicationId, thread.jevSuggestedStatus!);
+      setStatusDismissed(true);
+      router.refresh();
+    });
+  }
 
   function handleSuggest() {
     setSuggestFailed(false);
@@ -109,6 +163,20 @@ function TriageRow({
     linkedApplicationIds && linkedApplicationIds.length > 0
       ? applications.filter((a) => linkedApplicationIds.includes(a.id))
       : applications;
+
+  // Eager-classification summary (see classifyThreadForTriage) — only
+  // meaningful while nothing's been manually picked or confirmed yet; once
+  // a contact/application is picked (whether by the user or by this same
+  // suggestion), the pickers themselves show it instead.
+  const jevSuggestedContactName = thread.jevSuggestedContactId
+    ? contactOptions.find((c) => c.id === thread.jevSuggestedContactId)?.name ?? null
+    : null;
+  const jevSuggestedApplicationLabel = thread.jevSuggestedApplicationId
+    ? applications.find((a) => a.id === thread.jevSuggestedApplicationId)
+    : null;
+  const showNewOpportunityPrompt =
+    !thread.matchedApplication && !applicationId && Boolean(thread.jevSuggestedNewCompany || thread.jevSuggestedNewRole);
+  const showStatusSuggestion = Boolean(thread.jevSuggestedStatus) && !statusDismissed;
 
   // A manual pick change always overrides whatever suggestion was showing —
   // the suggest button reverts to its idle state rather than staying labeled
@@ -173,6 +241,81 @@ function TriageRow({
           </div>
         </div>
 
+        {(thread.jevRecruitingLikely === true || jevSuggestedContactName || jevSuggestedApplicationLabel) && (
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {thread.jevRecruitingLikely === true && (
+              <Badge variant="secondary">
+                Likely recruiting-related
+                {thread.jevRecruitingConfidence !== null && ` · ${confidenceWord(thread.jevRecruitingConfidence)}`}
+              </Badge>
+            )}
+            {(jevSuggestedApplicationLabel || jevSuggestedContactName) && (
+              <span className="text-muted-foreground">
+                Jev suggests:{" "}
+                {[
+                  jevSuggestedApplicationLabel ? applicationOptionLabel(jevSuggestedApplicationLabel) : null,
+                  jevSuggestedContactName,
+                ]
+                  .filter(Boolean)
+                  .join(" / ")}
+              </span>
+            )}
+          </div>
+        )}
+
+        {showNewOpportunityPrompt && (
+          <div className="rounded-md border border-dashed p-2.5 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Looks recruiting-related but doesn&apos;t match anything you&apos;re tracking yet — may be a new
+              opportunity:
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                value={newCompany}
+                onChange={(e) => setNewCompany(e.target.value)}
+                placeholder="Company"
+                className="h-7 w-36 text-xs"
+              />
+              <Input
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                placeholder="Role"
+                className="h-7 w-44 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleCreateApplication}
+                disabled={isCreatingApplication || !newCompany.trim() || !newRole.trim()}
+              >
+                {isCreatingApplication ? "Creating…" : "Create application"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showStatusSuggestion && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">
+              Jev suggests marking this application <span className="font-medium text-foreground">{thread.jevSuggestedStatus}</span>
+              {thread.jevSuggestedStatusConf !== null && ` · ${confidenceWord(thread.jevSuggestedStatusConf)}`}
+            </span>
+            {suggestedStatusApplicationId ? (
+              <>
+                <Button type="button" size="sm" onClick={handleApplyStatus} disabled={isApplyingStatus}>
+                  {isApplyingStatus ? "Applying…" : "Apply"}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setStatusDismissed(true)}>
+                  Dismiss
+                </Button>
+              </>
+            ) : (
+              <span className="text-muted-foreground italic">pick an application first to apply</span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
           <ContactPicker
             options={contactOptions}
@@ -227,6 +370,8 @@ export default function TriageList({
   bulkConfirmMatches,
   bulkIgnoreMatches,
   createContact,
+  createApplication,
+  updateApplicationStatus,
   suggestMatch,
 }: Props) {
   const router = useRouter();
@@ -237,8 +382,12 @@ export default function TriageList({
   function getPick(thread: TriageThread): Pick {
     return (
       picks.get(thread.id) ?? {
-        contactId: thread.matchedContact?.id ?? "",
-        applicationId: thread.matchedApplication?.id ?? "",
+        // Prefill from Jev's eager classification when nothing's been
+        // confirmed yet — this is what makes the queue arrive pre-filled
+        // instead of requiring a manual "Suggest match" click first.
+        // Confirm/Ignore are still required actions either way.
+        contactId: thread.matchedContact?.id ?? thread.jevSuggestedContactId ?? "",
+        applicationId: thread.matchedApplication?.id ?? thread.jevSuggestedApplicationId ?? "",
       }
     );
   }
@@ -314,6 +463,8 @@ export default function TriageList({
           confirmMatch={confirmMatch}
           ignoreMatch={ignoreMatch}
           createContact={createContact}
+          createApplication={createApplication}
+          updateApplicationStatus={updateApplicationStatus}
           suggestMatch={suggestMatch}
           selected={selectedIds.has(thread.id)}
           onToggleSelected={() => toggleSelected(thread.id)}

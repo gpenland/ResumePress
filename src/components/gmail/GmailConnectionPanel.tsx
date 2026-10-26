@@ -3,11 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { GmailLabel } from "@/lib/gmail";
 import type { SyncResult } from "@/lib/emailThreads";
 
 type ConnectedProps = {
@@ -15,10 +13,6 @@ type ConnectedProps = {
   email: string;
   connectedAt: Date;
   lastSyncAt: Date | null;
-  labels: GmailLabel[];
-  labelsError: string | null;
-  selectedLabelIds: string[];
-  saveLabels: (formData: FormData) => Promise<void>;
   syncNow: () => Promise<SyncResult>;
   disconnect: () => Promise<void>;
 };
@@ -29,8 +23,8 @@ type Props = ConnectedProps | DisconnectedProps;
 
 // Collapsed by default — connecting/reconfiguring Gmail is a rare, one-time
 // chore, so the default view is a one-line status plus the one action
-// (Sync now) worth surfacing on every visit. Expanding reveals every other
-// feature (timestamps, label selection, disconnect) unchanged.
+// (Sync now) worth surfacing on every visit. Expanding reveals the
+// connected-since timestamp and disconnect, unchanged.
 export default function GmailConnectionPanel(props: Props) {
   if (!props.connected) {
     return (
@@ -43,45 +37,16 @@ export default function GmailConnectionPanel(props: Props) {
     );
   }
 
-  const { email, connectedAt, lastSyncAt, labels, labelsError, selectedLabelIds, saveLabels, syncNow, disconnect } =
-    props;
+  const { email, connectedAt, lastSyncAt, syncNow, disconnect } = props;
 
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const [selected, setSelected] = useState(new Set(selectedLabelIds));
-  const [isSaving, startSaving] = useTransition();
   const [isSyncing, startSyncing] = useTransition();
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function labelsFormData(): FormData {
-    const data = new FormData();
-    for (const id of selected) data.append("labelIds", id);
-    return data;
-  }
-
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    startSaving(async () => {
-      await saveLabels(labelsFormData());
-      router.refresh();
-    });
-  }
 
   function handleSync() {
     setSyncResult(null);
     startSyncing(async () => {
-      // Always persist the current checkbox state first — otherwise a
-      // checked-but-unsaved label would silently get left out of the sync.
-      await saveLabels(labelsFormData());
       const result = await syncNow();
       setSyncResult(result);
       router.refresh();
@@ -98,7 +63,7 @@ export default function GmailConnectionPanel(props: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Button type="button" size="sm" onClick={handleSync} disabled={isSyncing || selected.size === 0}>
+          <Button type="button" size="sm" onClick={handleSync} disabled={isSyncing}>
             {isSyncing ? "Syncing…" : "Sync now"}
           </Button>
           <button
@@ -120,33 +85,8 @@ export default function GmailConnectionPanel(props: Props) {
       )}
 
       {expanded && (
-        <div className="space-y-4 border-t pt-3">
+        <div className="space-y-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">Connected {connectedAt.toLocaleDateString()}</p>
-
-          {labelsError ? (
-            <p className="text-sm text-destructive">{labelsError}</p>
-          ) : (
-            <form onSubmit={handleSave} className="space-y-2">
-              <p className="text-sm font-medium">Labels to sync</p>
-              <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                {labels.map((label) => (
-                  <div key={label.id} className="flex items-center gap-2" onClick={() => toggle(label.id)}>
-                    <Checkbox
-                      name="labelIds"
-                      value={label.id}
-                      checked={selected.has(label.id)}
-                      onCheckedChange={() => toggle(label.id)}
-                      className="pointer-events-none"
-                    />
-                    <span className="text-sm">{label.name}</span>
-                  </div>
-                ))}
-              </div>
-              <Button type="submit" size="sm" variant="outline" disabled={isSaving}>
-                {isSaving ? "Saving…" : "Save label selection"}
-              </Button>
-            </form>
-          )}
 
           <form action={disconnect} className="pt-2 border-t">
             <SubmitButton
