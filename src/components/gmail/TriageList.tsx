@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
 import type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
+import type { SuggestedMatch } from "@/lib/emailThreads";
+import { confidenceWord } from "@/lib/jev";
 
 export type TriageThread = {
   id: string;
@@ -49,6 +51,7 @@ type Props = {
   ) => Promise<void>;
   bulkIgnoreMatches: (threadIds: string[]) => Promise<void>;
   createContact: CreateContact;
+  suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
 };
 
 type RowProps = {
@@ -59,6 +62,7 @@ type RowProps = {
   confirmMatch: (threadId: string, contactId: string | null, applicationId: string | null) => Promise<void>;
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
+  suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
   selected: boolean;
   onToggleSelected: () => void;
   pick: Pick;
@@ -147,6 +151,7 @@ function TriageRow({
   confirmMatch,
   ignoreMatch,
   createContact,
+  suggestMatch,
   selected,
   onToggleSelected,
   pick,
@@ -154,7 +159,32 @@ function TriageRow({
 }: RowProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isSuggesting, startSuggestTransition] = useTransition();
+  const [suggestionNote, setSuggestionNote] = useState<string | null>(null);
   const { contactId, applicationId } = pick;
+
+  function handleSuggest() {
+    setSuggestionNote(null);
+    startSuggestTransition(async () => {
+      const result = await suggestMatch(thread.id);
+      if (!result.ok) {
+        setSuggestionNote(result.error);
+        return;
+      }
+      onPickChange({
+        contactId: result.contactId ?? contactId,
+        applicationId: result.applicationId ?? applicationId,
+      });
+      const notes: string[] = [];
+      if (result.contactId && result.contactConfidence !== null) {
+        notes.push(`contact: ${confidenceWord(result.contactConfidence)}`);
+      }
+      if (result.applicationId && result.applicationConfidence !== null) {
+        notes.push(`application: ${confidenceWord(result.applicationConfidence)}`);
+      }
+      setSuggestionNote(notes.length > 0 ? `Suggested — ${notes.join(", ")}` : "No confident suggestion found.");
+    });
+  }
 
   // Once a contact is picked, narrow the application list down to just the
   // applications that contact is actually linked to (ApplicationContact) —
@@ -251,7 +281,11 @@ function TriageRow({
             createContact={createContact}
             onCreated={(contact) => onPickChange({ contactId: contact.id, applicationId })}
           />
+          <Button type="button" size="sm" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
+            {isSuggesting ? "Suggesting…" : "Suggest match"}
+          </Button>
         </div>
+        {suggestionNote && <p className="text-xs text-muted-foreground">{suggestionNote}</p>}
       </CardContent>
     </Card>
   );
@@ -267,6 +301,7 @@ export default function TriageList({
   bulkConfirmMatches,
   bulkIgnoreMatches,
   createContact,
+  suggestMatch,
 }: Props) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -363,6 +398,7 @@ export default function TriageList({
           confirmMatch={confirmMatch}
           ignoreMatch={ignoreMatch}
           createContact={createContact}
+          suggestMatch={suggestMatch}
           selected={selectedIds.has(thread.id)}
           onToggleSelected={() => toggleSelected(thread.id)}
           pick={getPick(thread)}

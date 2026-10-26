@@ -13,6 +13,8 @@ import {
   type GmailThread,
 } from "@/lib/gmail";
 import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
+import { listContactsForUser } from "@/lib/contacts";
+import { askJev, type JevQuestion } from "@/lib/jev";
 import type { EmailThread } from "@prisma/client";
 
 export type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
@@ -469,4 +471,81 @@ export async function confirmEmailThreadMatchForUser(
     await createInteractionFromEmailThreadIfMissing(userId, thread, contactId, applicationId);
   }
   return { ok: true };
+}
+
+export type SuggestedMatch =
+  | { ok: true; contactId: string | null; contactConfidence: number | null; applicationId: string | null; applicationConfidence: number | null }
+  | { ok: false; error: string };
+
+// On-demand only (never run at sync time) — one Jev call per user click, bounded
+// cost. Only ever prefills the triage row's local pick state; Confirm/Ignore are
+// unaffected and still required, same as a manual <select> choice.
+const MAX_SUGGESTION_CANDIDATES = 40;
+
+export async function suggestMatchForThreadForUser(userId: string, emailThreadId: string): Promise<SuggestedMatch> {
+  const thread = await prisma.emailThread.findFirst({ where: { id: emailThreadId, userId } });
+  if (!thread) return { ok: false, error: "Thread not found." };
+
+  const [contacts, applications] = await Promise.all([
+    listContactsForUser(userId),
+    listApplicationPickerOptionsForUser(userId),
+  ]);
+  // Both already ordered most-recently-updated first — cap as a request-size
+  // safety valve, same philosophy as compileResumeSchema's length caps.
+  const contactCandidates = contacts.slice(0, MAX_SUGGESTION_CANDIDATES);
+  const applicationCandidates = applications.slice(0, MAX_SUGGESTION_CANDIDATES);
+
+  if (contactCandidates.length === 0 && applicationCandidates.length === 0) {
+    return { ok: true, contactId: null, contactConfidence: null, applicationId: null, applicationConfidence: null };
+  }
+
+  const state = [
+    thread.subject ? `Subject: ${thread.subject}` : null,
+    thread.snippet ? `Snippet: ${thread.snippet}` : null,
+    thread.participants.length ? `Participants: ${thread.participants.join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const questions: Record<string, JevQuestion> = {};
+  if (contactCandidates.length > 0) {
+    questions.contact = {
+      type: "choice",
+      instructions: "Which contact is this email thread most likely associated with?",
+      criteria: {
+        none: "None of these contacts",
+        ...Object.fromEntries(
+          contactCandidates.map((c) => [c.id, [c.name, c.title, c.company?.name].filter(Boolean).join(" — ")])
+        ),
+      },
+    };
+  }
+  if (applicationCandidates.length > 0) {
+    questions.application = {
+      type: "choice",
+      instructions: "Which job application is this email thread most likely associated with?",
+      criteria: {
+        none: "None of these applications",
+        ...Object.fromEntries(
+          applicationCandidates.map((a) => [a.id, `${a.companyName} — ${a.roleTitle} (${a.status})`])
+        ),
+      },
+    };
+  }
+
+  const result = await askJev(state, questions);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const contactAnswer = result.answers.contact;
+  const applicationAnswer = result.answers.application;
+  const contactChoice = contactAnswer && contactAnswer.type === "choice" ? contactAnswer : null;
+  const applicationChoice = applicationAnswer && applicationAnswer.type === "choice" ? applicationAnswer : null;
+
+  return {
+    ok: true,
+    contactId: contactChoice && contactChoice.choice !== "none" ? contactChoice.choice : null,
+    contactConfidence: contactChoice ? contactChoice.confidence : null,
+    applicationId: applicationChoice && applicationChoice.choice !== "none" ? applicationChoice.choice : null,
+    applicationConfidence: applicationChoice ? applicationChoice.confidence : null,
+  };
 }
