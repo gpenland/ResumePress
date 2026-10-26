@@ -304,6 +304,26 @@ model EmailThread {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
+  // Jev-derived triage suggestions, written eagerly by syncGmailForUser for
+  // threads not already exactly matched (see "Gmail sync" in CLAUDE.md).
+  // Suggestion-only, same as every other Jev feature: Confirm/Ignore/Attach
+  // in the triage UI are the only things that ever write matchedContactId/
+  // matchedApplicationId/status. Plain nullable columns rather than FK
+  // relations on purpose — a stale suggestion pointing at a since-deleted
+  // row is harmless noise the UI just stops rendering, not a constraint to
+  // enforce.
+  jevRecruitingLikely         Boolean?
+  jevRecruitingConfidence     Float?
+  jevSuggestedContactId       String?
+  jevSuggestedContactConf     Float?
+  jevSuggestedApplicationId   String?
+  jevSuggestedApplicationConf Float?
+  jevSuggestedNewCompany      String? // set when recruiting-likely but no existing application looked right
+  jevSuggestedNewRole         String?
+  jevSuggestedStatus          String? // candidate next status for jevSuggestedApplicationId/matchedApplicationId
+  jevSuggestedStatusConf      Float?
+  jevClassifiedAt             DateTime?
+
   @@unique([userId, gmailThreadId])
 }
 

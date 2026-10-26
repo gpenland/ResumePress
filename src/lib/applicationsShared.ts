@@ -21,6 +21,20 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+// Shared between suggestApplicationStatusForUser (applications.ts, on-demand
+// "Suggest status" button) and the eager per-thread classification in
+// emailThreads.ts's sync — both ask Jev to choose a status from the same
+// rubric, just over different evidence (an application's recent confirmed
+// email interactions vs. one specific thread's own content).
+export const STATUS_DESCRIPTIONS: Record<ApplicationStatus, string> = {
+  Applied: "Submitted the application; no response yet",
+  OA: "Received an online assessment or coding test to complete",
+  Interviewing: "In the interview process (phone screen, onsite, etc.)",
+  Offer: "Received a job offer",
+  Rejected: "Rejected, or explicitly turned down",
+  Ghosted: "No response for a long time after applying or interviewing",
+};
+
 export type ApplicationWithCompany = Application & { company: Company };
 
 // Single source of truth for status color: each status maps to one semantic

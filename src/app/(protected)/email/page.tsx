@@ -2,9 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { requireUserId } from "@/lib/auth";
 import { getGmailConnectionStatus } from "@/lib/gmailAccount";
-import { prisma } from "@/lib/prisma";
 import {
-  listAvailableLabelsForUser,
   listTriageThreadsForUser,
   listRecentMatchedThreadsForUser,
   listIgnoredThreadsForUser,
@@ -18,12 +16,12 @@ import RecentEmailsList from "@/components/gmail/RecentEmailsList";
 import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
 import {
   disconnectGmail,
-  saveGmailSyncLabels,
   syncGmailNow,
   confirmEmailThreadMatch,
   ignoreEmailThreadMatch,
   restoreEmailThreadMatch,
   createContactFromTriage,
+  createApplicationFromTriage,
   bulkConfirmEmailThreadMatches,
   bulkIgnoreEmailThreadMatches,
   suggestMatchForThread,
@@ -33,9 +31,6 @@ export default async function EmailPage() {
   const userId = await requireUserId();
   const status = await getGmailConnectionStatus(userId);
 
-  let labels: Awaited<ReturnType<typeof listAvailableLabelsForUser>> = [];
-  let labelsError: string | null = null;
-  let selectedLabelIds: string[] = [];
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
@@ -44,16 +39,14 @@ export default async function EmailPage() {
   let applicationIdsByContact: Record<string, string[]> = {};
 
   if (status.connected) {
-    const [account, threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
+    const [threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
       await Promise.all([
-        prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
         listTriageThreadsForUser(userId),
         listIgnoredThreadsForUser(userId),
         listContactOptionsForUser(userId),
         listApplicationPickerOptionsForUser(userId),
         listApplicationIdsByContactForUser(userId),
       ]);
-    selectedLabelIds = account?.syncLabelIds ?? [];
     threads = threadsResult;
     ignoredThreads = ignoredResult;
     contactOptions = contactOptionsResult;
@@ -64,12 +57,6 @@ export default async function EmailPage() {
     if (threads.length === 0) {
       recentThreads = await listRecentMatchedThreadsForUser(userId);
     }
-
-    try {
-      labels = await listAvailableLabelsForUser(userId);
-    } catch (err) {
-      labelsError = err instanceof Error ? err.message : "Could not load Gmail labels.";
-    }
   }
 
   return (
@@ -77,8 +64,8 @@ export default async function EmailPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight font-heading">Email</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Connect Gmail to sync labels, then confirm, reassign, or ignore how each thread matches a
-          contact or application. Optional; nothing else requires it.
+          Connect Gmail to scan unread inbox mail, then confirm, reassign, or ignore how each thread
+          matches a contact or application. Optional; nothing else requires it.
         </p>
       </div>
 
@@ -88,10 +75,6 @@ export default async function EmailPage() {
           email={status.email}
           connectedAt={status.connectedAt}
           lastSyncAt={status.lastSyncAt}
-          labels={labels}
-          labelsError={labelsError}
-          selectedLabelIds={selectedLabelIds}
-          saveLabels={saveGmailSyncLabels}
           syncNow={syncGmailNow}
           disconnect={disconnectGmail}
         />

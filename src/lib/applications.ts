@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { findOrCreateCompanyForUser } from "@/lib/companies";
 import type { Application, ApplicationStatusHistory } from "@prisma/client";
-import { APPLICATION_STATUSES, type ApplicationStatus, type ApplicationWithCompany } from "@/lib/applicationsShared";
+import {
+  APPLICATION_STATUSES,
+  STATUS_DESCRIPTIONS,
+  type ApplicationStatus,
+  type ApplicationWithCompany,
+} from "@/lib/applicationsShared";
 import { parseStatusHistory, type MappedApplicationRow } from "@/lib/notionImportShared";
 import { askJev } from "@/lib/jev";
 
@@ -142,15 +147,6 @@ export async function updateApplicationStatusForUser(
 
   return { ok: true };
 }
-
-const STATUS_DESCRIPTIONS: Record<ApplicationStatus, string> = {
-  Applied: "Submitted the application; no response yet",
-  OA: "Received an online assessment or coding test to complete",
-  Interviewing: "In the interview process (phone screen, onsite, etc.)",
-  Offer: "Received a job offer",
-  Rejected: "Rejected, or explicitly turned down",
-  Ghosted: "No response for a long time after applying or interviewing",
-};
 
 export type SuggestedStatus =
   | { ok: true; status: ApplicationStatus | null; confidence: number | null }

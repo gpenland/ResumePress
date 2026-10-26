@@ -2,9 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getGmailConnectionStatus, disconnectGmailAccount } from "@/lib/gmailAccount";
 import { createContactForUser } from "@/lib/contacts";
+import { createApplicationForUser } from "@/lib/applications";
 import {
-  listAvailableLabelsForUser,
-  updateSyncLabelsForUser,
   syncGmailForUser,
   getEmailSyncStatsForUser,
   listTriageThreadsForUser,
@@ -14,10 +13,6 @@ import {
   restoreEmailThreadMatchForUser,
 } from "@/lib/emailThreads";
 import { textResult, errorResult } from "./shared";
-
-function errMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 /**
  * Gmail connection + sync + triage. Mirrors /email's actions.ts exactly;
@@ -34,37 +29,10 @@ export function registerEmailTools(server: McpServer, userId: string): void {
   );
 
   server.registerTool(
-    "list_gmail_labels",
-    {
-      description: "List the Gmail labels available to sync from (requires Gmail to be connected).",
-      inputSchema: {},
-    },
-    async () => {
-      try {
-        return textResult(await listAvailableLabelsForUser(userId));
-      } catch (err) {
-        return errorResult(errMessage(err));
-      }
-    }
-  );
-
-  server.registerTool(
-    "save_gmail_sync_labels",
-    {
-      description: "Set which Gmail label ids to sync from.",
-      inputSchema: { labelIds: z.array(z.string()).max(50) },
-    },
-    async ({ labelIds }) => {
-      await updateSyncLabelsForUser(userId, labelIds);
-      return textResult({ ok: true });
-    }
-  );
-
-  server.registerTool(
     "sync_gmail_now",
     {
       description:
-        "Trigger a Gmail sync: fetches new/changed threads for the configured labels, matches them to contacts/applications, and re-checks previously unmatched threads. Requires Gmail connected and at least one sync label configured.",
+        "Trigger a Gmail sync: scans every currently-unread inbox thread regardless of label, matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
       inputSchema: {},
     },
     async () => {
@@ -191,6 +159,19 @@ export function registerEmailTools(server: McpServer, userId: string): void {
     async ({ name, email }) => {
       const contact = await createContactForUser(userId, { name, emails: email ? [email] : [] });
       return textResult({ id: contact.id, name: contact.name });
+    }
+  );
+
+  server.registerTool(
+    "create_application_from_triage",
+    {
+      description:
+        "Create a new application from an unmatched triage thread Jev flagged as recruiting-related but not matching anything tracked yet. Doesn't confirm the thread's match itself.",
+      inputSchema: { companyName: z.string().min(1).max(200), roleTitle: z.string().min(1).max(200) },
+    },
+    async ({ companyName, roleTitle }) => {
+      const application = await createApplicationForUser(userId, { companyName, roleTitle });
+      return textResult({ id: application.id, roleTitle: application.roleTitle, companyName });
     }
   );
 }

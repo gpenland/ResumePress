@@ -2,40 +2,25 @@ import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import {
   refreshAccessToken,
-  listLabels,
-  getProfile,
-  listMessageIdsForLabel,
-  listNewThreadIdsSinceHistory,
+  listUnreadInboxThreadIds,
+  getThreadBodyText,
   getThread,
   gmailThreadUrl,
   GmailApiError,
-  type GmailLabel,
   type GmailThread,
 } from "@/lib/gmail";
 import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import { listContactsForUser } from "@/lib/contacts";
 import { askJev, type JevQuestion } from "@/lib/jev";
+import { APPLICATION_STATUSES, STATUS_DESCRIPTIONS, type ApplicationStatus } from "@/lib/applicationsShared";
 import type { EmailThread } from "@prisma/client";
 
 export type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
-
-const SYSTEM_LABEL_ALLOWLIST = new Set(["INBOX", "SENT", "STARRED", "IMPORTANT"]);
 
 export async function getValidAccessTokenForUser(userId: string): Promise<string> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) throw new GmailApiError("Gmail is not connected.");
   return refreshAccessToken(decrypt(account.encryptedRefreshToken));
-}
-
-/** Filters out Gmail's noisy CATEGORY_ and CHAT system labels — keeps user-created labels plus the handful of system labels someone would plausibly want to sync. */
-export async function listAvailableLabelsForUser(userId: string): Promise<GmailLabel[]> {
-  const accessToken = await getValidAccessTokenForUser(userId);
-  const labels = await listLabels(accessToken);
-  return labels.filter((l) => l.type === "user" || SYSTEM_LABEL_ALLOWLIST.has(l.id));
-}
-
-export async function updateSyncLabelsForUser(userId: string, labelIds: string[]): Promise<void> {
-  await prisma.gmailAccount.update({ where: { userId }, data: { syncLabelIds: labelIds } });
 }
 
 type MatchCandidates = {
@@ -232,21 +217,243 @@ export type SyncResult =
   | { ok: true; threadsUpserted: number; rematched: number }
   | { ok: false; error: string };
 
+const THREAD_SYNC_CONCURRENCY = 8;
+
+// Runs `fn` over `items` with at most `limit` in flight at once. Each thread
+// below is fetched/classified/upserted independently (keyed by its own
+// userId+gmailThreadId), so this is safe to parallelize instead of
+// processing the whole unread inbox one thread at a time.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    for (;;) {
+      const i = nextIndex++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+const COMMON_WEBMAIL_DOMAINS = new Set([
+  "gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "aol.com", "protonmail.com", "live.com", "me.com",
+]);
+
+/** A rough "this looks like the company, not a personal/webmail address" guess from a thread's participants — used only as a prefill the user can edit, never auto-applied. */
+function guessCompanyNameFromParticipants(participants: string[]): string | null {
+  for (const email of participants) {
+    const domain = email.split("@")[1]?.toLowerCase();
+    if (!domain || COMMON_WEBMAIL_DOMAINS.has(domain)) continue;
+    const name = domain.split(".")[0];
+    return name ? name.charAt(0).toUpperCase() + name.slice(1) : null;
+  }
+  return null;
+}
+
+const SUBJECT_SPLIT_RE = /[-|:•]/;
+
+/** Candidate role-title substrings from a subject line (e.g. "Your application to Acme — Software Engineer"), for Jev to disambiguate — never generated, only chosen from. */
+function subjectRoleCandidates(subject: string | null): string[] {
+  if (!subject) return [];
+  const parts = subject.split(SUBJECT_SPLIT_RE).map((s) => s.trim()).filter((s) => s.length > 2);
+  return [...new Set(parts)];
+}
+
+type ThreadClassification = {
+  recruitingLikely: boolean | null;
+  recruitingConfidence: number | null;
+  suggestedContactId: string | null;
+  suggestedContactConf: number | null;
+  suggestedApplicationId: string | null;
+  suggestedApplicationConf: number | null;
+  suggestedNewCompany: string | null;
+  suggestedNewRole: string | null;
+  suggestedStatus: string | null;
+  suggestedStatusConf: number | null;
+};
+
+const EMPTY_CLASSIFICATION: ThreadClassification = {
+  recruitingLikely: null,
+  recruitingConfidence: null,
+  suggestedContactId: null,
+  suggestedContactConf: null,
+  suggestedApplicationId: null,
+  suggestedApplicationConf: null,
+  suggestedNewCompany: null,
+  suggestedNewRole: null,
+  suggestedStatus: null,
+  suggestedStatusConf: null,
+};
+
 /**
- * Manual "Sync now" (PLAN.md §4). Uses the History API when a baseline
- * historyId exists, falling back to a plain per-label message list (capped,
- * no pagination — fine at personal scale) on the first sync or whenever the
- * history window has expired. This is the least-proven part of the whole
- * tracker (see docs/MIGRATION_PLAN.md §6 risk 3) and has not been exercised
- * against a live Gmail account — verify manually before relying on it, and
- * before wiring a scheduled/cron sync on top of it.
+ * Eager, per-thread Jev classification run during sync (see CLAUDE.md "AI
+ * Features (Jev)" — this is the one deliberate exception to "on-demand
+ * only, bounded cost" every other Jev feature here keeps to). Only called
+ * for threads whose content is new or changed since the last classification
+ * pass (see the `needsJevPass` check in syncGmailForUser) — not re-run on
+ * every sync click.
+ *
+ * `knownApplicationId`/`knownApplicationStatus` are set when the thread
+ * already has a resolved application (an exact contact-email match, or a
+ * contact/application Jev already suggested on a prior pass) — in that case
+ * this only asks the status question, skipping the recruiting/match
+ * questions entirely (a known match is already high-confidence).
+ */
+async function classifyThreadForTriage(
+  accessToken: string,
+  thread: Pick<GmailThread, "id" | "subject" | "snippet" | "participants">,
+  contactCandidates: { id: string; name: string; title: string | null; company: { name: string } | null }[],
+  applicationCandidates: ApplicationPickerOption[],
+  knownApplicationId: string | null,
+  knownApplicationStatus: string | null
+): Promise<ThreadClassification> {
+  let bodyText = "";
+  try {
+    bodyText = await getThreadBodyText(accessToken, thread.id);
+  } catch {
+    // Classify on subject/snippet alone rather than skipping entirely —
+    // still useful signal, just less reliable than with the full body.
+  }
+
+  const state = [
+    thread.subject ? `Subject: ${thread.subject}` : null,
+    thread.snippet ? `Snippet: ${thread.snippet}` : null,
+    bodyText ? `Body:\n${bodyText}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const result: ThreadClassification = { ...EMPTY_CLASSIFICATION };
+
+  if (knownApplicationId) {
+    // Already matched — only worth asking whether this specific email
+    // suggests a status change (e.g. a rejection for an app marked Applied).
+    const statusResult = await askJev(state, {
+      status: {
+        type: "choice",
+        instructions: "Based on this email, what is the most likely current status of this job application?",
+        criteria: Object.fromEntries(APPLICATION_STATUSES.map((s) => [s, STATUS_DESCRIPTIONS[s]])),
+      },
+    });
+    if (statusResult.ok) {
+      const answer = statusResult.answers.status;
+      if (answer.type === "choice") {
+        const suggested = APPLICATION_STATUSES.includes(answer.choice as ApplicationStatus) ? answer.choice : null;
+        if (suggested && suggested !== knownApplicationStatus) {
+          result.suggestedStatus = suggested;
+          result.suggestedStatusConf = answer.confidence;
+        }
+      }
+    }
+    return result;
+  }
+
+  const questions: Record<string, JevQuestion> = {
+    recruiting: {
+      type: "noul",
+      instructions:
+        "Is this email related to a job application, recruiting, or hiring process (e.g. an application confirmation, recruiter outreach, interview scheduling, a rejection, an offer)? Routine personal email, newsletters, receipts, and notifications are not.",
+    },
+  };
+  if (contactCandidates.length > 0) {
+    questions.contact = {
+      type: "choice",
+      instructions: "Which contact is this email thread most likely associated with?",
+      criteria: {
+        none: "None of these contacts",
+        ...Object.fromEntries(
+          contactCandidates.map((c) => [c.id, [c.name, c.title, c.company?.name].filter(Boolean).join(" — ")])
+        ),
+      },
+    };
+  }
+  if (applicationCandidates.length > 0) {
+    questions.application = {
+      type: "choice",
+      instructions: "Which job application is this email thread most likely associated with?",
+      criteria: {
+        none: "None of these applications",
+        ...Object.fromEntries(
+          applicationCandidates.map((a) => [a.id, `${a.companyName} — ${a.roleTitle} (${a.status})`])
+        ),
+      },
+    };
+  }
+
+  const classifyResult = await askJev(state, questions);
+  if (!classifyResult.ok) return result;
+
+  const recruitingAnswer = classifyResult.answers.recruiting;
+  if (recruitingAnswer?.type === "noul") {
+    result.recruitingLikely = recruitingAnswer.noul > 0.5;
+    result.recruitingConfidence = recruitingAnswer.noul;
+  }
+
+  const contactAnswer = classifyResult.answers.contact;
+  if (contactAnswer?.type === "choice" && contactAnswer.choice !== "none") {
+    result.suggestedContactId = contactAnswer.choice;
+    result.suggestedContactConf = contactAnswer.confidence;
+  }
+  const applicationAnswer = classifyResult.answers.application;
+  if (applicationAnswer?.type === "choice" && applicationAnswer.choice !== "none") {
+    result.suggestedApplicationId = applicationAnswer.choice;
+    result.suggestedApplicationConf = applicationAnswer.confidence;
+  }
+
+  // Recruiting-related but didn't match anything we're already tracking —
+  // might be a brand-new opportunity. Guess a company (deterministic, from
+  // the sender's domain) and a role (deterministic candidates from the
+  // subject line, Jev only disambiguates between them — never generates).
+  if (result.recruitingLikely && !result.suggestedApplicationId) {
+    result.suggestedNewCompany = guessCompanyNameFromParticipants(thread.participants);
+    const roleCandidates = subjectRoleCandidates(thread.subject);
+    if (roleCandidates.length === 1) {
+      result.suggestedNewRole = roleCandidates[0];
+    } else if (roleCandidates.length >= 2) {
+      const roleResult = await askJev(state, {
+        role: {
+          type: "choice",
+          instructions: "Which of these is most likely the job role/title this recruiting email is about?",
+          criteria: Object.fromEntries(roleCandidates.map((c) => [c, c])),
+        },
+      });
+      if (roleResult.ok) {
+        const roleAnswer = roleResult.answers.role;
+        if (roleAnswer.type === "choice" && roleCandidates.includes(roleAnswer.choice)) {
+          result.suggestedNewRole = roleAnswer.choice;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Manual "Sync now". Scans every currently-unread inbox thread, regardless
+ * of label (see gmail.ts's listUnreadInboxThreadIds) — replaces the earlier
+ * label-picker + History-API-incremental design. Re-scanned fresh each
+ * sync rather than tracked incrementally: "currently unread" is a
+ * self-pruning set that shrinks as mail gets read, unlike a label's full
+ * history, so there's no backlog to avoid re-scanning.
+ *
+ * For each thread, eagerly runs Jev classification (see
+ * classifyThreadForTriage) so the triage queue arrives pre-filled with
+ * "likely recruiting-related", a guessed job/contact, or a suggested status
+ * change — the one deliberate exception to every other Jev feature's
+ * on-demand-only, bounded-cost design (see CLAUDE.md "AI Features (Jev)").
+ * Classification only re-runs for a thread when it's new or has new
+ * activity since the last pass, not on every sync click.
+ *
+ * This is the least-proven part of the whole tracker (see
+ * docs/MIGRATION_PLAN.md §6 risk 3) and has not been exercised against a
+ * live Gmail account — verify manually before relying on it.
  */
 export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { ok: false, error: "Gmail is not connected." };
-  if (account.syncLabelIds.length === 0) {
-    return { ok: false, error: "Select at least one label to sync first." };
-  }
 
   let accessToken: string;
   try {
@@ -258,30 +465,31 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   const candidates = await loadMatchCandidates(userId);
   const rematched = await rematchUnmatchedThreadsForUser(userId, candidates);
 
-  const threadIds = new Set<string>();
+  // Full candidate lists for Jev's match-guess choice questions, fetched
+  // once up front rather than per-thread — same cap/rationale as
+  // suggestMatchForThreadForUser's on-demand version.
+  const [contactChoices, applicationChoices] = await Promise.all([
+    listContactsForUser(userId),
+    listApplicationPickerOptionsForUser(userId),
+  ]);
+  const contactCandidates = contactChoices.slice(0, MAX_SUGGESTION_CANDIDATES);
+  const applicationCandidates = applicationChoices.slice(0, MAX_SUGGESTION_CANDIDATES);
+  const applicationStatusById = new Map(applicationChoices.map((a) => [a.id, a.status]));
 
-  for (const labelId of account.syncLabelIds) {
-    let ids: string[] = [];
-    try {
-      if (!account.historyId) throw new GmailApiError("no baseline historyId yet");
-      ids = await listNewThreadIdsSinceHistory(accessToken, account.historyId, labelId);
-    } catch {
-      try {
-        ids = await listMessageIdsForLabel(accessToken, labelId);
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : "Failed to list Gmail messages." };
-      }
-    }
-    ids.forEach((id) => threadIds.add(id));
+  let threadIds: string[];
+  try {
+    threadIds = await listUnreadInboxThreadIds(accessToken);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to list Gmail messages." };
   }
 
   let upserted = 0;
-  for (const gmailThreadId of threadIds) {
+  await mapWithConcurrency(threadIds, THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
     let gmailThread: GmailThread;
     try {
       gmailThread = await getThread(accessToken, gmailThreadId);
     } catch {
-      continue; // skip threads that fail to fetch rather than aborting the whole sync
+      return; // skip threads that fail to fetch rather than aborting the whole sync
     }
 
     const existing = await prisma.emailThread.findUnique({
@@ -293,6 +501,25 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
       existing && existing.matchStatus !== "unmatched"
         ? { contactId: existing.matchedContactId, applicationId: existing.matchedApplicationId, matchStatus: existing.matchStatus }
         : matchThread(gmailThread, candidates);
+
+    const needsJevPass =
+      !existing?.jevClassifiedAt || (gmailThread.lastMessageAt && gmailThread.lastMessageAt > existing.jevClassifiedAt);
+
+    let classification: ThreadClassification = EMPTY_CLASSIFICATION;
+    if (needsJevPass) {
+      // An exact contact match, or a Jev suggestion already on record from a
+      // prior pass, both count as "already resolved" — skip re-asking which
+      // job/contact and go straight to the status question.
+      const knownApplicationId = match.applicationId ?? existing?.jevSuggestedApplicationId ?? null;
+      classification = await classifyThreadForTriage(
+        accessToken,
+        gmailThread,
+        contactCandidates,
+        applicationCandidates,
+        knownApplicationId,
+        knownApplicationId ? applicationStatusById.get(knownApplicationId) ?? null : null
+      );
+    }
 
     const emailThreadRow = await prisma.emailThread.upsert({
       where: { userId_gmailThreadId: { userId, gmailThreadId: gmailThread.id } },
@@ -307,6 +534,21 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
         matchedApplicationId: match.applicationId,
         matchStatus: match.matchStatus,
         userId,
+        ...(needsJevPass
+          ? {
+              jevRecruitingLikely: classification.recruitingLikely,
+              jevRecruitingConfidence: classification.recruitingConfidence,
+              jevSuggestedContactId: classification.suggestedContactId,
+              jevSuggestedContactConf: classification.suggestedContactConf,
+              jevSuggestedApplicationId: classification.suggestedApplicationId,
+              jevSuggestedApplicationConf: classification.suggestedApplicationConf,
+              jevSuggestedNewCompany: classification.suggestedNewCompany,
+              jevSuggestedNewRole: classification.suggestedNewRole,
+              jevSuggestedStatus: classification.suggestedStatus,
+              jevSuggestedStatusConf: classification.suggestedStatusConf,
+              jevClassifiedAt: new Date(),
+            }
+          : {}),
       },
       update: {
         subject: gmailThread.subject,
@@ -316,6 +558,21 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
         matchedContactId: match.contactId,
         matchedApplicationId: match.applicationId,
         matchStatus: match.matchStatus,
+        ...(needsJevPass
+          ? {
+              jevRecruitingLikely: classification.recruitingLikely,
+              jevRecruitingConfidence: classification.recruitingConfidence,
+              jevSuggestedContactId: classification.suggestedContactId,
+              jevSuggestedContactConf: classification.suggestedContactConf,
+              jevSuggestedApplicationId: classification.suggestedApplicationId,
+              jevSuggestedApplicationConf: classification.suggestedApplicationConf,
+              jevSuggestedNewCompany: classification.suggestedNewCompany,
+              jevSuggestedNewRole: classification.suggestedNewRole,
+              jevSuggestedStatus: classification.suggestedStatus,
+              jevSuggestedStatusConf: classification.suggestedStatusConf,
+              jevClassifiedAt: new Date(),
+            }
+          : {}),
       },
     });
     upserted++;
@@ -323,18 +580,11 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     if (match.matchStatus === "auto") {
       await createInteractionFromEmailThreadIfMissing(userId, emailThreadRow, match.contactId, match.applicationId);
     }
-  }
-
-  let newHistoryId = account.historyId;
-  try {
-    newHistoryId = (await getProfile(accessToken)).historyId;
-  } catch {
-    // Keep the old historyId — the next sync just falls back to a full list again.
-  }
+  });
 
   await prisma.gmailAccount.update({
     where: { userId },
-    data: { historyId: newHistoryId, lastSyncAt: new Date() },
+    data: { lastSyncAt: new Date() },
   });
 
   return { ok: true, threadsUpserted: upserted, rematched };

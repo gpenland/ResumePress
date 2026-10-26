@@ -52,30 +52,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token;
 }
 
-export type GmailLabel = { id: string; name: string; type: string };
-
-export async function listLabels(accessToken: string): Promise<GmailLabel[]> {
-  const data = (await gmailFetch("/labels", accessToken)) as { labels?: GmailLabel[] };
-  return data.labels ?? [];
-}
-
-export async function getProfile(accessToken: string): Promise<{ historyId: string }> {
-  const data = (await gmailFetch("/profile", accessToken)) as { historyId: string };
-  return data;
-}
-
-export async function listMessageIdsForLabel(
-  accessToken: string,
-  labelId: string,
-  maxResults = 50
-): Promise<string[]> {
-  const data = (await gmailFetch(
-    `/messages?labelIds=${encodeURIComponent(labelId)}&maxResults=${maxResults}`,
-    accessToken
-  )) as { messages?: { id: string; threadId: string }[] };
-  return [...new Set((data.messages ?? []).map((m) => m.threadId))];
-}
-
 // Every currently-unread thread in the inbox, regardless of label — paginated
 // (Gmail caps a single /messages?q= page at 500; most inboxes are well under
 // that, but this walks nextPageToken rather than silently truncating).
@@ -149,20 +125,6 @@ export async function getThreadBodyText(accessToken: string, threadId: string): 
     .filter(Boolean);
 
   return texts.join("\n\n---\n\n").slice(0, MAX_THREAD_BODY_CHARS);
-}
-
-/** New thread ids added to `labelId` since `startHistoryId`. Throws (caller should fall back to a full list) if the history window has expired. */
-export async function listNewThreadIdsSinceHistory(
-  accessToken: string,
-  startHistoryId: string,
-  labelId: string
-): Promise<string[]> {
-  const data = (await gmailFetch(
-    `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&labelId=${encodeURIComponent(labelId)}&historyTypes=messageAdded`,
-    accessToken
-  )) as { history?: { messagesAdded?: { message: { id: string; threadId: string } }[] }[] };
-  const threadIds = (data.history ?? []).flatMap((h) => (h.messagesAdded ?? []).map((m) => m.message.threadId));
-  return [...new Set(threadIds)];
 }
 
 export type GmailThread = {

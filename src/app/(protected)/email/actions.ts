@@ -3,7 +3,6 @@
 import { requireUserId } from "@/lib/auth";
 import { disconnectGmailAccount } from "@/lib/gmailAccount";
 import {
-  updateSyncLabelsForUser,
   syncGmailForUser,
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
@@ -13,19 +12,13 @@ import {
   type SuggestedMatch,
 } from "@/lib/emailThreads";
 import { createContactForUser } from "@/lib/contacts";
+import { createApplicationForUser } from "@/lib/applications";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 
 export async function disconnectGmail() {
   const userId = await requireUserId();
   await disconnectGmailAccount(userId);
-  revalidatePath("/email");
-}
-
-export async function saveGmailSyncLabels(formData: FormData) {
-  const userId = await requireUserId();
-  const labelIds = formData.getAll("labelIds").map(String);
-  await updateSyncLabelsForUser(userId, labelIds);
   revalidatePath("/email");
 }
 
@@ -102,4 +95,19 @@ export async function createContactFromTriage(name: string, email: string | null
   revalidatePath("/email");
   revalidatePath("/contacts");
   return { id: contact.id, name: contact.name };
+}
+
+// Mirrors createContactFromTriage above, for the "this looks like a new
+// opportunity, not one you're already tracking" case Jev's eager
+// classification can surface during sync (jevSuggestedNewCompany/Role on the
+// thread). Doesn't confirm the thread's match itself — the caller picks the
+// new application in the row's select and hits Confirm, same as any other
+// match.
+export async function createApplicationFromTriage(companyName: string, roleTitle: string) {
+  const userId = await requireUserId();
+  const application = await createApplicationForUser(userId, { companyName, roleTitle });
+
+  revalidatePath("/email");
+  revalidatePath("/applications");
+  return { id: application.id, roleTitle: application.roleTitle, companyName };
 }
