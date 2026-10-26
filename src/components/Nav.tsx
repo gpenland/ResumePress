@@ -26,7 +26,7 @@ export default async function Nav() {
   return (
     <header className="bg-background sticky top-0 z-50">
       <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4 min-w-0">
-        <Link href="/" className="font-semibold tracking-tight text-foreground shrink-0">
+        <Link href="/" className="font-heading font-semibold tracking-tight text-foreground shrink-0">
           ResumePress
         </Link>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
