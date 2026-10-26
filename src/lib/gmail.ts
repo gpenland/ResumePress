@@ -13,15 +13,35 @@ export class GmailApiError extends Error {
   }
 }
 
-async function gmailFetch(path: string, accessToken: string): Promise<unknown> {
+const MAX_RATE_LIMIT_RETRIES = 4;
+
+function isRateLimitResponse(status: number, bodyText: string): boolean {
+  if (status === 429) return true;
+  // Gmail reports quota exhaustion as a 403 with a reason in the body
+  // (rateLimitExceeded / userRateLimitExceeded), not a 429 — a plain
+  // status check would misclassify a real permission error as transient.
+  return status === 403 && /rateLimitExceeded/i.test(bodyText);
+}
+
+// Google's own guidance for this exact error ("Quota exceeded... Units per
+// minute per user") is to retry with truncated exponential backoff rather
+// than treat it as a hard failure — the budget resets within the minute.
+// Every Gmail call in this file funnels through here, so this covers
+// listing, label lookups, and per-thread fetches alike.
+async function gmailFetch(path: string, accessToken: string, attempt = 0): Promise<unknown> {
   const res = await fetch(`${GMAIL_API}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new GmailApiError(`Gmail API ${path} failed: ${res.status} ${body}`, res.status);
+  if (res.ok) return res.json();
+
+  const bodyText = await res.text().catch(() => "");
+  if (isRateLimitResponse(res.status, bodyText) && attempt < MAX_RATE_LIMIT_RETRIES) {
+    const delayMs = 500 * 2 ** attempt + Math.floor(Math.random() * 250);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return gmailFetch(path, accessToken, attempt + 1);
   }
-  return res.json();
+
+  throw new GmailApiError(`Gmail API ${path} failed: ${res.status} ${bodyText}`, res.status);
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<string> {
@@ -122,6 +142,7 @@ type GmailMessagePart = {
   mimeType?: string;
   body?: { data?: string };
   parts?: GmailMessagePart[];
+  headers?: { name: string; value: string }[];
 };
 
 function decodeBase64Url(data: string): string {
@@ -150,25 +171,6 @@ function extractMessageText(payload: GmailMessagePart): string {
 
 const MAX_THREAD_BODY_CHARS = 20_000;
 
-/**
- * Full message bodies for every message in a thread, fetched and decoded on
- * the fly for Jev classification — never persisted (EmailThread only ever
- * stores subject/snippet, per the read-only/metadata-only design). Bounded
- * in length for the same reason urlFetch.ts caps fetched page size: this
- * feeds an LLM-adjacent call, not unbounded internal processing.
- */
-export async function getThreadBodyText(accessToken: string, threadId: string): Promise<string> {
-  const data = (await gmailFetch(`/threads/${threadId}?format=full`, accessToken)) as {
-    messages?: { payload?: GmailMessagePart }[];
-  };
-
-  const texts = (data.messages ?? [])
-    .map((m) => (m.payload ? extractMessageText(m.payload) : ""))
-    .filter(Boolean);
-
-  return texts.join("\n\n---\n\n").slice(0, MAX_THREAD_BODY_CHARS);
-}
-
 export type GmailThread = {
   id: string;
   subject: string | null;
@@ -183,17 +185,26 @@ function extractEmails(headerValue: string | undefined): string[] {
   return matches.map((e) => e.toLowerCase());
 }
 
-export async function getThread(accessToken: string, threadId: string): Promise<GmailThread> {
-  const data = (await gmailFetch(
-    `/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Subject`,
-    accessToken
-  )) as {
+/**
+ * Metadata (subject/snippet/participants/lastMessageAt) *and* body text
+ * from a single `format=full` fetch, instead of the two separate Gmail
+ * calls (one `format=metadata`, one `format=full`) this used to be —
+ * `threads.get` costs the same Gmail API quota regardless of `format`, so
+ * fetching full and deriving metadata from it halves the quota spent per
+ * thread for free. This matters: a sync touching hundreds of threads was
+ * hitting Gmail's per-user-per-minute quota before this change. Body text
+ * is decoded on the fly for Jev classification — never persisted
+ * (EmailThread only ever stores subject/snippet) — and bounded in length
+ * for the same reason urlFetch.ts caps fetched page size: this feeds an
+ * LLM-adjacent call, not unbounded internal processing.
+ */
+export async function getThreadDetails(
+  accessToken: string,
+  threadId: string
+): Promise<{ thread: GmailThread; bodyText: string }> {
+  const data = (await gmailFetch(`/threads/${threadId}?format=full`, accessToken)) as {
     id: string;
-    messages: {
-      snippet?: string;
-      internalDate?: string;
-      payload?: { headers?: { name: string; value: string }[] };
-    }[];
+    messages?: { snippet?: string; internalDate?: string; payload?: GmailMessagePart }[];
   };
 
   const participants = new Set<string>();
@@ -216,13 +227,20 @@ export async function getThread(accessToken: string, threadId: string): Promise<
     }
   }
 
-  return {
+  const thread: GmailThread = {
     id: data.id,
     subject,
     snippet,
     participants: [...participants],
     lastMessageAt: lastInternalDate ? new Date(lastInternalDate) : new Date(),
   };
+
+  const texts = (data.messages ?? [])
+    .map((m) => (m.payload ? extractMessageText(m.payload) : ""))
+    .filter(Boolean);
+  const bodyText = texts.join("\n\n---\n\n").slice(0, MAX_THREAD_BODY_CHARS);
+
+  return { thread, bodyText };
 }
 
 export function gmailThreadUrl(threadId: string): string {

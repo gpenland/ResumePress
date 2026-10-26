@@ -5,8 +5,7 @@ import {
   listInboxThreadIds,
   listThreadIdsForLabel,
   listLabels,
-  getThreadBodyText,
-  getThread,
+  getThreadDetails,
   gmailThreadUrl,
   GmailApiError,
   type GmailLabel,
@@ -239,7 +238,15 @@ export type SyncResult =
   | { ok: true; threadsUpserted: number; rematched: number }
   | { ok: false; error: string };
 
-const THREAD_SYNC_CONCURRENCY = 8;
+// Lowered from 8: with up to ~1500 threads in a single sync (the 1000-thread
+// inbox cap plus however many carry the override label) each costing a
+// Gmail API call, high concurrency burns through Gmail's per-user-per-
+// minute quota fast enough to trip "Quota exceeded... Units per minute per
+// user" (seen in production). Spreading the same calls out over more wall-
+// clock time, rather than bursting them, is what actually avoids that —
+// gmailFetch's retry-with-backoff (gmail.ts) is the backstop for whatever
+// still gets rate-limited despite this.
+const THREAD_SYNC_CONCURRENCY = 3;
 
 // Runs `fn` over `items` with at most `limit` in flight at once. Each thread
 // below is fetched/classified/upserted independently (keyed by its own
@@ -324,21 +331,13 @@ const EMPTY_CLASSIFICATION: ThreadClassification = {
  * questions entirely (a known match is already high-confidence).
  */
 async function classifyThreadForTriage(
-  accessToken: string,
   thread: Pick<GmailThread, "id" | "subject" | "snippet" | "participants">,
+  bodyText: string,
   contactCandidates: { id: string; name: string; title: string | null; company: { name: string } | null }[],
   applicationCandidates: ApplicationPickerOption[],
   knownApplicationId: string | null,
   knownApplicationStatus: string | null
 ): Promise<ThreadClassification> {
-  let bodyText = "";
-  try {
-    bodyText = await getThreadBodyText(accessToken, thread.id);
-  } catch {
-    // Classify on subject/snippet alone rather than skipping entirely —
-    // still useful signal, just less reliable than with the full body.
-  }
-
   const state = [
     thread.subject ? `Subject: ${thread.subject}` : null,
     thread.snippet ? `Snippet: ${thread.snippet}` : null,
@@ -376,7 +375,8 @@ async function classifyThreadForTriage(
     recruiting: {
       type: "noul",
       instructions:
-        "Is this email related to a job application, recruiting, or hiring process (e.g. an application confirmation, recruiter outreach, interview scheduling, a rejection, an offer)? Routine personal email, newsletters, receipts, and notifications are not.",
+        "Is this a personal email specifically about a job application the recipient has submitted, or a specific recruiter/hiring contact reaching out to the recipient (e.g. an application confirmation, interview scheduling, a rejection, an offer, direct recruiter outreach)? " +
+        "Answer no for anything automated or bulk, even if it mentions jobs or hiring: job-board/platform digests and alerts listing job openings or recommendations (e.g. LinkedIn job alerts, Jobright, Indeed, ZipRecruiter, Glassdoor, 'jobs you may be interested in' emails), newsletters, receipts, and other mass notifications are not personal correspondence about the recipient's own candidacy and should be answered no.",
     },
   };
   if (contactCandidates.length > 0) {
@@ -530,8 +530,9 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   let upserted = 0;
   await mapWithConcurrency(threadIds, THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
     let gmailThread: GmailThread;
+    let bodyText: string;
     try {
-      gmailThread = await getThread(accessToken, gmailThreadId);
+      ({ thread: gmailThread, bodyText } = await getThreadDetails(accessToken, gmailThreadId));
     } catch {
       return; // skip threads that fail to fetch rather than aborting the whole sync
     }
@@ -556,8 +557,8 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
       // job/contact and go straight to the status question.
       const knownApplicationId = match.applicationId ?? existing?.jevSuggestedApplicationId ?? null;
       classification = await classifyThreadForTriage(
-        accessToken,
         gmailThread,
+        bodyText,
         contactCandidates,
         applicationCandidates,
         knownApplicationId,
