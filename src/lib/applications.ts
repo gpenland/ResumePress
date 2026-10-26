@@ -345,6 +345,45 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
   };
 }
 
+/**
+ * Bulk status change for the applications list's multi-select action bar
+ * (and the MCP bulk_update_application_status tool). Mirrors
+ * updateApplicationStatusForUser per id: ownership-checked read, skip
+ * no-ops, update + history write in one transaction. Ids not owned by the
+ * caller (or already missing) are silently skipped rather than failing the
+ * whole batch.
+ */
+export async function bulkUpdateApplicationStatusForUser(
+  userId: string,
+  ids: string[],
+  status: string
+): Promise<void> {
+  for (const id of ids) {
+    const existing = await prisma.application.findFirst({ where: { id, userId } });
+    if (!existing || existing.status === status) continue;
+
+    await prisma.$transaction([
+      prisma.application.updateMany({
+        where: { id, userId },
+        data: { status },
+      }),
+      prisma.applicationStatusHistory.create({
+        data: {
+          applicationId: id,
+          fromStatus: existing.status,
+          toStatus: status,
+          userId,
+        },
+      }),
+    ]);
+  }
+}
+
+/** Bulk delete for the applications list's multi-select action bar (and the MCP bulk_delete_applications tool). */
+export async function bulkDeleteApplicationsForUser(userId: string, ids: string[]): Promise<void> {
+  await prisma.application.deleteMany({ where: { id: { in: ids }, userId } });
+}
+
 export async function getApplicationForUser(userId: string, applicationId: string) {
   return prisma.application.findFirst({
     where: { id: applicationId, userId },
