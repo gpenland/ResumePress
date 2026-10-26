@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { Category, Entry, ResumeEntry } from "@prisma/client";
 import { updateResumeEntries } from "@/app/(protected)/resumes/actions";
+import { fetchResumePdf, triggerBlobDownload } from "@/lib/pdfDownloadClient";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +32,8 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
   const [saved, setSaved] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -110,22 +113,35 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
 
   function handleDownload() {
     startDownload(async () => {
+      setDownloadError(null);
       await persistSelection();
-      // Use location.href so popup blockers don't interfere with file downloads
-      window.location.href = `/api/pdf/${resumeId}`;
+      const result = await fetchResumePdf(`/api/pdf/${resumeId}`);
+      if (!result.ok) {
+        setDownloadError(result.error);
+        return;
+      }
+      triggerBlobDownload(result.blobUrl, result.filename);
     });
   }
 
   function handlePreview() {
     startPreview(async () => {
+      setPreviewError(null);
       await persistSelection();
-      // Inline mode asks the PDF route for Content-Disposition: inline so it can
-      // render in an <iframe> instead of triggering a browser download.
-      setPreviewUrl(`/api/pdf/${resumeId}?inline=1&t=${Date.now()}`);
+      // Inline mode asks the PDF route for Content-Disposition: inline, which
+      // only affects the filename a browser would suggest — we always render
+      // the fetched blob in the <iframe> below regardless.
+      const result = await fetchResumePdf(`/api/pdf/${resumeId}?inline=1&t=${Date.now()}`);
+      if (!result.ok) {
+        setPreviewError(result.error);
+        return;
+      }
+      setPreviewUrl(result.blobUrl);
     });
   }
 
   function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
   }
 
@@ -160,6 +176,10 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
           </Button>
         </div>
       </div>
+
+      {(downloadError || previewError) && (
+        <p className="text-sm text-destructive">{downloadError || previewError}</p>
+      )}
 
       {previewUrl && (
         <Card className="py-0">
