@@ -121,20 +121,18 @@ with no signal that this was the cause. Candidates: `Application(userId,
 status)`, `Interaction(userId, occurredAt)`, `EmailThread(userId,
 matchStatus)`, `EmailThread(userId, lastMessageAt)`.
 
-## 8. Dashboard has no "needs attention" signal for applications
+## 8. ~~Dashboard "needs attention" signal for applications~~ — skipped
 
-**Files:** `src/app/(protected)/page.tsx`, `src/lib/applications.ts`
-
-The dashboard surfaces the 5 most-recently-updated applications and a
-triage count, but nothing flags applications that have gone quiet — no
-status change or logged interaction in, say, 14+ days. The app already has
-an analogous idea for contacts (`nextFollowUpAt`, currently unused on the
-dashboard) but nothing for applications, which are the primary object in
-the tracker. This is the one genuinely new (small) feature on this list:
-a "needs a follow-up" dashboard card, computed from data that already
-exists (`ApplicationStatusHistory`/`updatedAt`) — no new entities, no new
-settings surface, just a derived view that serves the app's actual job
-(don't let an application silently die from inaction).
+**Status: skipped per user feedback (2026-10-26).** The original proposal
+was a "gone quiet" flag for applications with no status change or logged
+interaction in ~14+ days, on the theory that it'd mirror the existing
+(currently dashboard-unused) `Contact.nextFollowUpAt` idea. Feedback: many
+real hiring processes — government, academic, enterprise — legitimately
+take months between touches, so a generic staleness window would mostly
+produce false-positive noise rather than a useful signal, not something
+worth building as-is. Left here rather than deleted so the reasoning isn't
+lost if a better-targeted version (e.g. user-set per-application follow-up
+dates, matching how `Contact.nextFollowUpAt` already works) comes up later.
 
 ## 9. List pages have no pagination ceiling
 
