@@ -29,6 +29,7 @@ import {
   createContactFromTriage,
   bulkConfirmEmailThreadMatches,
   bulkIgnoreEmailThreadMatches,
+  suggestMatchForThread,
 } from "./actions";
 
 export default async function EmailPage() {
@@ -146,6 +147,7 @@ export default async function EmailPage() {
               bulkConfirmMatches={bulkConfirmEmailThreadMatches}
               bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
               createContact={createContactFromTriage}
+              suggestMatch={suggestMatchForThread}
             />
           </div>
 

@@ -8,7 +8,9 @@ import {
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
+  suggestMatchForThreadForUser,
   type SyncResult,
+  type SuggestedMatch,
 } from "@/lib/emailThreads";
 import { createContactForUser } from "@/lib/contacts";
 import { revalidatePath } from "next/cache";
@@ -82,6 +84,11 @@ export async function restoreEmailThreadMatch(threadId: string) {
   if (!result.ok) notFound();
 
   revalidatePath("/email");
+}
+
+export async function suggestMatchForThread(threadId: string): Promise<SuggestedMatch> {
+  const userId = await requireUserId();
+  return suggestMatchForThreadForUser(userId, threadId);
 }
 
 // Barebones contact creation from an unmatched triage thread — name + the one
