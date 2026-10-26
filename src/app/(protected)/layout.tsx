@@ -4,6 +4,7 @@ import { listContactOptionsForUser } from "@/lib/contacts";
 import { listApplicationOptionsForUser } from "@/lib/interactions";
 import { logInteraction } from "./contacts/actions";
 import GlobalQuickAdd from "@/components/contacts/GlobalQuickAdd";
+import ResumeFlourish from "@/components/ResumeFlourish";
 
 export default async function ProtectedLayout({
   children,
@@ -33,6 +34,7 @@ export default async function ProtectedLayout({
         applicationOptions={applicationOptions}
         logInteraction={logInteraction}
       />
+      <ResumeFlourish />
     </>
   );
 }
