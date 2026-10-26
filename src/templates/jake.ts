@@ -1,3 +1,8 @@
+// Relative import, not the usual "@/lib/..." alias: this file is run
+// directly through ts-node by scripts/check-jake-template.ts, which doesn't
+// resolve tsconfig.json's path aliases.
+import { EMPHASIS_CONTENT_SOURCE } from "../lib/richTextMarkers";
+
 export type Identity = {
   name: string;
   email: string;
@@ -52,12 +57,16 @@ function escapeLatex(str: string): string {
     .replace(/\^/g, "\\textasciicircum{}");
 }
 
-// Convert **bold** and *italic* markers to LaTeX commands.
-// Must run after escapeLatex so inner content is already safe.
+const BOLD_RE = new RegExp(String.raw`\*\*(${EMPHASIS_CONTENT_SOURCE})\*\*`, "g");
+const ITALIC_RE = new RegExp(String.raw`\*(${EMPHASIS_CONTENT_SOURCE})\*`, "g");
+
+// Convert **bold** and *italic* markers to LaTeX commands. A marker only
+// opens/closes when it isn't immediately adjacent to whitespace (see
+// EMPHASIS_CONTENT_SOURCE) — otherwise two unrelated literal asterisks in the
+// same bullet (e.g. "A* pathfinding", "O(n*log n)") get greedily paired and
+// silently eaten. Must run after escapeLatex so inner content is already safe.
 function applyFormatting(str: string): string {
-  return str
-    .replace(/\*\*([^*]+)\*\*/g, "\\textbf{$1}")
-    .replace(/\*([^*]+)\*/g, "\\textit{$1}");
+  return str.replace(BOLD_RE, "\\textbf{$1}").replace(ITALIC_RE, "\\textit{$1}");
 }
 
 function e(str: string | null | undefined): string {
