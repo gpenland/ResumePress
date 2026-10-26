@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
 import UserMenu from "@/components/UserMenu";
@@ -23,26 +22,17 @@ export default async function Nav() {
 
   return (
     <header className="bg-background sticky top-0 z-50">
-      <div className="mx-auto max-w-6xl px-4 h-14 grid grid-cols-[1fr_auto_1fr] items-center gap-4 min-w-0">
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0 overflow-x-auto">
-          <Link href="/" className="font-semibold tracking-tight text-foreground shrink-0">
-            ResumePress
-          </Link>
+      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4 min-w-0">
+        <Link href="/" className="font-semibold tracking-tight text-foreground shrink-0">
+          ResumePress
+        </Link>
+        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
           <NavLinks links={NAV_LINKS} />
-        </div>
-        <div className="hidden sm:flex justify-center">
-          {session?.user && (
-            <form action="/search" method="GET" className="shrink-0">
-              <Input name="q" placeholder="Search..." className="h-8 w-40" />
-            </form>
-          )}
-        </div>
-        <div className="flex items-center gap-3 sm:gap-6 justify-end min-w-0">
           {session?.user && (
             <Link
               href="/search"
               aria-label="Search"
-              className="sm:hidden shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <Search className="size-3.5" />
             </Link>
