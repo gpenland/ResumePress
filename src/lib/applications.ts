@@ -340,6 +340,8 @@ export type ApplicationPipelineStats = {
   active: number;
   offers: number;
   offerRate: number | null;
+  rejections: number;
+  rejectionRate: number | null;
   newThisWeek: number;
   newLastWeek: number;
   byStatus: { status: string; count: number }[];
@@ -373,6 +375,7 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
   const counts = new Map<string, number>();
   let active = 0;
   let offers = 0;
+  let rejections = 0;
   let newThisWeek = 0;
   let newLastWeek = 0;
 
@@ -380,6 +383,7 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
     counts.set(status, (counts.get(status) ?? 0) + 1);
     if (status !== "Rejected" && status !== "Ghosted") active++;
     if (status === "Offer") offers++;
+    if (status === "Rejected") rejections++;
 
     if (!appliedAt) continue;
     const age = now - appliedAt.getTime();
@@ -396,6 +400,8 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
     active,
     offers,
     offerRate: applications.length === 0 ? null : offers / applications.length,
+    rejections,
+    rejectionRate: applications.length === 0 ? null : rejections / applications.length,
     newThisWeek,
     newLastWeek,
     byStatus,

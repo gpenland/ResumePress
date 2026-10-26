@@ -87,9 +87,9 @@ export default function StatisticsPanel({
           href="/applications"
         />
         <StatTile
-          label="Offer rate"
-          value={pipeline.offerRate === null ? "—" : `${Math.round(pipeline.offerRate * 100)}%`}
-          hint={`${pipeline.offers} offer${pipeline.offers === 1 ? "" : "s"}`}
+          label="Rejection rate"
+          value={pipeline.rejectionRate === null ? "—" : `${Math.round(pipeline.rejectionRate * 100)}%`}
+          hint={`${pipeline.rejections} rejection${pipeline.rejections === 1 ? "" : "s"}`}
         />
         <StatTile
           label="Applied this week"
@@ -100,7 +100,6 @@ export default function StatisticsPanel({
         <StatTile
           label="Last synced"
           value={email.connected ? formatRelativeTime(email.lastSyncAt) : "Not connected"}
-          hint={email.connected ? `${email.matched} of ${email.total} matched` : undefined}
           href="/email"
         />
       </div>
