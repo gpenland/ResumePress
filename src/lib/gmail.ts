@@ -151,16 +151,31 @@ async function paginatedThreadIds(
 }
 
 // Every thread in the inbox, read or unread, regardless of label — capped at
-// INBOX_SCAN_LIMIT total threads. Unlike "currently unread" (a self-pruning
-// set that only shrinks), the full inbox only grows, so re-scanning it in
-// full every sync has no natural ceiling — the cap is the ceiling. Gmail's
-// list endpoint returns messages newest-first with no explicit sort param
-// needed, so capping here means "the N most recently active threads," not
-// an arbitrary truncation.
+// INBOX_SCAN_LIMIT total threads either way. Unlike "currently unread" (a
+// self-pruning set that only shrinks), the full inbox only grows, so
+// re-scanning it in full has no natural ceiling — the cap is the ceiling.
+// Gmail's list endpoint returns messages newest-first with no explicit
+// sort param needed, so capping here means "the N most recently active
+// threads," not an arbitrary truncation.
+//
+// `sinceEpochSeconds`, when given, narrows the scan to `after:<timestamp>`
+// (Gmail search syntax accepts a Unix timestamp directly, not just a
+// date) instead of scanning the whole inbox — this is what makes a resync
+// cheap: emailThreads.ts passes this on every sync after the first,
+// scoped to just what's changed since the last one, rather than
+// re-fetching every thread's full details again regardless of whether
+// anything about it changed. See "Gmail sync" in CLAUDE.md for the
+// overlap-buffer rationale (why it's lastSyncAt *minus* a margin, not
+// lastSyncAt exactly).
 const INBOX_SCAN_LIMIT = 1000;
 
-export async function listInboxThreadIds(accessToken: string, accountKey: string): Promise<string[]> {
-  return paginatedThreadIds(accessToken, accountKey, { q: "in:inbox" }, INBOX_SCAN_LIMIT);
+export async function listInboxThreadIds(
+  accessToken: string,
+  accountKey: string,
+  sinceEpochSeconds?: number
+): Promise<string[]> {
+  const q = sinceEpochSeconds ? `in:inbox after:${sinceEpochSeconds}` : "in:inbox";
+  return paginatedThreadIds(accessToken, accountKey, { q }, INBOX_SCAN_LIMIT);
 }
 
 // Every thread carrying a specific label, regardless of how old — the

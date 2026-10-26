@@ -255,8 +255,8 @@ export default function GmailConnectionPanel(props: Props) {
           <div className="space-y-1.5 pt-2 border-t">
             <p className="text-sm font-medium">Debug: clear unmatched emails</p>
             <p className="text-xs text-muted-foreground">
-              Deletes every unmatched thread (not confirmed/ignored ones) so the next sync re-fetches and
-              re-classifies them from scratch — for testing a clean resync.
+              Deletes every unmatched thread (not confirmed/ignored ones) and resets the next sync back to a
+              full inbox scan, instead of its normal incremental catch-up — for testing a clean resync.
             </p>
             <Button
               type="button"

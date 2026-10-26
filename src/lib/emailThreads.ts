@@ -455,11 +455,18 @@ async function classifyThreadForTriage(
 
 /**
  * Manual "Sync now". Scans the inbox — read and unread, regardless of label
- * (see gmail.ts's listInboxThreadIds) — replacing the earlier label-picker +
- * History-API-incremental design. Capped at INBOX_SCAN_LIMIT (1000) most
- * recently active threads per sync; re-scanned fresh each time rather than
- * tracked incrementally, so that cap is the only thing bounding cost on a
- * large or long-lived inbox.
+ * (see gmail.ts's listInboxThreadIds). The *first* sync for an account (no
+ * lastSyncAt yet) scans the whole inbox, capped at INBOX_SCAN_LIMIT (1000)
+ * most recently active threads. Every sync after that is incremental:
+ * scoped to `after:<lastSyncAt minus a buffer>` instead of re-fetching
+ * every thread's full details again regardless of whether anything about
+ * it changed — the earlier design re-scanned everything on every sync,
+ * which made a resync cost the same as the first sync every time (what
+ * made a ~500-thread inbox take ~10 minutes to resync in practice, even
+ * when almost nothing had changed). The 1000-thread cap still applies to
+ * the incremental case as a safety ceiling; it should rarely if ever
+ * actually bind there, since "new activity since the last sync" is
+ * normally far smaller than the whole inbox.
  *
  * For each thread, eagerly runs Jev classification (see
  * classifyThreadForTriage) so the triage queue arrives pre-filled with
@@ -501,9 +508,26 @@ export async function syncGmailForUser(
   const applicationCandidates = applicationChoices.slice(0, MAX_SUGGESTION_CANDIDATES);
   const applicationStatusById = new Map(applicationChoices.map((a) => [a.id, a.status]));
 
+  // Incremental resync: once there's a prior successful sync to anchor to,
+  // only ask Gmail for threads with activity since then, rather than
+  // re-fetching every thread's full details again regardless of whether
+  // anything about it changed (what made every sync as expensive as the
+  // first one). The buffer subtracted from lastSyncAt — not lastSyncAt
+  // exactly — covers a message arriving *during* the previous sync's own
+  // run: that message's date is before the run's completion timestamp
+  // (lastSyncAt), so a bare "since lastSyncAt" cutoff would miss it
+  // forever. The buffer just needs to comfortably exceed how long a sync
+  // actually takes; re-covering a few already-processed threads at the
+  // edges is harmless (needsJevPass still skips reclassifying anything
+  // that hasn't changed; the upsert is idempotent either way).
+  const RESYNC_OVERLAP_BUFFER_MS = 15 * 60 * 1000;
+  const sinceEpochSeconds = account.lastSyncAt
+    ? Math.floor((account.lastSyncAt.getTime() - RESYNC_OVERLAP_BUFFER_MS) / 1000)
+    : undefined;
+
   let threadIds: string[];
   try {
-    threadIds = await listInboxThreadIds(accessToken, userId);
+    threadIds = await listInboxThreadIds(accessToken, userId, sinceEpochSeconds);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to list Gmail messages." };
   }
@@ -885,9 +909,19 @@ export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyn
  * decisions, neither of which this should touch. Safe to hard-delete:
  * createInteractionFromEmailThreadIfMissing only ever runs for "auto"
  * matches, so an "unmatched" row never has an Interaction pointing at it.
+ *
+ * Also clears lastSyncAt: once a sync has succeeded once, every later
+ * sync only asks Gmail for threads changed since lastSyncAt (see
+ * syncGmailForUser) — without resetting it here, a resync right after
+ * clearing would stay scoped to that narrow window and likely never
+ * re-fetch the very threads this just deleted, defeating the point of a
+ * "clean resync" test.
  */
 export async function clearUnmatchedThreadsForUser(userId: string): Promise<{ cleared: number }> {
-  const { count } = await prisma.emailThread.deleteMany({ where: { userId, matchStatus: "unmatched" } });
+  const [{ count }] = await prisma.$transaction([
+    prisma.emailThread.deleteMany({ where: { userId, matchStatus: "unmatched" } }),
+    prisma.gmailAccount.updateMany({ where: { userId }, data: { lastSyncAt: null } }),
+  ]);
   return { cleared: count };
 }
 
