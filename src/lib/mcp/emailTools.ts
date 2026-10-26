@@ -5,6 +5,7 @@ import { createContactForUser } from "@/lib/contacts";
 import { createApplicationForUser } from "@/lib/applications";
 import {
   runTrackedGmailSyncForUser,
+  cancelStuckSyncForUser,
   listAvailableLabelsForUser,
   updateSyncLabelsForUser,
   clearUnmatchedThreadsForUser,
@@ -75,6 +76,16 @@ export function registerEmailTools(server: McpServer, userId: string): void {
       if (!result.ok) return errorResult(result.error);
       return textResult(result);
     }
+  );
+
+  server.registerTool(
+    "cancel_stuck_sync",
+    {
+      description:
+        "Clear a sync stuck reporting 'running' (e.g. the server restarted mid-sync, whether that sync was started from the browser, the cron job, or sync_gmail_now) without waiting for the normal 20-minute staleness window. Safe to call even if the sync turns out not to actually be dead — its result is ignored if that's the case, so cancelling never clobbers a sync that finishes normally right after.",
+      inputSchema: {},
+    },
+    async () => textResult(await cancelStuckSyncForUser(userId))
   );
 
   server.registerTool(

@@ -5,6 +5,7 @@ import { disconnectGmailAccount } from "@/lib/gmailAccount";
 import {
   startGmailSyncInBackgroundForUser,
   getGmailSyncStatusForUser,
+  cancelStuckSyncForUser,
   updateSyncLabelsForUser,
   clearUnmatchedThreadsForUser,
   confirmEmailThreadMatchForUser,
@@ -49,6 +50,18 @@ export async function startGmailSync(): Promise<{ started: boolean; error?: stri
 export async function getGmailSyncStatus(): Promise<GmailSyncStatus> {
   const userId = await requireUserId();
   return getGmailSyncStatusForUser(userId);
+}
+
+// Manual override for a sync stuck in "running" — e.g. after a server
+// restart mid-sync — without waiting for the 20-minute staleness window
+// that lets a new sync attempt reclaim the slot automatically. See
+// cancelStuckSyncForUser's own doc comment for why this is safe even if
+// the sync wasn't actually dead.
+export async function cancelSync(): Promise<{ cancelled: boolean }> {
+  const userId = await requireUserId();
+  const result = await cancelStuckSyncForUser(userId);
+  revalidatePath("/email");
+  return result;
 }
 
 /** Debug tool: deletes unmatched EmailThread rows so the next sync re-fetches and re-classifies them from scratch. Doesn't touch confirmed/ignored threads. */

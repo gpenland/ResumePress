@@ -23,6 +23,7 @@ import {
   saveOverrideLabel,
   startGmailSync,
   getGmailSyncStatus,
+  cancelSync,
   clearUnmatchedThreads,
   confirmEmailThreadMatch,
   ignoreEmailThreadMatch,
@@ -116,6 +117,7 @@ export default async function EmailPage() {
           saveOverrideLabel={saveOverrideLabel}
           startSync={startGmailSync}
           getSyncStatus={getGmailSyncStatus}
+          cancelSync={cancelSync}
           clearUnmatched={clearUnmatchedThreads}
           disconnect={disconnectGmail}
         />
