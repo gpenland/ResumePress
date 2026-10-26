@@ -21,6 +21,33 @@ export type { ApplicationPickerOption } from "@/lib/emailThreadsShared";
 
 const SYSTEM_LABEL_ALLOWLIST = new Set(["INBOX", "SENT", "STARRED", "IMPORTANT"]);
 
+// How many Gmail threads syncGmailForUser fetches/upserts at once. Bounded
+// rather than unlimited so a large first sync doesn't fire off hundreds of
+// simultaneous Gmail API calls.
+const THREAD_SYNC_CONCURRENCY = 8;
+
+// Runs `fn` over `items` with at most `limit` in flight at once, collecting
+// results in input order. A plain `Promise.all(items.map(fn))` would run
+// every item at once with no cap; a plain sequential `for` loop (the
+// previous approach here) runs one at a time with no overlap at all.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    for (;;) {
+      const i = nextIndex++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export async function getValidAccessTokenForUser(userId: string): Promise<string> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) throw new GmailApiError("Gmail is not connected.");
@@ -276,12 +303,18 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   }
 
   let upserted = 0;
-  for (const gmailThreadId of threadIds) {
+  // Each thread is fetched, matched, and upserted independently (keyed by its
+  // own userId+gmailThreadId), so this is safe to run with bounded
+  // concurrency instead of one at a time — one at a time means N serial
+  // Gmail API round trips plus 2N DB calls, which on a first sync or a busy
+  // label with dozens of new threads is easily tens of seconds to minutes
+  // and risks hitting a platform request timeout before the sync finishes.
+  await mapWithConcurrency(Array.from(threadIds), THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
     let gmailThread: GmailThread;
     try {
       gmailThread = await getThread(accessToken, gmailThreadId);
     } catch {
-      continue; // skip threads that fail to fetch rather than aborting the whole sync
+      return; // skip threads that fail to fetch rather than aborting the whole sync
     }
 
     const existing = await prisma.emailThread.findUnique({
@@ -323,7 +356,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     if (match.matchStatus === "auto") {
       await createInteractionFromEmailThreadIfMissing(userId, emailThreadRow, match.contactId, match.applicationId);
     }
-  }
+  });
 
   let newHistoryId = account.historyId;
   try {
