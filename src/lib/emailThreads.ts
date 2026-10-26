@@ -706,6 +706,21 @@ export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyn
  * thread just because classification didn't run); labelForced always wins
  * regardless of what Jev concluded — see GmailAccount.syncLabelIds.
  */
+/**
+ * Debug/reset tool: deletes every unmatched EmailThread row so the next
+ * sync re-fetches and re-classifies them from scratch, for testing the
+ * resync path in isolation from whatever state a prior sync left behind.
+ * Scoped to matchStatus: "unmatched" only — auto/confirmed/ignored rows
+ * represent either Jev's confirmed matches or the user's own triage
+ * decisions, neither of which this should touch. Safe to hard-delete:
+ * createInteractionFromEmailThreadIfMissing only ever runs for "auto"
+ * matches, so an "unmatched" row never has an Interaction pointing at it.
+ */
+export async function clearUnmatchedThreadsForUser(userId: string): Promise<{ cleared: number }> {
+  const { count } = await prisma.emailThread.deleteMany({ where: { userId, matchStatus: "unmatched" } });
+  return { cleared: count };
+}
+
 export async function listTriageThreadsForUser(userId: string) {
   return prisma.emailThread.findMany({
     where: {

@@ -13,8 +13,6 @@ export class GmailApiError extends Error {
   }
 }
 
-const MAX_RATE_LIMIT_RETRIES = 4;
-
 function isRateLimitResponse(status: number, bodyText: string): boolean {
   if (status === 429) return true;
   // Gmail reports quota exhaustion as a 403 with a reason in the body
@@ -23,12 +21,43 @@ function isRateLimitResponse(status: number, bodyText: string): boolean {
   return status === 403 && /rateLimitExceeded/i.test(bodyText);
 }
 
-// Google's own guidance for this exact error ("Quota exceeded... Units per
-// minute per user") is to retry with truncated exponential backoff rather
-// than treat it as a hard failure — the budget resets within the minute.
-// Every Gmail call in this file funnels through here, so this covers
-// listing, label lookups, and per-thread fetches alike.
+// Gmail's "Total Query Cost / Units per minute per user" quota is a rolling
+// per-minute budget, not a per-request limiter — a burst that exhausts it
+// needs up to ~60s to recover, not a few seconds. A concurrency cap alone
+// only bounds how many calls are in flight, not how many are *started* per
+// second once each completes quickly, so it doesn't actually prevent
+// bursting through a per-minute ceiling. This gate instead enforces a
+// minimum spacing between call starts, globally across every concurrent
+// caller in this process (module-level state, not per-call) — the actual
+// per-call quota cost isn't published for certain, so the interval below is
+// deliberately conservative rather than tuned to a number we can't verify.
+const MIN_GMAIL_CALL_INTERVAL_MS = 250;
+let nextAllowedCallAt = 0;
+let throttleGate: Promise<void> = Promise.resolve();
+
+function throttleGmailCall(): Promise<void> {
+  const previousGate = throttleGate;
+  throttleGate = (async () => {
+    await previousGate;
+    const waitMs = Math.max(0, nextAllowedCallAt - Date.now());
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    nextAllowedCallAt = Date.now() + MIN_GMAIL_CALL_INTERVAL_MS;
+  })();
+  return throttleGate;
+}
+
+// Backoff ceiling covers a full minute (1+2+4+8+16+32 = 63s, plus jitter) —
+// short enough to be worth it, long enough to actually outlast the quota
+// window it's recovering from, unlike a sub-10s backoff that just retries
+// into the same still-exhausted minute.
+const MAX_RATE_LIMIT_RETRIES = 6;
+
+// Every Gmail call in this file funnels through here, so both the throttle
+// and the retry-on-rate-limit cover listing, label lookups, and per-thread
+// fetches alike.
 async function gmailFetch(path: string, accessToken: string, attempt = 0): Promise<unknown> {
+  await throttleGmailCall();
+
   const res = await fetch(`${GMAIL_API}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -36,7 +65,7 @@ async function gmailFetch(path: string, accessToken: string, attempt = 0): Promi
 
   const bodyText = await res.text().catch(() => "");
   if (isRateLimitResponse(res.status, bodyText) && attempt < MAX_RATE_LIMIT_RETRIES) {
-    const delayMs = 500 * 2 ** attempt + Math.floor(Math.random() * 250);
+    const delayMs = 1000 * 2 ** attempt + Math.floor(Math.random() * 500);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     return gmailFetch(path, accessToken, attempt + 1);
   }

@@ -21,6 +21,7 @@ import {
   disconnectGmail,
   saveOverrideLabel,
   syncGmailNow,
+  clearUnmatchedThreads,
   confirmEmailThreadMatch,
   ignoreEmailThreadMatch,
   restoreEmailThreadMatch,
@@ -95,6 +96,7 @@ export default async function EmailPage() {
           overrideLabelId={overrideLabelId}
           saveOverrideLabel={saveOverrideLabel}
           syncNow={syncGmailNow}
+          clearUnmatched={clearUnmatchedThreads}
           disconnect={disconnectGmail}
         />
       ) : (
