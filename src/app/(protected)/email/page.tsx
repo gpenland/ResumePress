@@ -9,6 +9,7 @@ import {
   listApplicationPickerOptionsForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
+import { updateApplicationStatus } from "@/app/(protected)/applications/actions";
 import { Badge } from "@/components/ui/badge";
 import GmailConnectionPanel from "@/components/gmail/GmailConnectionPanel";
 import TriageList from "@/components/gmail/TriageList";
@@ -102,6 +103,8 @@ export default async function EmailPage() {
                 bulkConfirmMatches={bulkConfirmEmailThreadMatches}
                 bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
                 createContact={createContactFromTriage}
+                createApplication={createApplicationFromTriage}
+                updateApplicationStatus={updateApplicationStatus}
                 suggestMatch={suggestMatchForThread}
               />
             )}
