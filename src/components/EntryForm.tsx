@@ -27,9 +27,9 @@ const XYZ_LEVEL_LABELS = ["Needs XYZ", "Partial XYZ", "Full XYZ"] as const;
 const XYZ_LEVEL_VARIANTS = ["destructive", "secondary", "default"] as const;
 
 function confidenceWord(confidence: number): string {
-  if (confidence > 0.9) return "clear read";
-  if (confidence >= 0.5) return "rough read";
-  return "uncertain";
+  if (confidence > 0.9) return "high confidence";
+  if (confidence >= 0.5) return "medium confidence";
+  return "low confidence";
 }
 
 function BulletScoreBadge({ result }: { result: BulletScoreResult }) {
