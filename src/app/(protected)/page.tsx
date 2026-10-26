@@ -164,13 +164,13 @@ export default async function HomePage() {
 // needs no client state. Purely decorative; never the only content on the
 // page, never blocks or shifts anything above it.
 const COLOPHON_LINES = [
-  "Typeset with care, one application at a time.",
-  "Every entry here is a small bet on tomorrow.",
-  "Paper remembers what inboxes forget.",
+  "Typeset with care.",
+  "You miss every shot you don't take.",
+  "You are not great than your resume.",
   "No LaTeX was harmed in the making of this dashboard.",
-  "Here's to the next “Offer.”",
-  "Built by someone who has also stared at a blank cover letter.",
-  "Margins matter. So does this search. Keep going.",
+  "We are all GMI",
+  "Powered by AI slop.",
+  "Loading AI B2B SaaS...",
 ];
 
 function Colophon() {
