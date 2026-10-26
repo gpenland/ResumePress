@@ -7,7 +7,7 @@ Ranked by impact against the product's goals: a high-quality, enjoyable,
 efficient experience; useful functionality without overload; elegant,
 simple, consistent design; simple data in, simple data out.
 
-## 1. SSRF guard has a DNS-rebinding (TOCTOU) bypass
+## 1. ~~SSRF guard has a DNS-rebinding (TOCTOU) bypass~~ — fixed (PR #74)
 
 **File:** `src/lib/urlFetch.ts` (`assertPublicHost`, ~lines 39–82)
 
@@ -27,7 +27,7 @@ exact validated IP (e.g. a custom `lookup` on the `http(s)` agent / undici
 dispatcher that returns the pinned address), instead of trusting a second,
 independent resolution.
 
-## 2. PDF compile/open failures render as raw JSON with no way back
+## 2. ~~PDF compile/open failures render as raw JSON with no way back~~ — fixed (PR #75)
 
 **Files:** `src/components/ResumeBuilder.tsx` (~line 115, `window.location.href`
 download), `src/components/applications/ResumeSection.tsx` (~line 62, plain
@@ -48,7 +48,7 @@ navigation, show a normal in-app error state (toast/inline message) on
 non-200, and only hand the user a blob URL (new tab or `<iframe>`) on
 success.
 
-## 3. Bold/italic markdown in bullets silently mangles text with a literal `*`
+## 3. ~~Bold/italic markdown in bullets silently mangles text with a literal `*`~~ — fixed (PR #76)
 
 **File:** `src/templates/jake.ts` (`applyFormatting`, ~lines 55–61)
 
@@ -65,7 +65,7 @@ guarantee a resume tool needs to hold.
 (to not re-catch `**bold**`), or adopt an unambiguous escape (`\*`) for a
 literal asterisk, documented alongside the existing bold/italic markers.
 
-## 4. Gmail sync is fully sequential — slow and a timeout risk
+## 4. ~~Gmail sync is fully sequential — slow and a timeout risk~~ — fixed (PR #77)
 
 **File:** `src/lib/emailThreads.ts` (`syncGmailForUser`, ~lines 279–310)
 
@@ -108,7 +108,7 @@ catch site in all three files was traced individually.
 No code change made. Left here rather than deleted so the investigation
 isn't lost if the concern resurfaces.
 
-## 6. Entry version history is a raw field dump, not a diff
+## 6. ~~Entry version history is a raw field dump, not a diff~~ — fixed (PR #78)
 
 **Files:** `src/lib/entries.ts` (`EntryVersion` write path),
 `EntryHistory.tsx`
@@ -120,7 +120,7 @@ comparing two full dumps by eye. The feature already does the hard part
 an existing feature, not new scope: highlight just the fields that differ
 from the version before them.
 
-## 7. No indexes beyond implicit unique constraints
+## 7. ~~No indexes beyond implicit unique constraints~~ — fixed
 
 **File:** `prisma/schema.prisma`
 
@@ -128,9 +128,18 @@ Every query in the app filters by `userId`, and several also filter/sort by
 `status`, `matchStatus`, `occurredAt`, or `lastMessageAt` — none of it
 indexed (Postgres doesn't auto-index plain FK columns). Harmless at today's
 scale; free to fix now, and the alternative is debugging a slow query later
-with no signal that this was the cause. Candidates: `Application(userId,
-status)`, `Interaction(userId, occurredAt)`, `EmailThread(userId,
-matchStatus)`, `EmailThread(userId, lastMessageAt)`.
+with no signal that this was the cause.
+
+**Fixed in PR #80**, with one correction from the original candidate list
+above: tracing the actual query shapes in `applications.ts`/`contacts.ts`/
+`emailThreads.ts` showed the interaction-timeline queries (the ones that
+actually sort by `occurredAt`) filter by `applicationId`/`contactId`, not
+`userId` — they're nested relation fetches on an application/contact detail
+page, not a direct `userId`-scoped query. Indexed accordingly:
+`Application(userId, status)`, `Application(userId, updatedAt)`,
+`Contact(userId, updatedAt)`, `Interaction(applicationId, occurredAt)`,
+`Interaction(contactId, occurredAt)`, `EmailThread(userId, matchStatus)`,
+`EmailThread(userId, lastMessageAt)`.
 
 ## 8. ~~Dashboard "needs attention" signal for applications~~ — skipped
 
