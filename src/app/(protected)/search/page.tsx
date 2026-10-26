@@ -4,6 +4,8 @@ import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
 import { globalSearch } from "@/lib/search";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default async function SearchPage({
   searchParams,
@@ -17,13 +19,23 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-      <div>
+      <div className="space-y-3">
         <h1 className="text-2xl font-bold tracking-tight font-heading">Search</h1>
-        {q && <p className="text-muted-foreground text-sm mt-1">{totalCount} result(s) for &ldquo;{q}&rdquo;</p>}
+        <form action="/search" method="GET" className="flex gap-2">
+          <Input
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Search applications, contacts, interactions…"
+            autoFocus
+            className="max-w-md"
+          />
+          <Button type="submit" size="sm">Search</Button>
+        </form>
+        {q && <p className="text-muted-foreground text-sm">{totalCount} result(s) for &ldquo;{q}&rdquo;</p>}
       </div>
 
       {!results ? (
-        <p className="text-muted-foreground text-sm">Search applications, contacts, and interactions from the box above.</p>
+        <p className="text-muted-foreground text-sm">Search applications, contacts, and interactions above.</p>
       ) : totalCount === 0 ? (
         <p className="text-muted-foreground text-sm">No results.</p>
       ) : (
