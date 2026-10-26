@@ -152,7 +152,36 @@ export default async function HomePage() {
           )}
         </section>
       </div>
+
+      <Colophon />
     </div>
+  );
+}
+
+// A small printer's note, the way a real document might carry one at the
+// bottom of its last page — ties back to the "paper" design language.
+// Rotates by day-of-year (not randomly) so it's stable within a day and
+// needs no client state. Purely decorative; never the only content on the
+// page, never blocks or shifts anything above it.
+const COLOPHON_LINES = [
+  "Typeset with care, one application at a time.",
+  "Every entry here is a small bet on tomorrow.",
+  "Paper remembers what inboxes forget.",
+  "No LaTeX was harmed in the making of this dashboard.",
+  "Here's to the next “Offer.”",
+  "Built by someone who has also stared at a blank cover letter.",
+  "Margins matter. So does this search. Keep going.",
+];
+
+function Colophon() {
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000
+  );
+  const line = COLOPHON_LINES[dayOfYear % COLOPHON_LINES.length];
+  return (
+    <p className="text-center text-xs italic text-muted-foreground/60 font-heading pt-2">
+      {line}
+    </p>
   );
 }
 

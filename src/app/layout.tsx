@@ -35,11 +35,20 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
+// A small hello for whoever opens devtools — purely decorative, kept out of
+// THEME_INIT_SCRIPT so it never risks the flash-of-wrong-theme guarantee
+// that script exists for.
+const CONSOLE_GREETING_SCRIPT = `
+console.log("%c\\ud83d\\udcc4 ResumePress", "font-size:16px;font-weight:bold;");
+console.log("%cPoking around the source? Respect. May your next status update say \\"Offer.\\"", "color:#81A1C1;font-style:italic;");
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: CONSOLE_GREETING_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground antialiased">
         <Nav />
