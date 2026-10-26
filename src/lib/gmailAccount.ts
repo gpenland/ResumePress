@@ -1,12 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 
-export type GmailConnectionStatus = {
-  connected: boolean;
-  email?: string;
-  connectedAt?: Date;
-  lastSyncAt?: Date | null;
-};
+export type GmailConnectionStatus =
+  | { connected: false }
+  | { connected: true; email: string; connectedAt: Date; lastSyncAt: Date | null };
 
 export async function getGmailConnectionStatus(userId: string): Promise<GmailConnectionStatus> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });

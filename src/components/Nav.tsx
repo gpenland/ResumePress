@@ -10,17 +10,18 @@ import NavLinks from "@/components/NavLinks";
 import { listTriageThreadsForUser } from "@/lib/emailThreads";
 import { cn } from "@/lib/utils";
 
-const NAV_LINKS = [
-  { href: "/applications", label: "Applications" },
-  { href: "/contacts", label: "Contacts" },
-  { href: "/resumes", label: "Resumes", matchPrefixes: ["/entries", "/categories"] },
-];
-
 export default async function Nav() {
   const session = await auth();
   const triageCount = session?.user?.id
     ? (await listTriageThreadsForUser(session.user.id)).length
     : 0;
+
+  const navLinks = [
+    { href: "/applications", label: "Applications" },
+    { href: "/contacts", label: "Contacts" },
+    { href: "/resumes", label: "Resumes", matchPrefixes: ["/entries", "/categories"] },
+    { href: "/email", label: "Email", badge: triageCount },
+  ];
 
   return (
     <header className="bg-background sticky top-0 z-50">
@@ -29,7 +30,7 @@ export default async function Nav() {
           ResumePress
         </Link>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <NavLinks links={NAV_LINKS} />
+          <NavLinks links={navLinks} />
           {session?.user && (
             <Link
               href="/search"
@@ -43,7 +44,6 @@ export default async function Nav() {
           {session?.user ? (
             <UserMenu
               user={session.user}
-              triageCount={triageCount}
               signOutAction={async () => {
                 "use server";
                 await signOut({ redirectTo: "/" });

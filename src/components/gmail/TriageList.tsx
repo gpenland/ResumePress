@@ -289,16 +289,6 @@ export default function TriageList({
     });
   }
 
-  if (threads.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center py-16 text-center gap-2">
-          <p className="text-muted-foreground text-sm">All caught up. Nothing pending triage.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-3">
       {selectedIds.size > 0 && (

@@ -407,6 +407,19 @@ export async function listTriageThreadsForUser(userId: string) {
   });
 }
 
+/** Most-recently-active already-matched threads, for the "Recent emails" pane shown in place of an empty triage queue. */
+export async function listRecentMatchedThreadsForUser(userId: string, limit = 5) {
+  return prisma.emailThread.findMany({
+    where: { userId, matchStatus: { in: ["auto", "confirmed"] } },
+    include: {
+      matchedContact: { select: { id: true, name: true } },
+      matchedApplication: { select: { id: true, roleTitle: true, company: { select: { name: true } } } },
+    },
+    orderBy: { lastMessageAt: "desc" },
+    take: limit,
+  });
+}
+
 export async function listIgnoredThreadsForUser(userId: string) {
   return prisma.emailThread.findMany({
     where: { userId, matchStatus: "ignored" },

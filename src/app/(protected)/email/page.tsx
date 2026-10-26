@@ -6,18 +6,15 @@ import { prisma } from "@/lib/prisma";
 import {
   listAvailableLabelsForUser,
   listTriageThreadsForUser,
+  listRecentMatchedThreadsForUser,
   listIgnoredThreadsForUser,
   listApplicationPickerOptionsForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import SubmitButton from "@/components/SubmitButton";
-import Link from "next/link";
-import { cn } from "@/lib/utils";
-import GmailSyncPanel from "@/components/gmail/GmailSyncPanel";
+import GmailConnectionPanel from "@/components/gmail/GmailConnectionPanel";
 import TriageList from "@/components/gmail/TriageList";
+import RecentEmailsList from "@/components/gmail/RecentEmailsList";
 import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
 import {
   disconnectGmail,
@@ -40,6 +37,7 @@ export default async function EmailPage() {
   let labelsError: string | null = null;
   let selectedLabelIds: string[] = [];
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
+  let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
   let contactOptions: Awaited<ReturnType<typeof listContactOptionsForUser>> = [];
   let applications: Awaited<ReturnType<typeof listApplicationPickerOptionsForUser>> = [];
@@ -62,6 +60,11 @@ export default async function EmailPage() {
     applications = applicationsResult;
     applicationIdsByContact = applicationIdsByContactResult;
 
+    // Only needed to fill the space the triage queue leaves behind when it's empty.
+    if (threads.length === 0) {
+      recentThreads = await listRecentMatchedThreadsForUser(userId);
+    }
+
     try {
       labels = await listAvailableLabelsForUser(userId);
     } catch (err) {
@@ -79,56 +82,22 @@ export default async function EmailPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Connection</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {status.connected ? (
-            <>
-              <p className="text-sm">
-                Connected as <span className="font-medium">{status.email}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Connected {status.connectedAt?.toLocaleDateString()}
-                {status.lastSyncAt
-                  ? ` · Last synced ${status.lastSyncAt.toLocaleDateString()}`
-                  : " · Never synced"}
-              </p>
-              {labelsError ? (
-                <p className="text-sm text-destructive">{labelsError}</p>
-              ) : (
-                <GmailSyncPanel
-                  labels={labels}
-                  selectedLabelIds={selectedLabelIds}
-                  saveLabels={saveGmailSyncLabels}
-                  syncNow={syncGmailNow}
-                />
-              )}
-              <form action={disconnectGmail} className="pt-2 border-t">
-                <SubmitButton
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  pendingText="Disconnecting…"
-                >
-                  Disconnect
-                </SubmitButton>
-              </form>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">Not connected.</p>
-              <Link
-                href="/api/gmail/oauth/start"
-                className={cn(buttonVariants({ size: "sm" }))}
-              >
-                Connect Gmail
-              </Link>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {status.connected ? (
+        <GmailConnectionPanel
+          connected
+          email={status.email}
+          connectedAt={status.connectedAt}
+          lastSyncAt={status.lastSyncAt}
+          labels={labels}
+          labelsError={labelsError}
+          selectedLabelIds={selectedLabelIds}
+          saveLabels={saveGmailSyncLabels}
+          syncNow={syncGmailNow}
+          disconnect={disconnectGmail}
+        />
+      ) : (
+        <GmailConnectionPanel connected={false} />
+      )}
 
       {status.connected && (
         <>
@@ -137,19 +106,25 @@ export default async function EmailPage() {
               <h2 className="text-lg font-semibold">Needs review</h2>
               {threads.length > 0 && <Badge variant="secondary">{threads.length}</Badge>}
             </div>
-            <TriageList
-              threads={threads}
-              contactOptions={contactOptions}
-              applications={applications}
-              applicationIdsByContact={applicationIdsByContact}
-              confirmMatch={confirmEmailThreadMatch}
-              ignoreMatch={ignoreEmailThreadMatch}
-              bulkConfirmMatches={bulkConfirmEmailThreadMatches}
-              bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
-              createContact={createContactFromTriage}
-              suggestMatch={suggestMatchForThread}
-            />
+            {threads.length === 0 ? (
+              <p className="text-sm text-muted-foreground">All caught up — nothing pending triage.</p>
+            ) : (
+              <TriageList
+                threads={threads}
+                contactOptions={contactOptions}
+                applications={applications}
+                applicationIdsByContact={applicationIdsByContact}
+                confirmMatch={confirmEmailThreadMatch}
+                ignoreMatch={ignoreEmailThreadMatch}
+                bulkConfirmMatches={bulkConfirmEmailThreadMatches}
+                bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
+                createContact={createContactFromTriage}
+                suggestMatch={suggestMatchForThread}
+              />
+            )}
           </div>
+
+          {threads.length === 0 && <RecentEmailsList threads={recentThreads} />}
 
           <IgnoredThreadsList threads={ignoredThreads} restoreMatch={restoreEmailThreadMatch} />
         </>
