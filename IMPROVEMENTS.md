@@ -80,22 +80,33 @@ flags as "the least-proven" in the codebase.
 `Promise.all` over chunks of 5–10), keeping the existing idempotent
 upsert/match logic as-is.
 
-## 5. AI-assisted features can fail silently with no user-visible explanation
+## 5. ~~AI-assisted features failing silently~~ — investigated, no bug found
 
 **Files:** `src/lib/jobPosting.ts`, `src/lib/urlFetch.ts`, `src/lib/jev.ts`
-(bare `catch {}` blocks)
 
-Not fully traced to a concrete repro, but each of these has at least one
-catch block that doesn't clearly propagate a message for every failure
-mode. If "Autofill from link" or a Jev suggestion does nothing on a fetch
-failure that isn't one of the explicitly-handled cases, the user has no way
-to tell "it found nothing" from "it broke" — which quietly erodes trust in
-every AI-assisted feature in the app, not just the one that happened to
-fail.
+The original audit flagged this as a lower-confidence concern ("not fully
+traced to a concrete repro") worth a follow-up pass. That follow-up: every
+catch site in all three files was traced individually.
 
-**Fix shape:** audit each catch site; every one should either surface a
-specific `{ok:false, error}` the caller already renders, or be narrowed to
-only swallow the cases it's actually meant to.
+- `jev.ts` — every failure path (missing API key, network error, non-2xx
+  response) returns a descriptive `{ok:false, error}`; nothing is swallowed.
+- `urlFetch.ts` — same pattern, every catch returns a specific error string
+  (invalid URL, host validation failure, unreachable).
+- `jobPosting.ts` — its one bare `catch { continue }` (inside the JSON-LD
+  search loop) is a legitimate per-item fallback: a malformed `<script
+  type="application/ld+json">` block shouldn't abort the search for a valid
+  one elsewhere on the page. Its one documented "fails open" path (a failed
+  Jev disambiguation call leaves an ambiguous field unresolved rather than
+  failing the whole autofill) is intentional and already commented in place
+  — matches the Jev actionability principle, not a bug.
+- The UI consumer (`ApplicationForm.tsx`'s `handleAutofill`) already renders
+  `result.error` on explicit failure, and a partial fill (some fields found,
+  others left blank) is self-evident — the untouched fields simply stay
+  empty, which is correct (no false confidence, never overwrites something
+  the user already typed).
+
+No code change made. Left here rather than deleted so the investigation
+isn't lost if the concern resurfaces.
 
 ## 6. Entry version history is a raw field dump, not a diff
 
