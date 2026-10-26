@@ -13,7 +13,7 @@ export default function NewResumePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">New Resume</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading">New Resume</h1>
         <p className="text-muted-foreground text-sm mt-1">Set up your resume details and contact info</p>
       </div>
 

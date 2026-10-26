@@ -23,7 +23,7 @@ export default async function ContactsPage({
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Contacts</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">Contacts</h1>
           <p className="text-muted-foreground text-sm mt-1">{contacts.length} total</p>
         </div>
         <Link href="/contacts/new" className={cn(buttonVariants())}>New Contact</Link>

@@ -6,7 +6,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 import {
   parseCsvTable,
   guessColumnMapping,
@@ -124,7 +124,7 @@ export default function NotionImportWizard({ importAction }: Props) {
                 <select
                   value={mapping[field.key] ?? ""}
                   onChange={(e) => updateMapping(field.key, e.target.value)}
-                  className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  className={nativeSelectClassName()}
                 >
                   <option value="">— none —</option>
                   {headers.map((h, i) => (

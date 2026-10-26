@@ -46,7 +46,7 @@ export default async function ResumeDetailPage({
     <div className="mx-auto max-w-5xl px-4 py-10 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{resume.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">{resume.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="outline">{resume.templateId} template</Badge>
           </div>

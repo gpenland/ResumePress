@@ -34,7 +34,7 @@ export default async function ApplicationsPage({
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Applications</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">Applications</h1>
           <p className="text-muted-foreground text-sm mt-1">{applications.length} total</p>
         </div>
         <div className="flex items-center gap-2">

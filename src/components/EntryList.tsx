@@ -75,9 +75,9 @@ export default function EntryList({ categories, entries, category, deleteEntry, 
           <CardContent className="flex flex-col items-center py-16 text-center gap-3">
             {entries.length === 0 ? (
               <>
-                <p className="text-muted-foreground text-sm">No entries found</p>
+                <p className="text-muted-foreground text-sm">No entries yet</p>
                 <Link href="/entries/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                  Create your first entry
+                  Add your first entry
                 </Link>
               </>
             ) : (

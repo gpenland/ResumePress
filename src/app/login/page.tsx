@@ -24,7 +24,7 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto max-w-sm px-4 py-24 text-center">
-      <h1 className="text-2xl font-semibold mb-2">Sign in to ResumePress</h1>
+      <h1 className="text-2xl font-semibold mb-2 font-heading">Sign in to ResumePress</h1>
       <p className="text-muted-foreground text-sm mb-6">
         Sign in to see and manage your entries and resumes.
       </p>

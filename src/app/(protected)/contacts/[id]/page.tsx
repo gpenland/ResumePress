@@ -7,6 +7,7 @@ import { getContactForUser } from "@/lib/contacts";
 import { listApplicationOptionsForUser } from "@/lib/interactions";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import DeleteItemButton from "@/components/DeleteItemButton";
 import InteractionTimeline from "@/components/contacts/InteractionTimeline";
@@ -40,7 +41,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{contact.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">{contact.name}</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {contact.emails.map((email, idx) => (
               <span key={email}>
@@ -84,9 +85,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       {contact.tags.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           {contact.tags.map((tag) => (
-            <span key={tag} className="text-xs bg-secondary text-secondary-foreground rounded-full px-2 py-0.5">
+            <Badge key={tag} variant="secondary">
               {tag}
-            </span>
+            </Badge>
           ))}
         </div>
       )}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 
 // Extension point for Module D (Resume integration, docs/MIGRATION_PLAN.md §5).
 // Rendered from applications/[id]/page.tsx (Module A). Do not add contact/
@@ -100,7 +100,7 @@ export default function ResumeSection({
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            className={nativeSelectClassName()}
           >
             {resumes.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>

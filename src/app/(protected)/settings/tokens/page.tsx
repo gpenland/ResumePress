@@ -18,16 +18,16 @@ export default async function ApiTokensPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">API Tokens</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading">API Tokens</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Use a token to connect an MCP client (e.g. Claude) to your ResumePress data at{" "}
           <code className="text-xs">/api/mcp</code>.
         </p>
       </div>
 
-      <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
+      <Card className="py-0 gap-0">
         {tokens.length === 0 && (
-          <div className="px-5 py-6 text-sm text-muted-foreground">No tokens yet.</div>
+          <div className="px-5 py-6 text-sm text-muted-foreground">No tokens yet</div>
         )}
         {tokens.map((t, i) => {
           const revoked = !!t.revokedAt;
@@ -65,7 +65,7 @@ export default async function ApiTokensPage() {
             </div>
           );
         })}
-      </div>
+      </Card>
 
       <Card>
         <CardHeader>

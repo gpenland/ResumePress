@@ -34,7 +34,7 @@ export default async function EditResumePage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight">Edit Resume</h1>
+      <h1 className="text-2xl font-bold tracking-tight font-heading">Edit Resume</h1>
 
       <form action={updateWithId} className="space-y-6">
         <Card>

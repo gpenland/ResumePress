@@ -28,7 +28,7 @@ export default async function ResumesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Resumes</h1>
+          <h1 className="text-2xl font-bold tracking-tight font-heading">Resumes</h1>
           <p className="text-muted-foreground text-sm mt-1">{resumes.length} saved</p>
         </div>
         <Link href="/resumes/new" className={cn(buttonVariants())}>New Resume</Link>
@@ -39,7 +39,7 @@ export default async function ResumesPage() {
           <CardContent className="flex flex-col items-center py-16 text-center gap-3">
             <p className="text-muted-foreground text-sm">No resumes yet</p>
             <Link href="/resumes/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-              Create your first resume
+              Add your first resume
             </Link>
           </CardContent>
         </Card>

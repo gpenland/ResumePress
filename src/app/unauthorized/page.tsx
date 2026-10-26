@@ -9,7 +9,7 @@ export default function UnauthorizedPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-24 text-center">
-      <h1 className="text-2xl font-semibold mb-2">Access restricted</h1>
+      <h1 className="text-2xl font-semibold mb-2 font-heading">Access restricted</h1>
       <p className="text-muted-foreground text-sm mb-6">
         This app is private. The Google account you&apos;re signed in with isn&apos;t on
         the allowlist.

@@ -27,12 +27,12 @@ export default async function CategoriesPage() {
         <Link href="/entries" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to Entries
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight mt-3">Categories</h1>
+        <h1 className="text-2xl font-bold tracking-tight font-heading mt-3">Categories</h1>
         <p className="text-muted-foreground text-sm mt-1">Built-in categories cannot be deleted</p>
       </div>
 
       {/* Category list — plain rows so spacing is fully controlled */}
-      <div className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden">
+      <Card className="py-0 gap-0">
         {categories.map((cat, i) => (
           <div
             key={cat.id}
@@ -59,7 +59,7 @@ export default async function CategoriesPage() {
             )}
           </div>
         ))}
-      </div>
+      </Card>
 
       <Card>
         <CardHeader>
