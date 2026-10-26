@@ -213,6 +213,9 @@ model Application {
   emailThreads     EmailThread[]
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, updatedAt])
 }
 
 // One row per status change, written automatically by the server action that
@@ -254,6 +257,8 @@ model Contact {
   matchedEmailThreads EmailThread[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 model ApplicationContact {
@@ -283,6 +288,9 @@ model Interaction {
   user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@index([applicationId, occurredAt])
+  @@index([contactId, occurredAt])
 }
 
 model EmailThread {
@@ -305,6 +313,8 @@ model EmailThread {
   updatedAt            DateTime      @updatedAt
 
   @@unique([userId, gmailThreadId])
+  @@index([userId, matchStatus])
+  @@index([userId, lastMessageAt])
 }
 
 // Gmail OAuth grant, fully decoupled from Auth.js's own Account model — see
