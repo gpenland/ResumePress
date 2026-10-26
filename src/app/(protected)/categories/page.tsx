@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { createCategory, deleteCategory } from "./actions";
@@ -23,7 +24,10 @@ export default async function CategoriesPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
+        <Link href="/entries" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Back to Entries
+        </Link>
+        <h1 className="text-2xl font-bold tracking-tight mt-3">Categories</h1>
         <p className="text-muted-foreground text-sm mt-1">Built-in categories cannot be deleted</p>
       </div>
 
