@@ -4,13 +4,14 @@ import { useRef, useState, useTransition } from "react";
 import type { Category, Entry } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
 import { scoreBulletText } from "@/app/(protected)/entries/actions";
+import { cn } from "cn";
 
 type Props = {
   category: Category;
@@ -43,6 +44,48 @@ function BulletScoreBadge({ result }: { result: BulletScoreResult }) {
   );
 }
 
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
+
+// A clickable pill styled exactly like the score badges it turns into once clicked —
+// idle "Score bullets" -> "Scoring…" -> the overall level badge (or "Score failed").
+function ScoreBubbleButton({
+  state,
+  onClick,
+  disabled,
+}: {
+  state: "loading" | BulletScoreState | null;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  let label = "Score bullets";
+  let variant: BadgeVariant = "outline";
+
+  if (state === "loading") {
+    label = "Scoring…";
+  } else if (state && "error" in state) {
+    label = "Score failed";
+    variant = "destructive";
+  } else if (state) {
+    const level = Math.min(2, Math.max(0, Math.round(state.score)));
+    label = XYZ_LEVEL_LABELS[level];
+    variant = XYZ_LEVEL_VARIANTS[level];
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        badgeVariants({ variant }),
+        "cursor-pointer hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 transition-opacity"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function EntryForm({ category, entry, action, submitLabel }: Props) {
   const cfg = getFieldConfig(category.slug);
   const formRef = useRef<HTMLFormElement>(null);
@@ -61,22 +104,38 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const [draggedBulletIndex, setDraggedBulletIndex] = useState<number | null>(null);
   const [dragOverBulletIndex, setDragOverBulletIndex] = useState<number | null>(null);
   const [bulletScores, setBulletScores] = useState<Record<number, BulletScoreState>>({});
-  const [scoringIndices, setScoringIndices] = useState<Set<number>>(new Set());
+  const [overallScore, setOverallScore] = useState<BulletScoreState | null>(null);
+  const [isScoringAll, setIsScoringAll] = useState(false);
 
-  async function handleScore(i: number) {
-    setScoringIndices((prev) => new Set(prev).add(i));
-    const result = await scoreBulletText(bullets[i]);
-    setBulletScores((prev) => ({
-      ...prev,
-      [i]: result.ok
+  async function handleScoreAll() {
+    const scorable = bullets
+      .map((text, index) => ({ text, index }))
+      .filter((b) => b.text.trim().length > 0);
+    if (scorable.length === 0) return;
+
+    setIsScoringAll(true);
+    const results = await Promise.all(scorable.map((b) => scoreBulletText(b.text)));
+
+    const newScores: Record<number, BulletScoreState> = {};
+    results.forEach((result, i) => {
+      newScores[scorable[i].index] = result.ok
         ? { score: result.score, confidence: result.confidence, legend: result.legend }
-        : { error: result.error },
-    }));
-    setScoringIndices((prev) => {
-      const next = new Set(prev);
-      next.delete(i);
-      return next;
+        : { error: result.error };
     });
+    setBulletScores(newScores);
+
+    const oks = Object.values(newScores).filter((s): s is BulletScoreResult => !("error" in s));
+    if (oks.length === 0) {
+      const firstError = Object.values(newScores).find((s): s is { error: string } => "error" in s);
+      setOverallScore({ error: firstError?.error ?? "Could not score bullets." });
+    } else {
+      setOverallScore({
+        score: oks.reduce((sum, o) => sum + o.score, 0) / oks.length,
+        confidence: oks.reduce((sum, o) => sum + o.confidence, 0) / oks.length,
+        legend: oks[0].legend,
+      });
+    }
+    setIsScoringAll(false);
   }
 
   function addBullet() { setBullets((p) => [...p, ""]); }
@@ -231,16 +290,6 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
                     </div>
                     <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
                     <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleScore(i)}
-                      disabled={!bullet.trim() || scoringIndices.has(i)}
-                      className="mt-1 text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      {scoringIndices.has(i) ? "Scoring…" : "Score"}
-                    </Button>
                     {bullets.length > 1 && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
                     )}
@@ -285,6 +334,24 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
       </form>
 
       <div className="xl:sticky xl:top-20 space-y-3">
+        {cfg.bullets && (
+          <div className="flex items-center gap-2 px-1">
+            <ScoreBubbleButton
+              state={isScoringAll ? "loading" : overallScore}
+              onClick={handleScoreAll}
+              disabled={isScoringAll || !bullets.some((b) => b.trim())}
+            />
+            {overallScore && !isScoringAll && (
+              "error" in overallScore ? (
+                <span className="text-xs text-destructive">{overallScore.error}</span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {overallScore.legend[String(Math.min(2, Math.max(0, Math.round(overallScore.score))))]} · {confidenceWord(overallScore.confidence)}
+                </span>
+              )
+            )}
+          </div>
+        )}
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Preview</p>
         <Card>
           <CardContent className="pt-5 pb-5 text-[13px] leading-snug space-y-2">
