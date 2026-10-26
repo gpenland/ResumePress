@@ -7,6 +7,7 @@
 
 import { fetchExternalUrl } from "@/lib/urlFetch";
 import { askJev, type JevQuestion } from "@/lib/jev";
+import { decodeHtmlEntities, stripTags } from "@/lib/htmlText";
 
 export type JobPostingAutofill = {
   companyName: string | null;
@@ -22,22 +23,6 @@ type JsonLdJobPosting = {
   hiringOrganization?: { name?: unknown } | { name?: unknown }[];
   jobLocation?: JsonLdLocation | JsonLdLocation[];
 };
-
-function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
-}
-
-function stripTags(s: string): string {
-  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values.map((v) => v.trim()).filter(Boolean))];

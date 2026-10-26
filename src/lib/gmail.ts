@@ -3,6 +3,8 @@
 // src/app/api/gmail/oauth/callback/route.ts). Every call here is read-only
 // per PLAN.md §4 ("Gmail is read-only... request only gmail.readonly").
 
+import { stripTags } from "@/lib/htmlText";
+
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 export class GmailApiError extends Error {
@@ -72,6 +74,81 @@ export async function listMessageIdsForLabel(
     accessToken
   )) as { messages?: { id: string; threadId: string }[] };
   return [...new Set((data.messages ?? []).map((m) => m.threadId))];
+}
+
+// Every currently-unread thread in the inbox, regardless of label — paginated
+// (Gmail caps a single /messages?q= page at 500; most inboxes are well under
+// that, but this walks nextPageToken rather than silently truncating).
+// Re-run on every sync rather than tracked incrementally: unlike a label's
+// full history, "currently unread" is a self-pruning set that shrinks as the
+// user reads mail, so there's no large backlog to avoid re-scanning.
+export async function listUnreadInboxThreadIds(accessToken: string): Promise<string[]> {
+  const threadIds = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const params = new URLSearchParams({ q: "is:unread in:inbox", maxResults: "500" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const data = (await gmailFetch(`/messages?${params}`, accessToken)) as {
+      messages?: { id: string; threadId: string }[];
+      nextPageToken?: string;
+    };
+    for (const m of data.messages ?? []) threadIds.add(m.threadId);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return [...threadIds];
+}
+
+type GmailMessagePart = {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GmailMessagePart[];
+};
+
+function decodeBase64Url(data: string): string {
+  return Buffer.from(data, "base64url").toString("utf-8");
+}
+
+/** Depth-first search for the first part whose mimeType matches, decoding its body. */
+function findPartText(part: GmailMessagePart, mimeType: string): string | null {
+  if (part.mimeType === mimeType && part.body?.data) {
+    return decodeBase64Url(part.body.data);
+  }
+  for (const child of part.parts ?? []) {
+    const found = findPartText(child, mimeType);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Plain text if the message has one, else the HTML part with tags stripped. */
+function extractMessageText(payload: GmailMessagePart): string {
+  const plain = findPartText(payload, "text/plain");
+  if (plain) return plain;
+  const html = findPartText(payload, "text/html");
+  return html ? stripTags(html) : "";
+}
+
+const MAX_THREAD_BODY_CHARS = 20_000;
+
+/**
+ * Full message bodies for every message in a thread, fetched and decoded on
+ * the fly for Jev classification — never persisted (EmailThread only ever
+ * stores subject/snippet, per the read-only/metadata-only design). Bounded
+ * in length for the same reason urlFetch.ts caps fetched page size: this
+ * feeds an LLM-adjacent call, not unbounded internal processing.
+ */
+export async function getThreadBodyText(accessToken: string, threadId: string): Promise<string> {
+  const data = (await gmailFetch(`/threads/${threadId}?format=full`, accessToken)) as {
+    messages?: { payload?: GmailMessagePart }[];
+  };
+
+  const texts = (data.messages ?? [])
+    .map((m) => (m.payload ? extractMessageText(m.payload) : ""))
+    .filter(Boolean);
+
+  return texts.join("\n\n---\n\n").slice(0, MAX_THREAD_BODY_CHARS);
 }
 
 /** New thread ids added to `labelId` since `startHistoryId`. Throws (caller should fall back to a full list) if the history window has expired. */
