@@ -41,14 +41,14 @@ export default async function EntriesPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Entries</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {entries.length} total ·{" "}
-            <Link href="/categories" className="underline-offset-4 hover:underline hover:text-foreground">
-              Manage categories
-            </Link>
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">{entries.length} total</p>
         </div>
-        <Link href="/entries/new" className={cn(buttonVariants())}>New Entry</Link>
+        <div className="flex items-center gap-2">
+          <Link href="/categories" className={cn(buttonVariants({ variant: "outline" }))}>
+            Manage Categories
+          </Link>
+          <Link href="/entries/new" className={cn(buttonVariants())}>New Entry</Link>
+        </div>
       </div>
 
       <EntryList
