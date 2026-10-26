@@ -5,7 +5,7 @@ import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
 import { listCompaniesForUser } from "@/lib/companies";
 import ApplicationForm from "@/components/applications/ApplicationForm";
-import { updateApplication } from "../../actions";
+import { updateApplication, autofillApplicationFromUrl } from "../../actions";
 
 export default async function EditApplicationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,6 +29,7 @@ export default async function EditApplicationPage({ params }: { params: Promise<
         application={application}
         action={updateApplication.bind(null, application.id)}
         submitLabel="Save Changes"
+        autofillFromUrl={autofillApplicationFromUrl}
       />
     </div>
   );

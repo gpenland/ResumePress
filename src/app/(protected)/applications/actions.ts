@@ -15,6 +15,7 @@ import {
   type ApplicationInput,
   type SuggestedStatus,
 } from "@/lib/applications";
+import { extractJobPostingFromUrl, type JobPostingAutofill } from "@/lib/jobPosting";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -62,6 +63,13 @@ export async function updateApplicationStatus(id: string, status: string) {
 export async function suggestApplicationStatus(id: string): Promise<SuggestedStatus> {
   const userId = await requireUserId();
   return suggestApplicationStatusForUser(userId, id);
+}
+
+export async function autofillApplicationFromUrl(
+  url: string
+): Promise<{ ok: true; data: JobPostingAutofill } | { ok: false; error: string }> {
+  await requireUserId();
+  return extractJobPostingFromUrl(url);
 }
 
 /** Logs a note-only history entry without changing status (issue #17). */

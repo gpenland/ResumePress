@@ -8,12 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import StatusSelect from "@/components/applications/StatusSelect";
 import { findNearDuplicateCompanyName } from "@/lib/companiesShared";
+import type { JobPostingAutofill } from "@/lib/jobPosting";
 
 type Props = {
   companies: Company[];
   application?: Application & { company: Company };
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
+  autofillFromUrl: (url: string) => Promise<{ ok: true; data: JobPostingAutofill } | { ok: false; error: string }>;
 };
 
 function toDateInputValue(d: Date | string | null | undefined): string {
@@ -27,11 +29,42 @@ function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ApplicationForm({ companies, application, action, submitLabel }: Props) {
+export default function ApplicationForm({ companies, application, action, submitLabel, autofillFromUrl }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [isAutofilling, startAutofillTransition] = useTransition();
+  const [autofillError, setAutofillError] = useState<string | null>(null);
   const [status, setStatus] = useState(application?.status ?? "Applied");
   const [companySuggestion, setCompanySuggestion] = useState<string | null>(null);
+
+  function setFieldIfEmpty(name: string, value: string | null) {
+    if (!value) return;
+    const input = formRef.current?.elements.namedItem(name);
+    if (input instanceof HTMLInputElement && !input.value.trim()) {
+      input.value = value;
+    }
+  }
+
+  function handleAutofill() {
+    const urlInput = formRef.current?.elements.namedItem("postingUrl");
+    const url = urlInput instanceof HTMLInputElement ? urlInput.value.trim() : "";
+    if (!url) {
+      setAutofillError("Enter a posting URL first.");
+      return;
+    }
+    setAutofillError(null);
+    startAutofillTransition(async () => {
+      const result = await autofillFromUrl(url);
+      if (!result.ok) {
+        setAutofillError(result.error);
+        return;
+      }
+      setFieldIfEmpty("companyName", result.data.companyName);
+      setFieldIfEmpty("roleTitle", result.data.roleTitle);
+      setFieldIfEmpty("location", result.data.location);
+      setFieldIfEmpty("term", result.data.term);
+    });
+  }
 
   function handleCompanyBlur(e: React.FocusEvent<HTMLInputElement>) {
     const typed = e.target.value;
@@ -131,7 +164,20 @@ export default function ApplicationForm({ companies, application, action, submit
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="postingUrl">Posting URL</Label>
-          <Input id="postingUrl" name="postingUrl" type="url" placeholder="https://..." defaultValue={application?.postingUrl ?? ""} />
+          <div className="flex gap-2">
+            <Input
+              id="postingUrl"
+              name="postingUrl"
+              type="url"
+              placeholder="https://..."
+              defaultValue={application?.postingUrl ?? ""}
+              className="flex-1"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={handleAutofill} disabled={isAutofilling}>
+              {isAutofilling ? "Fetching…" : "Autofill from link"}
+            </Button>
+          </div>
+          {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
         </div>
       </div>
 
