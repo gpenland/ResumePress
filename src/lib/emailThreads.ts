@@ -473,7 +473,10 @@ async function classifyThreadForTriage(
  * docs/MIGRATION_PLAN.md §6 risk 3) and has not been exercised against a
  * live Gmail account — verify manually before relying on it.
  */
-export async function syncGmailForUser(userId: string): Promise<SyncResult> {
+export async function syncGmailForUser(
+  userId: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<SyncResult> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { ok: false, error: "Gmail is not connected." };
 
@@ -526,9 +529,20 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     }
   }
   threadIds = [...threadIdSet];
+  onProgress?.(0, threadIds.length);
 
   let upserted = 0;
+  let processed = 0;
   await mapWithConcurrency(threadIds, THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
+    try {
+      await processThread(gmailThreadId);
+    } finally {
+      processed++;
+      onProgress?.(processed, threadIds.length);
+    }
+  });
+
+  async function processThread(gmailThreadId: string): Promise<void> {
     let gmailThread: GmailThread;
     let bodyText: string;
     try {
@@ -627,7 +641,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     if (match.matchStatus === "auto") {
       await createInteractionFromEmailThreadIfMissing(userId, emailThreadRow, match.contactId, match.applicationId);
     }
-  });
+  }
 
   await prisma.gmailAccount.update({
     where: { userId },
@@ -635,6 +649,117 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
   });
 
   return { ok: true, threadsUpserted: upserted, rematched };
+}
+
+// Atomically claims the "running" slot — returns false if a sync (manual or
+// cron) is already in progress for this account, so two triggers can never
+// race each other or double up on Gmail API calls.
+async function markSyncRunningForUser(userId: string): Promise<boolean> {
+  const { count } = await prisma.gmailAccount.updateMany({
+    where: { userId, syncStatus: { not: "running" } },
+    data: { syncStatus: "running", syncStartedAt: new Date(), syncTotal: null, syncDone: 0, syncError: null },
+  });
+  return count > 0;
+}
+
+async function finalizeSyncStatus(userId: string, result: SyncResult | null, error?: string): Promise<void> {
+  const message = error ?? (result && !result.ok ? result.error : undefined);
+  await prisma.gmailAccount
+    .update({
+      where: { userId },
+      data: message ? { syncStatus: "error", syncError: message } : { syncStatus: "idle", syncError: null },
+    })
+    .catch(() => {
+      // Best-effort — if this write fails, getGmailSyncStatusForUser will
+      // keep reporting "running" until the next sync attempt overwrites it,
+      // which is a stale-but-safe failure mode, not a crash.
+    });
+}
+
+function trackSyncProgress(userId: string): (done: number, total: number) => void {
+  return (done, total) => {
+    void prisma.gmailAccount.update({ where: { userId }, data: { syncDone: done, syncTotal: total } }).catch(() => {});
+  };
+}
+
+/**
+ * Awaited, synchronous sync — for callers that want the final result
+ * directly rather than polling (the cron job, and MCP's sync_gmail_now,
+ * both of which aren't subject to a browser's own request-timeout
+ * constraints the way "Sync now" is). Guards against overlapping with a
+ * concurrent sync via the same syncStatus field startGmailSyncInBackgroundForUser
+ * (below) uses.
+ */
+export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncResult> {
+  const account = await prisma.gmailAccount.findUnique({ where: { userId } });
+  if (!account) return { ok: false, error: "Gmail is not connected." };
+  if (!(await markSyncRunningForUser(userId))) {
+    return { ok: false, error: "A sync is already in progress for this account." };
+  }
+
+  try {
+    const result = await syncGmailForUser(userId, trackSyncProgress(userId));
+    await finalizeSyncStatus(userId, result);
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Sync failed unexpectedly.";
+    await finalizeSyncStatus(userId, null, message);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Fire-and-forget sync — for the browser's "Sync now" button. Returns as
+ * soon as the sync has been *claimed and started*, not when it finishes:
+ * a sync over hundreds of threads can run for minutes, far longer than a
+ * single request/response (and any reverse proxy in front of it) should be
+ * expected to survive. The client polls getGmailSyncStatusForUser instead
+ * of awaiting this call directly. The un-awaited syncGmailForUser call
+ * below keeps running after this function returns because this is a
+ * long-running Node process (Docker + `node server.js`, not a short-lived
+ * serverless function) — the event loop keeps it alive regardless of
+ * whether the HTTP response that triggered it has already been sent.
+ */
+export async function startGmailSyncInBackgroundForUser(userId: string): Promise<{ started: boolean; error?: string }> {
+  const account = await prisma.gmailAccount.findUnique({ where: { userId } });
+  if (!account) return { started: false, error: "Gmail is not connected." };
+  if (!(await markSyncRunningForUser(userId))) {
+    return { started: false, error: "A sync is already in progress." };
+  }
+
+  void syncGmailForUser(userId, trackSyncProgress(userId))
+    .then((result) => finalizeSyncStatus(userId, result))
+    .catch((err) => finalizeSyncStatus(userId, null, err instanceof Error ? err.message : "Sync failed unexpectedly."));
+
+  return { started: true };
+}
+
+export type GmailSyncStatus = {
+  status: "idle" | "running" | "error";
+  startedAt: Date | null;
+  total: number | null;
+  done: number | null;
+  error: string | null;
+  lastSyncAt: Date | null;
+};
+
+/** Polled by the browser while a background sync (started above) is running, to drive the progress UI and know when to refresh. */
+export async function getGmailSyncStatusForUser(userId: string): Promise<GmailSyncStatus> {
+  const account = await prisma.gmailAccount.findUnique({
+    where: { userId },
+    select: { syncStatus: true, syncStartedAt: true, syncTotal: true, syncDone: true, syncError: true, lastSyncAt: true },
+  });
+  if (!account) {
+    return { status: "idle", startedAt: null, total: null, done: null, error: null, lastSyncAt: null };
+  }
+  return {
+    status: (account.syncStatus as GmailSyncStatus["status"]) || "idle",
+    startedAt: account.syncStartedAt,
+    total: account.syncTotal,
+    done: account.syncDone,
+    error: account.syncError,
+    lastSyncAt: account.lastSyncAt,
+  };
 }
 
 /**

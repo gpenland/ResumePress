@@ -4,7 +4,7 @@ import { getGmailConnectionStatus, disconnectGmailAccount } from "@/lib/gmailAcc
 import { createContactForUser } from "@/lib/contacts";
 import { createApplicationForUser } from "@/lib/applications";
 import {
-  syncGmailForUser,
+  runTrackedGmailSyncForUser,
   listAvailableLabelsForUser,
   updateSyncLabelsForUser,
   clearUnmatchedThreadsForUser,
@@ -67,11 +67,11 @@ export function registerEmailTools(server: McpServer, userId: string): void {
     "sync_gmail_now",
     {
       description:
-        "Trigger a Gmail sync: scans the inbox (read and unread, regardless of label, capped at the 1000 most recently active threads) plus any thread carrying the override label (see save_override_label), matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
+        "Trigger a Gmail sync and wait for it to finish (can take minutes for a large or first-time sync): scans the inbox (read and unread, regardless of label, capped at the 1000 most recently active threads) plus any thread carrying the override label (see save_override_label), matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Fails immediately with an error if a sync (from this call, the browser's 'Sync now', or the scheduled cron job) is already in progress for this account, rather than starting a second one. Requires Gmail connected.",
       inputSchema: {},
     },
     async () => {
-      const result = await syncGmailForUser(userId);
+      const result = await runTrackedGmailSyncForUser(userId);
       if (!result.ok) return errorResult(result.error);
       return textResult(result);
     }

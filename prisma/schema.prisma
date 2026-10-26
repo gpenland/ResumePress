@@ -360,4 +360,16 @@ model GmailAccount {
   historyId             String?
   lastSyncAt            DateTime?
   connectedAt           DateTime  @default(now())
+
+  // Background-sync tracking (see "Gmail sync" in CLAUDE.md): a sync can
+  // run for minutes, far longer than a single request/response is expected
+  // to survive, so the browser's "Sync now" kicks it off and polls this
+  // instead of awaiting one long-lived call. syncStatus: idle | running |
+  // error. syncTotal/syncDone are written by syncGmailForUser's progress
+  // callback as it goes — both null until a sync has started at least once.
+  syncStatus    String    @default("idle")
+  syncStartedAt DateTime?
+  syncTotal     Int?
+  syncDone      Int?
+  syncError     String?
 }
