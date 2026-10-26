@@ -21,42 +21,61 @@ function isRateLimitResponse(status: number, bodyText: string): boolean {
   return status === 403 && /rateLimitExceeded/i.test(bodyText);
 }
 
-// Gmail's "Total Query Cost / Units per minute per user" quota is a rolling
-// per-minute budget, not a per-request limiter — a burst that exhausts it
-// needs up to ~60s to recover, not a few seconds. A concurrency cap alone
-// only bounds how many calls are in flight, not how many are *started* per
-// second once each completes quickly, so it doesn't actually prevent
-// bursting through a per-minute ceiling. This gate instead enforces a
-// minimum spacing between call starts, globally across every concurrent
-// caller in this process (module-level state, not per-call) — the actual
-// per-call quota cost isn't published for certain, so the interval below is
-// deliberately conservative rather than tuned to a number we can't verify.
+// Gmail's "Total Query Cost / Units per minute per user" quota is per
+// *Gmail account* ("per user" in Google's quota metadata means the Gmail
+// account, not a ResumePress account) — two different people's Gmail
+// connections have two entirely separate budgets. The throttle is keyed on
+// `accountKey` (ResumePress's own userId, passed down from emailThreads.ts)
+// for exactly that reason: without it, syncing two accounts at once would
+// serialize them through one shared gate and slow each other down for no
+// real reason, since there's no actual quota collision between them. A
+// rolling per-minute budget is also not a per-request limiter — a burst
+// that exhausts it needs up to ~60s to recover, not a few seconds. A
+// concurrency cap alone only bounds how many calls are in flight, not how
+// many are *started* per second once each completes quickly, so it doesn't
+// actually prevent bursting through a per-minute ceiling; this gate
+// enforces a minimum spacing between call starts instead, per account. The
+// actual per-call quota cost isn't published for certain, so the interval
+// below is deliberately conservative rather than tuned to a number we
+// can't verify. Entries are never evicted — bounded by how many distinct
+// accounts have ever synced in this process's lifetime, which in turn is
+// bounded by ALLOWED_EMAILS (see CLAUDE.md "Auth"), not unbounded growth.
 const MIN_GMAIL_CALL_INTERVAL_MS = 250;
-let nextAllowedCallAt = 0;
-let throttleGate: Promise<void> = Promise.resolve();
+const throttleStateByAccount = new Map<string, { nextAllowedCallAt: number; gate: Promise<void> }>();
 
-function throttleGmailCall(): Promise<void> {
-  const previousGate = throttleGate;
-  throttleGate = (async () => {
+function throttleGmailCall(accountKey: string): Promise<void> {
+  let state = throttleStateByAccount.get(accountKey);
+  if (!state) {
+    state = { nextAllowedCallAt: 0, gate: Promise.resolve() };
+    throttleStateByAccount.set(accountKey, state);
+  }
+
+  const previousGate = state.gate;
+  state.gate = (async () => {
     await previousGate;
-    const waitMs = Math.max(0, nextAllowedCallAt - Date.now());
+    const waitMs = Math.max(0, state.nextAllowedCallAt - Date.now());
     if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
-    nextAllowedCallAt = Date.now() + MIN_GMAIL_CALL_INTERVAL_MS;
+    state.nextAllowedCallAt = Date.now() + MIN_GMAIL_CALL_INTERVAL_MS;
   })();
-  return throttleGate;
+  return state.gate;
 }
 
 // Backoff ceiling covers a full minute (1+2+4+8+16+32 = 63s, plus jitter) —
 // short enough to be worth it, long enough to actually outlast the quota
 // window it's recovering from, unlike a sub-10s backoff that just retries
-// into the same still-exhausted minute.
+// into the same still-exhausted minute. Already per-call (the `attempt`
+// counter lives on the call stack, not shared state), so it needs no
+// per-account keying the way the throttle above does.
 const MAX_RATE_LIMIT_RETRIES = 6;
 
 // Every Gmail call in this file funnels through here, so both the throttle
 // and the retry-on-rate-limit cover listing, label lookups, and per-thread
-// fetches alike.
-async function gmailFetch(path: string, accessToken: string, attempt = 0): Promise<unknown> {
-  await throttleGmailCall();
+// fetches alike. `accountKey` identifies whose quota this call counts
+// against — always the caller's own userId, never the access token itself
+// (tokens rotate; a stable, non-sensitive key is what the throttle map
+// above wants).
+async function gmailFetch(path: string, accessToken: string, accountKey: string, attempt = 0): Promise<unknown> {
+  await throttleGmailCall(accountKey);
 
   const res = await fetch(`${GMAIL_API}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -67,7 +86,7 @@ async function gmailFetch(path: string, accessToken: string, attempt = 0): Promi
   if (isRateLimitResponse(res.status, bodyText) && attempt < MAX_RATE_LIMIT_RETRIES) {
     const delayMs = 1000 * 2 ** attempt + Math.floor(Math.random() * 500);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
-    return gmailFetch(path, accessToken, attempt + 1);
+    return gmailFetch(path, accessToken, accountKey, attempt + 1);
   }
 
   throw new GmailApiError(`Gmail API ${path} failed: ${res.status} ${bodyText}`, res.status);
@@ -107,6 +126,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
 // have been collected.
 async function paginatedThreadIds(
   accessToken: string,
+  accountKey: string,
   baseParams: Record<string, string>,
   limit: number
 ): Promise<string[]> {
@@ -116,7 +136,7 @@ async function paginatedThreadIds(
   do {
     const params = new URLSearchParams({ ...baseParams, maxResults: "500" });
     if (pageToken) params.set("pageToken", pageToken);
-    const data = (await gmailFetch(`/messages?${params}`, accessToken)) as {
+    const data = (await gmailFetch(`/messages?${params}`, accessToken, accountKey)) as {
       messages?: { id: string; threadId: string }[];
       nextPageToken?: string;
     };
@@ -139,8 +159,8 @@ async function paginatedThreadIds(
 // an arbitrary truncation.
 const INBOX_SCAN_LIMIT = 1000;
 
-export async function listInboxThreadIds(accessToken: string): Promise<string[]> {
-  return paginatedThreadIds(accessToken, { q: "in:inbox" }, INBOX_SCAN_LIMIT);
+export async function listInboxThreadIds(accessToken: string, accountKey: string): Promise<string[]> {
+  return paginatedThreadIds(accessToken, accountKey, { q: "in:inbox" }, INBOX_SCAN_LIMIT);
 }
 
 // Every thread carrying a specific label, regardless of how old — the
@@ -153,8 +173,8 @@ export async function listInboxThreadIds(accessToken: string): Promise<string[]>
 // that id comes from.
 const LABEL_OVERRIDE_SCAN_LIMIT = 500;
 
-export async function listThreadIdsForLabel(accessToken: string, labelId: string): Promise<string[]> {
-  return paginatedThreadIds(accessToken, { labelIds: labelId }, LABEL_OVERRIDE_SCAN_LIMIT);
+export async function listThreadIdsForLabel(accessToken: string, accountKey: string, labelId: string): Promise<string[]> {
+  return paginatedThreadIds(accessToken, accountKey, { labelIds: labelId }, LABEL_OVERRIDE_SCAN_LIMIT);
 }
 
 export type GmailLabel = { id: string; name: string; type: string };
@@ -162,8 +182,8 @@ export type GmailLabel = { id: string; name: string; type: string };
 const SYSTEM_LABEL_ALLOWLIST = new Set(["INBOX", "SENT", "STARRED", "IMPORTANT"]);
 
 /** Filters out Gmail's noisy CATEGORY_ and CHAT system labels — keeps user-created labels plus the handful of system labels someone would plausibly want to pick as the override label. */
-export async function listLabels(accessToken: string): Promise<GmailLabel[]> {
-  const data = (await gmailFetch("/labels", accessToken)) as { labels?: GmailLabel[] };
+export async function listLabels(accessToken: string, accountKey: string): Promise<GmailLabel[]> {
+  const data = (await gmailFetch("/labels", accessToken, accountKey)) as { labels?: GmailLabel[] };
   return (data.labels ?? []).filter((l) => l.type === "user" || SYSTEM_LABEL_ALLOWLIST.has(l.id));
 }
 
@@ -229,9 +249,10 @@ function extractEmails(headerValue: string | undefined): string[] {
  */
 export async function getThreadDetails(
   accessToken: string,
+  accountKey: string,
   threadId: string
 ): Promise<{ thread: GmailThread; bodyText: string }> {
-  const data = (await gmailFetch(`/threads/${threadId}?format=full`, accessToken)) as {
+  const data = (await gmailFetch(`/threads/${threadId}?format=full`, accessToken, accountKey)) as {
     id: string;
     messages?: { snippet?: string; internalDate?: string; payload?: GmailMessagePart }[];
   };
