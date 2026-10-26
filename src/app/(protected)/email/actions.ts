@@ -4,6 +4,7 @@ import { requireUserId } from "@/lib/auth";
 import { disconnectGmailAccount } from "@/lib/gmailAccount";
 import {
   syncGmailForUser,
+  updateSyncLabelsForUser,
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
@@ -19,6 +20,13 @@ import { notFound } from "next/navigation";
 export async function disconnectGmail() {
   const userId = await requireUserId();
   await disconnectGmailAccount(userId);
+  revalidatePath("/email");
+}
+
+/** The manual triage-override label (see "Gmail sync" in CLAUDE.md) — a single label id, or null to clear it. */
+export async function saveOverrideLabel(labelId: string | null) {
+  const userId = await requireUserId();
+  await updateSyncLabelsForUser(userId, labelId ? [labelId] : []);
   revalidatePath("/email");
 }
 
