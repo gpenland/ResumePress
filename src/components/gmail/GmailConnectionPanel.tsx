@@ -20,6 +20,7 @@ type ConnectedProps = {
   saveOverrideLabel: (labelId: string | null) => Promise<void>;
   startSync: () => Promise<{ started: boolean; error?: string }>;
   getSyncStatus: () => Promise<GmailSyncStatus>;
+  cancelSync: () => Promise<{ cancelled: boolean }>;
   clearUnmatched: () => Promise<{ cleared: number }>;
   disconnect: () => Promise<void>;
 };
@@ -70,6 +71,7 @@ export default function GmailConnectionPanel(props: Props) {
     saveOverrideLabel,
     startSync,
     getSyncStatus,
+    cancelSync,
     clearUnmatched,
     disconnect,
   } = props;
@@ -87,6 +89,7 @@ export default function GmailConnectionPanel(props: Props) {
   const [isSavingLabel, startSavingLabel] = useTransition();
   const [isClearing, startClearing] = useTransition();
   const [clearResult, setClearResult] = useState<string | null>(null);
+  const [isCancelling, startCancelling] = useTransition();
 
   const isRunning = syncStatus.status === "running";
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,6 +154,18 @@ export default function GmailConnectionPanel(props: Props) {
     });
   }
 
+  function handleCancel() {
+    startCancelling(async () => {
+      const result = await cancelSync();
+      if (result.cancelled) {
+        // Optimistic: stop reporting "running" immediately rather than
+        // waiting for the next poll tick — the polling effect sees isRunning
+        // flip to false and stops on its own.
+        setSyncStatus((prev) => ({ ...prev, status: "idle", startedAt: null, error: null }));
+      }
+    });
+  }
+
   function handleClearUnmatched() {
     setClearResult(null);
     startClearing(async () => {
@@ -208,9 +223,20 @@ export default function GmailConnectionPanel(props: Props) {
               <div className="h-full w-2/5 bg-primary/50 animate-pulse rounded-full" />
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {progressPct !== null ? `${syncStatus.done} of ${syncStatus.total} threads checked` : "Finding emails to check…"}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {progressPct !== null ? `${syncStatus.done} of ${syncStatus.total} threads checked` : "Finding emails to check…"}
+            </p>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="text-xs text-muted-foreground hover:text-destructive underline shrink-0"
+              title="Use if a sync looks stuck (e.g. after a server restart) — safe even if it's still actually running."
+            >
+              {isCancelling ? "Cancelling…" : "Cancel"}
+            </button>
+          </div>
         </div>
       )}
 

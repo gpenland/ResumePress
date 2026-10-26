@@ -695,23 +695,33 @@ function isStale(syncStartedAt: Date | null): boolean {
   return !!syncStartedAt && Date.now() - syncStartedAt.getTime() > STALE_SYNC_THRESHOLD_MS;
 }
 
-async function markSyncRunningForUser(userId: string): Promise<boolean> {
+// Returns the exact syncStartedAt this call claimed (null if it couldn't
+// claim the slot) — finalizeSyncStatus below uses that same value as an
+// optimistic-lock token, so a run that's no longer the "current" one for
+// this account (superseded by a cancellation or a later reclaim) can't
+// clobber whatever happened after it.
+async function markSyncRunningForUser(userId: string): Promise<Date | null> {
   const staleCutoff = new Date(Date.now() - STALE_SYNC_THRESHOLD_MS);
+  const startedAt = new Date();
   const { count } = await prisma.gmailAccount.updateMany({
     where: {
       userId,
       OR: [{ syncStatus: { not: "running" } }, { syncStatus: "running", syncStartedAt: { lt: staleCutoff } }],
     },
-    data: { syncStatus: "running", syncStartedAt: new Date(), syncTotal: null, syncDone: 0, syncError: null },
+    data: { syncStatus: "running", syncStartedAt: startedAt, syncTotal: null, syncDone: 0, syncError: null },
   });
-  return count > 0;
+  return count > 0 ? startedAt : null;
 }
 
-async function finalizeSyncStatus(userId: string, result: SyncResult | null, error?: string): Promise<void> {
+async function finalizeSyncStatus(userId: string, claimedAt: Date, result: SyncResult | null, error?: string): Promise<void> {
   const message = error ?? (result && !result.ok ? result.error : undefined);
   await prisma.gmailAccount
-    .update({
-      where: { userId },
+    .updateMany({
+      // Only apply if this is still the run `claimedAt` identifies — if a
+      // manual cancel or a later reclaim has since changed syncStartedAt,
+      // this is a zombie finishing late and must not overwrite whatever
+      // superseded it.
+      where: { userId, syncStartedAt: claimedAt },
       data: message ? { syncStatus: "error", syncError: message } : { syncStatus: "idle", syncError: null },
     })
     .catch(() => {
@@ -719,6 +729,26 @@ async function finalizeSyncStatus(userId: string, result: SyncResult | null, err
       // keep reporting "running" until the next sync attempt overwrites it,
       // which is a stale-but-safe failure mode, not a crash.
     });
+}
+
+/**
+ * Manual override for a sync that appears stuck or crashed, without
+ * waiting for markSyncRunningForUser's STALE_SYNC_THRESHOLD_MS (20 min) to
+ * let a new attempt reclaim it automatically — the "Cancel" control next
+ * to the progress bar in GmailConnectionPanel.tsx while a sync is running.
+ * Clears syncStartedAt (not just syncStatus) so that if the process
+ * wasn't actually dead — just slow — its eventual finalizeSyncStatus call
+ * no longer matches this row's syncStartedAt and silently overwrites
+ * whatever happens next (this cancellation, or a fresh sync started right
+ * after it). No staleness check here on purpose: the user is the one
+ * asserting "this is stuck," not a timer guessing at it.
+ */
+export async function cancelStuckSyncForUser(userId: string): Promise<{ cancelled: boolean }> {
+  const { count } = await prisma.gmailAccount.updateMany({
+    where: { userId, syncStatus: "running" },
+    data: { syncStatus: "idle", syncStartedAt: null, syncError: null },
+  });
+  return { cancelled: count > 0 };
 }
 
 function trackSyncProgress(userId: string): (done: number, total: number) => void {
@@ -738,17 +768,18 @@ function trackSyncProgress(userId: string): (done: number, total: number) => voi
 export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncResult> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { ok: false, error: "Gmail is not connected." };
-  if (!(await markSyncRunningForUser(userId))) {
+  const claimedAt = await markSyncRunningForUser(userId);
+  if (!claimedAt) {
     return { ok: false, error: "A sync is already in progress for this account." };
   }
 
   try {
     const result = await syncGmailForUser(userId, trackSyncProgress(userId));
-    await finalizeSyncStatus(userId, result);
+    await finalizeSyncStatus(userId, claimedAt, result);
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed unexpectedly.";
-    await finalizeSyncStatus(userId, null, message);
+    await finalizeSyncStatus(userId, claimedAt, null, message);
     return { ok: false, error: message };
   }
 }
@@ -768,13 +799,14 @@ export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncRe
 export async function startGmailSyncInBackgroundForUser(userId: string): Promise<{ started: boolean; error?: string }> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { started: false, error: "Gmail is not connected." };
-  if (!(await markSyncRunningForUser(userId))) {
+  const claimedAt = await markSyncRunningForUser(userId);
+  if (!claimedAt) {
     return { started: false, error: "A sync is already in progress." };
   }
 
   void syncGmailForUser(userId, trackSyncProgress(userId))
-    .then((result) => finalizeSyncStatus(userId, result))
-    .catch((err) => finalizeSyncStatus(userId, null, err instanceof Error ? err.message : "Sync failed unexpectedly."));
+    .then((result) => finalizeSyncStatus(userId, claimedAt, result))
+    .catch((err) => finalizeSyncStatus(userId, claimedAt, null, err instanceof Error ? err.message : "Sync failed unexpectedly."));
 
   return { started: true };
 }
