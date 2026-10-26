@@ -2,7 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { requireUserId } from "@/lib/auth";
 import { getGmailConnectionStatus } from "@/lib/gmailAccount";
+import { prisma } from "@/lib/prisma";
 import {
+  listAvailableLabelsForUser,
   listTriageThreadsForUser,
   listRecentMatchedThreadsForUser,
   listIgnoredThreadsForUser,
@@ -17,6 +19,7 @@ import RecentEmailsList from "@/components/gmail/RecentEmailsList";
 import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
 import {
   disconnectGmail,
+  saveOverrideLabel,
   syncGmailNow,
   confirmEmailThreadMatch,
   ignoreEmailThreadMatch,
@@ -32,6 +35,9 @@ export default async function EmailPage() {
   const userId = await requireUserId();
   const status = await getGmailConnectionStatus(userId);
 
+  let labels: Awaited<ReturnType<typeof listAvailableLabelsForUser>> = [];
+  let labelsError: string | null = null;
+  let overrideLabelId: string | null = null;
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
@@ -40,14 +46,16 @@ export default async function EmailPage() {
   let applicationIdsByContact: Record<string, string[]> = {};
 
   if (status.connected) {
-    const [threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
+    const [account, threadsResult, ignoredResult, contactOptionsResult, applicationsResult, applicationIdsByContactResult] =
       await Promise.all([
+        prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
         listTriageThreadsForUser(userId),
         listIgnoredThreadsForUser(userId),
         listContactOptionsForUser(userId),
         listApplicationPickerOptionsForUser(userId),
         listApplicationIdsByContactForUser(userId),
       ]);
+    overrideLabelId = account?.syncLabelIds[0] ?? null;
     threads = threadsResult;
     ignoredThreads = ignoredResult;
     contactOptions = contactOptionsResult;
@@ -57,6 +65,12 @@ export default async function EmailPage() {
     // Only needed to fill the space the triage queue leaves behind when it's empty.
     if (threads.length === 0) {
       recentThreads = await listRecentMatchedThreadsForUser(userId);
+    }
+
+    try {
+      labels = await listAvailableLabelsForUser(userId);
+    } catch (err) {
+      labelsError = err instanceof Error ? err.message : "Could not load Gmail labels.";
     }
   }
 
@@ -76,6 +90,10 @@ export default async function EmailPage() {
           email={status.email}
           connectedAt={status.connectedAt}
           lastSyncAt={status.lastSyncAt}
+          labels={labels}
+          labelsError={labelsError}
+          overrideLabelId={overrideLabelId}
+          saveOverrideLabel={saveOverrideLabel}
           syncNow={syncGmailNow}
           disconnect={disconnectGmail}
         />

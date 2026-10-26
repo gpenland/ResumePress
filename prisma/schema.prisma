@@ -332,6 +332,13 @@ model EmailThread {
   jevSuggestedStatusConf      Float?
   jevClassifiedAt             DateTime?
 
+  // True when this thread currently carries the user's manual override
+  // label (GmailAccount.syncLabelIds) — recomputed fresh each sync (set
+  // false again if the label's removed in Gmail). A label-forced thread is
+  // always eligible for triage regardless of jevRecruitingLikely: see
+  // listTriageThreadsForUser's filter and "Gmail sync" in CLAUDE.md.
+  labelForced Boolean @default(false)
+
   @@unique([userId, gmailThreadId])
   @@index([userId, matchStatus])
   @@index([userId, lastMessageAt])

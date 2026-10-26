@@ -5,14 +5,19 @@ import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 import type { SyncResult } from "@/lib/emailThreads";
+import type { GmailLabel } from "@/lib/gmail";
 
 type ConnectedProps = {
   connected: true;
   email: string;
   connectedAt: Date;
   lastSyncAt: Date | null;
+  labels: GmailLabel[];
+  labelsError: string | null;
+  overrideLabelId: string | null;
+  saveOverrideLabel: (labelId: string | null) => Promise<void>;
   syncNow: () => Promise<SyncResult>;
   disconnect: () => Promise<void>;
 };
@@ -37,18 +42,29 @@ export default function GmailConnectionPanel(props: Props) {
     );
   }
 
-  const { email, connectedAt, lastSyncAt, syncNow, disconnect } = props;
+  const { email, connectedAt, lastSyncAt, labels, labelsError, overrideLabelId, saveOverrideLabel, syncNow, disconnect } =
+    props;
 
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [isSyncing, startSyncing] = useTransition();
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [selectedLabelId, setSelectedLabelId] = useState(overrideLabelId ?? "");
+  const [isSavingLabel, startSavingLabel] = useTransition();
 
   function handleSync() {
     setSyncResult(null);
     startSyncing(async () => {
       const result = await syncNow();
       setSyncResult(result);
+      router.refresh();
+    });
+  }
+
+  function handleLabelChange(value: string) {
+    setSelectedLabelId(value);
+    startSavingLabel(async () => {
+      await saveOverrideLabel(value || null);
       router.refresh();
     });
   }
@@ -87,6 +103,32 @@ export default function GmailConnectionPanel(props: Props) {
       {expanded && (
         <div className="space-y-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">Connected {connectedAt.toLocaleDateString()}</p>
+
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Always include a label</p>
+            <p className="text-xs text-muted-foreground">
+              Jev skips anything it doesn&apos;t think is recruiting-related. Tag an email with this label in
+              Gmail to force it into triage regardless — useful for something Jev missed, or older mail outside
+              the normal scan.
+            </p>
+            {labelsError ? (
+              <p className="text-xs text-destructive">{labelsError}</p>
+            ) : (
+              <select
+                value={selectedLabelId}
+                onChange={(e) => handleLabelChange(e.target.value)}
+                disabled={isSavingLabel}
+                className={nativeSelectClassName("sm")}
+              >
+                <option value="">No override label</option>
+                {labels.map((label) => (
+                  <option key={label.id} value={label.id}>
+                    {label.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
           <form action={disconnect} className="pt-2 border-t">
             <SubmitButton

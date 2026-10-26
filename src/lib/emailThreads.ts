@@ -3,10 +3,13 @@ import { decrypt } from "@/lib/encryption";
 import {
   refreshAccessToken,
   listInboxThreadIds,
+  listThreadIdsForLabel,
+  listLabels,
   getThreadBodyText,
   getThread,
   gmailThreadUrl,
   GmailApiError,
+  type GmailLabel,
   type GmailThread,
 } from "@/lib/gmail";
 import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
@@ -21,6 +24,25 @@ export async function getValidAccessTokenForUser(userId: string): Promise<string
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) throw new GmailApiError("Gmail is not connected.");
   return refreshAccessToken(decrypt(account.encryptedRefreshToken));
+}
+
+/** Labels the user can pick as the manual triage-override (see syncLabelIds below). */
+export async function listAvailableLabelsForUser(userId: string): Promise<GmailLabel[]> {
+  const accessToken = await getValidAccessTokenForUser(userId);
+  return listLabels(accessToken);
+}
+
+/**
+ * The manual override: any thread carrying one of these labels always gets
+ * pulled into the sync and always stays eligible for triage, regardless of
+ * Jev's recruiting classification or the INBOX_SCAN_LIMIT recency window.
+ * Reuses GmailAccount.syncLabelIds (the old label-picker's column, unused
+ * since sync moved to scanning the inbox itself) rather than a new column —
+ * same storage, new meaning: "force include," not "scope sync to only
+ * these."
+ */
+export async function updateSyncLabelsForUser(userId: string, labelIds: string[]): Promise<void> {
+  await prisma.gmailAccount.update({ where: { userId }, data: { syncLabelIds: labelIds } });
 }
 
 type MatchCandidates = {
@@ -483,6 +505,28 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to list Gmail messages." };
   }
 
+  // Manual override: any thread carrying one of the user's chosen labels is
+  // pulled in and marked labelForced regardless of whether it's within the
+  // INBOX_SCAN_LIMIT recency window — a label a user applies to an older
+  // thread should still reach triage. Recomputed fresh every sync (see
+  // labelForced's own schema comment) rather than failing the whole sync if
+  // one label lookup errors.
+  const threadIdSet = new Set(threadIds);
+  const labelForcedThreadIds = new Set<string>();
+  for (const labelId of account.syncLabelIds) {
+    try {
+      const ids = await listThreadIdsForLabel(accessToken, labelId);
+      for (const id of ids) {
+        labelForcedThreadIds.add(id);
+        threadIdSet.add(id);
+      }
+    } catch {
+      // Skip a label that fails to look up rather than aborting the sync —
+      // same philosophy as "skip threads that fail to fetch" below.
+    }
+  }
+  threadIds = [...threadIdSet];
+
   let upserted = 0;
   await mapWithConcurrency(threadIds, THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
     let gmailThread: GmailThread;
@@ -533,6 +577,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
         matchedContactId: match.contactId,
         matchedApplicationId: match.applicationId,
         matchStatus: match.matchStatus,
+        labelForced: labelForcedThreadIds.has(gmailThreadId),
         userId,
         ...(needsJevPass
           ? {
@@ -558,6 +603,7 @@ export async function syncGmailForUser(userId: string): Promise<SyncResult> {
         matchedContactId: match.contactId,
         matchedApplicationId: match.applicationId,
         matchStatus: match.matchStatus,
+        labelForced: labelForcedThreadIds.has(gmailThreadId),
         ...(needsJevPass
           ? {
               jevRecruitingLikely: classification.recruitingLikely,
@@ -646,9 +692,26 @@ export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyn
   return { connected: !!account, lastSyncAt: account?.lastSyncAt ?? null, needsReview, matched, total };
 }
 
+/**
+ * Unmatched threads worth a human look — excludes anything Jev explicitly
+ * classified as not recruiting-related, since the inbox scan (see "Gmail
+ * sync" in CLAUDE.md) covers the whole inbox now, not just a curated label,
+ * and without this filter every newsletter/receipt/personal email that
+ * doesn't exactly match a contact would flood this list too. Explicitly
+ * listed as true/null/labelForced (not `not: false`) to stay null-safe —
+ * `jevRecruitingLikely: { not: false }` would silently exclude NULL rows
+ * under SQL's three-valued logic, which is the opposite of "fail open."
+ * null covers not-yet-classified or Jev-unavailable threads (never hide a
+ * thread just because classification didn't run); labelForced always wins
+ * regardless of what Jev concluded — see GmailAccount.syncLabelIds.
+ */
 export async function listTriageThreadsForUser(userId: string) {
   return prisma.emailThread.findMany({
-    where: { userId, matchStatus: "unmatched" },
+    where: {
+      userId,
+      matchStatus: "unmatched",
+      OR: [{ jevRecruitingLikely: true }, { jevRecruitingLikely: null }, { labelForced: true }],
+    },
     include: {
       matchedContact: { select: { id: true, name: true } },
       matchedApplication: { select: { id: true, roleTitle: true, company: { select: { name: true } } } },

@@ -52,8 +52,36 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token;
 }
 
-// Every thread in the inbox, read or unread, regardless of label — paginated
-// (Gmail caps a single /messages?q= page at 500), capped at
+// Shared pagination core for both listInboxThreadIds and
+// listThreadIdsForLabel below — walks nextPageToken (Gmail caps a single
+// page at 500) until either results run out or `limit` unique thread ids
+// have been collected.
+async function paginatedThreadIds(
+  accessToken: string,
+  baseParams: Record<string, string>,
+  limit: number
+): Promise<string[]> {
+  const threadIds = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const params = new URLSearchParams({ ...baseParams, maxResults: "500" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const data = (await gmailFetch(`/messages?${params}`, accessToken)) as {
+      messages?: { id: string; threadId: string }[];
+      nextPageToken?: string;
+    };
+    for (const m of data.messages ?? []) {
+      if (threadIds.size >= limit) break;
+      threadIds.add(m.threadId);
+    }
+    pageToken = threadIds.size >= limit ? undefined : data.nextPageToken;
+  } while (pageToken);
+
+  return [...threadIds];
+}
+
+// Every thread in the inbox, read or unread, regardless of label — capped at
 // INBOX_SCAN_LIMIT total threads. Unlike "currently unread" (a self-pruning
 // set that only shrinks), the full inbox only grows, so re-scanning it in
 // full every sync has no natural ceiling — the cap is the ceiling. Gmail's
@@ -63,24 +91,31 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
 const INBOX_SCAN_LIMIT = 1000;
 
 export async function listInboxThreadIds(accessToken: string): Promise<string[]> {
-  const threadIds = new Set<string>();
-  let pageToken: string | undefined;
+  return paginatedThreadIds(accessToken, { q: "in:inbox" }, INBOX_SCAN_LIMIT);
+}
 
-  do {
-    const params = new URLSearchParams({ q: "in:inbox", maxResults: "500" });
-    if (pageToken) params.set("pageToken", pageToken);
-    const data = (await gmailFetch(`/messages?${params}`, accessToken)) as {
-      messages?: { id: string; threadId: string }[];
-      nextPageToken?: string;
-    };
-    for (const m of data.messages ?? []) {
-      if (threadIds.size >= INBOX_SCAN_LIMIT) break;
-      threadIds.add(m.threadId);
-    }
-    pageToken = threadIds.size >= INBOX_SCAN_LIMIT ? undefined : data.nextPageToken;
-  } while (pageToken);
+// Every thread carrying a specific label, regardless of how old — the
+// manual-override path (see GmailAccount.syncLabelIds / "Gmail sync" in
+// CLAUDE.md): a user-tagged label always gets pulled in and always stays
+// eligible for triage, even if it's older than the INBOX_SCAN_LIMIT window
+// or Jev classifies it as not recruiting-related. Uses the `labelIds` query
+// param (an actual label id) rather than `q: "label:<name>"` (which expects
+// the label's display name, not its id) — see listLabels below for where
+// that id comes from.
+const LABEL_OVERRIDE_SCAN_LIMIT = 500;
 
-  return [...threadIds];
+export async function listThreadIdsForLabel(accessToken: string, labelId: string): Promise<string[]> {
+  return paginatedThreadIds(accessToken, { labelIds: labelId }, LABEL_OVERRIDE_SCAN_LIMIT);
+}
+
+export type GmailLabel = { id: string; name: string; type: string };
+
+const SYSTEM_LABEL_ALLOWLIST = new Set(["INBOX", "SENT", "STARRED", "IMPORTANT"]);
+
+/** Filters out Gmail's noisy CATEGORY_ and CHAT system labels — keeps user-created labels plus the handful of system labels someone would plausibly want to pick as the override label. */
+export async function listLabels(accessToken: string): Promise<GmailLabel[]> {
+  const data = (await gmailFetch("/labels", accessToken)) as { labels?: GmailLabel[] };
+  return (data.labels ?? []).filter((l) => l.type === "user" || SYSTEM_LABEL_ALLOWLIST.has(l.id));
 }
 
 type GmailMessagePart = {

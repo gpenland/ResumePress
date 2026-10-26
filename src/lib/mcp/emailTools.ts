@@ -5,6 +5,8 @@ import { createContactForUser } from "@/lib/contacts";
 import { createApplicationForUser } from "@/lib/applications";
 import {
   syncGmailForUser,
+  listAvailableLabelsForUser,
+  updateSyncLabelsForUser,
   getEmailSyncStatsForUser,
   listTriageThreadsForUser,
   listIgnoredThreadsForUser,
@@ -13,6 +15,10 @@ import {
   restoreEmailThreadMatchForUser,
 } from "@/lib/emailThreads";
 import { textResult, errorResult } from "./shared";
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 /**
  * Gmail connection + sync + triage. Mirrors /email's actions.ts exactly;
@@ -29,10 +35,38 @@ export function registerEmailTools(server: McpServer, userId: string): void {
   );
 
   server.registerTool(
+    "list_gmail_labels",
+    {
+      description: "List the Gmail labels available to pick as the triage-override label (requires Gmail to be connected).",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return textResult(await listAvailableLabelsForUser(userId));
+      } catch (err) {
+        return errorResult(errMessage(err));
+      }
+    }
+  );
+
+  server.registerTool(
+    "save_override_label",
+    {
+      description:
+        "Set the manual triage-override label: any thread carrying this label is always pulled into sync and always eligible for triage, regardless of Jev's recruiting classification or the recency window. Pass null/omit to clear it.",
+      inputSchema: { labelId: z.string().nullable() },
+    },
+    async ({ labelId }) => {
+      await updateSyncLabelsForUser(userId, labelId ? [labelId] : []);
+      return textResult({ ok: true });
+    }
+  );
+
+  server.registerTool(
     "sync_gmail_now",
     {
       description:
-        "Trigger a Gmail sync: scans the inbox (read and unread, regardless of label, capped at the 1000 most recently active threads), matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
+        "Trigger a Gmail sync: scans the inbox (read and unread, regardless of label, capped at the 1000 most recently active threads) plus any thread carrying the override label (see save_override_label), matches them to contacts/applications, eagerly runs Jev classification on unmatched ones (recruiting-related?, guessed job/contact, suggested status change), and re-checks previously unmatched threads. Requires Gmail connected.",
       inputSchema: {},
     },
     async () => {
@@ -59,7 +93,11 @@ export function registerEmailTools(server: McpServer, userId: string): void {
 
   server.registerTool(
     "list_triage_threads",
-    { description: "List unmatched email threads awaiting manual triage.", inputSchema: {} },
+    {
+      description:
+        "List unmatched email threads awaiting manual triage — excludes anything Jev explicitly classified as not recruiting-related, unless it carries the override label (see save_override_label).",
+      inputSchema: {},
+    },
     async () => textResult(await listTriageThreadsForUser(userId))
   );
 
