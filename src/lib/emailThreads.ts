@@ -252,11 +252,17 @@ const THREAD_SYNC_CONCURRENCY = 3;
 // below is fetched/classified/upserted independently (keyed by its own
 // userId+gmailThreadId), so this is safe to parallelize instead of
 // processing the whole inbox scan one thread at a time.
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+  signal?: AbortSignal
+): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
   async function worker() {
     for (;;) {
+      if (signal?.aborted) return;
       const i = nextIndex++;
       if (i >= items.length) return;
       results[i] = await fn(items[i]);
@@ -482,7 +488,8 @@ async function classifyThreadForTriage(
  */
 export async function syncGmailForUser(
   userId: string,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  signal?: AbortSignal
 ): Promise<SyncResult> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { ok: false, error: "Gmail is not connected." };
@@ -557,14 +564,19 @@ export async function syncGmailForUser(
 
   let upserted = 0;
   let processed = 0;
-  await mapWithConcurrency(threadIds, THREAD_SYNC_CONCURRENCY, async (gmailThreadId) => {
-    try {
-      await processThread(gmailThreadId);
-    } finally {
-      processed++;
-      onProgress?.(processed, threadIds.length);
-    }
-  });
+  await mapWithConcurrency(
+    threadIds,
+    THREAD_SYNC_CONCURRENCY,
+    async (gmailThreadId) => {
+      try {
+        await processThread(gmailThreadId);
+      } finally {
+        processed++;
+        onProgress?.(processed, threadIds.length);
+      }
+    },
+    signal
+  );
 
   async function processThread(gmailThreadId: string): Promise<void> {
     let gmailThread: GmailThread;
@@ -667,6 +679,14 @@ export async function syncGmailForUser(
     }
   }
 
+  // A cancelled sync stopped early (mapWithConcurrency's workers saw the
+  // abort signal and quit picking up new threads) — don't advance
+  // lastSyncAt, or the next incremental resync would anchor to "now" and
+  // silently skip every thread this run never got to.
+  if (signal?.aborted) {
+    return { ok: false, error: "Sync cancelled." };
+  }
+
   await prisma.gmailAccount.update({
     where: { userId },
     data: { lastSyncAt: new Date() },
@@ -713,6 +733,33 @@ async function markSyncRunningForUser(userId: string): Promise<Date | null> {
   return count > 0 ? startedAt : null;
 }
 
+// In-memory registry of the AbortController backing each account's
+// currently-running sync, so cancelStuckSyncForUser below can actually stop
+// it instead of just editing DB bookkeeping while the real work keeps going
+// — the previous version of "Cancel" only reset syncStatus, leaving the
+// un-awaited syncGmailForUser call running regardless, which let Cancel +
+// Sync-now effectively start a second real sync for the same account while
+// the first was still alive. Scoped to this process: in the single
+// long-running Node process this app deploys as (see CLAUDE.md "Deployment"),
+// that's the only place a sync can actually be running, so this is
+// sufficient — it doesn't need to reach across processes/instances.
+const activeSyncControllers = new Map<string, AbortController>();
+
+function registerActiveSync(userId: string): AbortController {
+  const controller = new AbortController();
+  activeSyncControllers.set(userId, controller);
+  return controller;
+}
+
+function unregisterActiveSync(userId: string, controller: AbortController): void {
+  // Only clear this account's entry if it's still *this* run's controller —
+  // a fresh sync claimed via markSyncRunningForUser after this one finished
+  // (or was cancelled) would already have overwritten it with its own.
+  if (activeSyncControllers.get(userId) === controller) {
+    activeSyncControllers.delete(userId);
+  }
+}
+
 async function finalizeSyncStatus(userId: string, claimedAt: Date, result: SyncResult | null, error?: string): Promise<void> {
   const message = error ?? (result && !result.ok ? result.error : undefined);
   await prisma.gmailAccount
@@ -744,16 +791,31 @@ async function finalizeSyncStatus(userId: string, claimedAt: Date, result: SyncR
  * asserting "this is stuck," not a timer guessing at it.
  */
 export async function cancelStuckSyncForUser(userId: string): Promise<{ cancelled: boolean }> {
+  // Actually stop the run if it's alive in this process — see
+  // activeSyncControllers above. If it isn't (the process that started it
+  // died, which is the original "stuck" case this control was built for),
+  // this is a no-op and the DB reset below is all that's needed.
+  activeSyncControllers.get(userId)?.abort();
+
   const { count } = await prisma.gmailAccount.updateMany({
     where: { userId, syncStatus: "running" },
-    data: { syncStatus: "idle", syncStartedAt: null, syncError: null },
+    // Also clear syncTotal/syncDone (not just status/error) so the "Checked
+    // N thread(s) on the last sync" summary doesn't render the cancelled
+    // run's partial, in-progress counts as if they were a completed sync's.
+    data: { syncStatus: "idle", syncStartedAt: null, syncError: null, syncTotal: null, syncDone: null },
   });
   return { cancelled: count > 0 };
 }
 
-function trackSyncProgress(userId: string): (done: number, total: number) => void {
+// claimedAt is the same optimistic-lock token finalizeSyncStatus uses: a run
+// superseded by a cancel or a later reclaim stops matching this row (its
+// syncStartedAt no longer equals claimedAt) and its progress writes become
+// no-ops instead of racing with whatever run replaced it.
+function trackSyncProgress(userId: string, claimedAt: Date): (done: number, total: number) => void {
   return (done, total) => {
-    void prisma.gmailAccount.update({ where: { userId }, data: { syncDone: done, syncTotal: total } }).catch(() => {});
+    void prisma.gmailAccount
+      .updateMany({ where: { userId, syncStartedAt: claimedAt }, data: { syncDone: done, syncTotal: total } })
+      .catch(() => {});
   };
 }
 
@@ -773,14 +835,17 @@ export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncRe
     return { ok: false, error: "A sync is already in progress for this account." };
   }
 
+  const controller = registerActiveSync(userId);
   try {
-    const result = await syncGmailForUser(userId, trackSyncProgress(userId));
+    const result = await syncGmailForUser(userId, trackSyncProgress(userId, claimedAt), controller.signal);
     await finalizeSyncStatus(userId, claimedAt, result);
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed unexpectedly.";
     await finalizeSyncStatus(userId, claimedAt, null, message);
     return { ok: false, error: message };
+  } finally {
+    unregisterActiveSync(userId, controller);
   }
 }
 
@@ -804,9 +869,11 @@ export async function startGmailSyncInBackgroundForUser(userId: string): Promise
     return { started: false, error: "A sync is already in progress." };
   }
 
-  void syncGmailForUser(userId, trackSyncProgress(userId))
+  const controller = registerActiveSync(userId);
+  void syncGmailForUser(userId, trackSyncProgress(userId, claimedAt), controller.signal)
     .then((result) => finalizeSyncStatus(userId, claimedAt, result))
-    .catch((err) => finalizeSyncStatus(userId, claimedAt, null, err instanceof Error ? err.message : "Sync failed unexpectedly."));
+    .catch((err) => finalizeSyncStatus(userId, claimedAt, null, err instanceof Error ? err.message : "Sync failed unexpectedly."))
+    .finally(() => unregisterActiveSync(userId, controller));
 
   return { started: true };
 }
