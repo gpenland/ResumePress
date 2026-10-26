@@ -4,14 +4,11 @@ import { useRef, useState, useTransition } from "react";
 import type { Category, Entry } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge, badgeVariants } from "@/components/ui/badge";
 import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
-import { scoreBulletText } from "@/app/(protected)/entries/actions";
-import { cn } from "cn";
 
 type Props = {
   category: Category;
@@ -19,72 +16,6 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
 };
-
-type BulletScoreResult = { score: number; confidence: number; legend: Record<string, string> };
-type BulletScoreState = BulletScoreResult | { error: string };
-
-const XYZ_LEVEL_LABELS = ["Needs XYZ", "Partial XYZ", "Full XYZ"] as const;
-const XYZ_LEVEL_VARIANTS = ["destructive", "secondary", "default"] as const;
-
-function confidenceWord(confidence: number): string {
-  if (confidence > 0.9) return "clear read";
-  if (confidence >= 0.5) return "rough read";
-  return "uncertain";
-}
-
-function BulletScoreBadge({ result }: { result: BulletScoreResult }) {
-  const level = Math.min(2, Math.max(0, Math.round(result.score)));
-  return (
-    <div className="flex items-center gap-2 text-xs flex-wrap">
-      <Badge variant={XYZ_LEVEL_VARIANTS[level]}>{XYZ_LEVEL_LABELS[level]}</Badge>
-      <span className="text-muted-foreground">
-        {result.legend[String(level)]} · {confidenceWord(result.confidence)}
-      </span>
-    </div>
-  );
-}
-
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
-
-// A clickable pill styled exactly like the score badges it turns into once clicked —
-// idle "Score bullets" -> "Scoring…" -> the overall level badge (or "Score failed").
-function ScoreBubbleButton({
-  state,
-  onClick,
-  disabled,
-}: {
-  state: "loading" | BulletScoreState | null;
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  let label = "Score bullets";
-  let variant: BadgeVariant = "outline";
-
-  if (state === "loading") {
-    label = "Scoring…";
-  } else if (state && "error" in state) {
-    label = "Score failed";
-    variant = "destructive";
-  } else if (state) {
-    const level = Math.min(2, Math.max(0, Math.round(state.score)));
-    label = XYZ_LEVEL_LABELS[level];
-    variant = XYZ_LEVEL_VARIANTS[level];
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        badgeVariants({ variant }),
-        "cursor-pointer hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 transition-opacity"
-      )}
-    >
-      {label}
-    </button>
-  );
-}
 
 export default function EntryForm({ category, entry, action, submitLabel }: Props) {
   const cfg = getFieldConfig(category.slug);
@@ -103,40 +34,6 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const [bullets, setBullets] = useState<string[]>(entry?.bullets.length ? entry.bullets : [""]);
   const [draggedBulletIndex, setDraggedBulletIndex] = useState<number | null>(null);
   const [dragOverBulletIndex, setDragOverBulletIndex] = useState<number | null>(null);
-  const [bulletScores, setBulletScores] = useState<Record<number, BulletScoreState>>({});
-  const [overallScore, setOverallScore] = useState<BulletScoreState | null>(null);
-  const [isScoringAll, setIsScoringAll] = useState(false);
-
-  async function handleScoreAll() {
-    const scorable = bullets
-      .map((text, index) => ({ text, index }))
-      .filter((b) => b.text.trim().length > 0);
-    if (scorable.length === 0) return;
-
-    setIsScoringAll(true);
-    const results = await Promise.all(scorable.map((b) => scoreBulletText(b.text)));
-
-    const newScores: Record<number, BulletScoreState> = {};
-    results.forEach((result, i) => {
-      newScores[scorable[i].index] = result.ok
-        ? { score: result.score, confidence: result.confidence, legend: result.legend }
-        : { error: result.error };
-    });
-    setBulletScores(newScores);
-
-    const oks = Object.values(newScores).filter((s): s is BulletScoreResult => !("error" in s));
-    if (oks.length === 0) {
-      const firstError = Object.values(newScores).find((s): s is { error: string } => "error" in s);
-      setOverallScore({ error: firstError?.error ?? "Could not score bullets." });
-    } else {
-      setOverallScore({
-        score: oks.reduce((sum, o) => sum + o.score, 0) / oks.length,
-        confidence: oks.reduce((sum, o) => sum + o.confidence, 0) / oks.length,
-        legend: oks[0].legend,
-      });
-    }
-    setIsScoringAll(false);
-  }
 
   function addBullet() { setBullets((p) => [...p, ""]); }
   function updateBullet(i: number, val: string) { setBullets((p) => p.map((b, idx) => idx === i ? val : b)); }
@@ -237,75 +134,62 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
               <Button type="button" variant="ghost" size="sm" onClick={addBullet}>Add bullet</Button>
             </div>
             <div className="space-y-2">
-              {bullets.map((bullet, i) => {
-                const scoreResult = bulletScores[i];
-                return (
-                <div key={i} className="space-y-1">
+              {bullets.map((bullet, i) => (
+                <div
+                  key={i}
+                  className={`flex gap-1.5 items-start rounded-md transition-opacity ${
+                    draggedBulletIndex === i ? "opacity-40" : ""
+                  } ${
+                    dragOverBulletIndex === i && draggedBulletIndex !== null && draggedBulletIndex !== i
+                      ? "ring-2 ring-primary/50"
+                      : ""
+                  }`}
+                  onDragOver={(e) => {
+                    if (draggedBulletIndex === null) return;
+                    e.preventDefault();
+                    if (dragOverBulletIndex !== i) setDragOverBulletIndex(i);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverBulletIndex === i) setDragOverBulletIndex(null);
+                  }}
+                  onDrop={(e) => {
+                    if (draggedBulletIndex === null) return;
+                    e.preventDefault();
+                    reorderBullets(draggedBulletIndex, i);
+                    setDraggedBulletIndex(null);
+                    setDragOverBulletIndex(null);
+                  }}
+                >
                   <div
-                    className={`flex gap-1.5 items-start rounded-md transition-opacity ${
-                      draggedBulletIndex === i ? "opacity-40" : ""
-                    } ${
-                      dragOverBulletIndex === i && draggedBulletIndex !== null && draggedBulletIndex !== i
-                        ? "ring-2 ring-primary/50"
-                        : ""
-                    }`}
-                    onDragOver={(e) => {
-                      if (draggedBulletIndex === null) return;
-                      e.preventDefault();
-                      if (dragOverBulletIndex !== i) setDragOverBulletIndex(i);
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedBulletIndex(i);
+                      e.dataTransfer.effectAllowed = "move";
                     }}
-                    onDragLeave={() => {
-                      if (dragOverBulletIndex === i) setDragOverBulletIndex(null);
-                    }}
-                    onDrop={(e) => {
-                      if (draggedBulletIndex === null) return;
-                      e.preventDefault();
-                      reorderBullets(draggedBulletIndex, i);
+                    onDragEnd={() => {
                       setDraggedBulletIndex(null);
                       setDragOverBulletIndex(null);
                     }}
+                    className="mt-1.5 shrink-0 cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
+                    aria-hidden="true"
                   >
-                    <div
-                      draggable
-                      onDragStart={(e) => {
-                        setDraggedBulletIndex(i);
-                        e.dataTransfer.effectAllowed = "move";
-                      }}
-                      onDragEnd={() => {
-                        setDraggedBulletIndex(null);
-                        setDragOverBulletIndex(null);
-                      }}
-                      className="mt-1.5 shrink-0 cursor-grab touch-none text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
-                      aria-hidden="true"
-                    >
-                      <GripVertical className="size-3.5" />
-                    </div>
-                    <div className="flex flex-col mt-1.5 shrink-0">
-                      <button type="button" onClick={() => moveBullet(i, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
-                        <ChevronUp className="size-3.5" />
-                      </button>
-                      <button type="button" onClick={() => moveBullet(i, "down")} disabled={i === bullets.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
-                        <ChevronDown className="size-3.5" />
-                      </button>
-                    </div>
-                    <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
-                    <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
-                    {bullets.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
-                    )}
+                    <GripVertical className="size-3.5" />
                   </div>
-                  {scoreResult && (
-                    <div className="pl-8 pr-2">
-                      {"error" in scoreResult ? (
-                        <p className="text-xs text-destructive">{scoreResult.error}</p>
-                      ) : (
-                        <BulletScoreBadge result={scoreResult} />
-                      )}
-                    </div>
+                  <div className="flex flex-col mt-1.5 shrink-0">
+                    <button type="button" onClick={() => moveBullet(i, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+                      <ChevronUp className="size-3.5" />
+                    </button>
+                    <button type="button" onClick={() => moveBullet(i, "down")} disabled={i === bullets.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+                      <ChevronDown className="size-3.5" />
+                    </button>
+                  </div>
+                  <span className="mt-2.5 text-muted-foreground text-xs select-none">•</span>
+                  <RichTextArea value={bullet} onChange={(val) => updateBullet(i, val)} rows={2} placeholder="Bullet point..." className="flex-1" />
+                  {bullets.length > 1 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeBullet(i)} className="mt-1 text-muted-foreground hover:text-destructive shrink-0">Remove</Button>
                   )}
                 </div>
-                );
-              })}
+              ))}
             </div>
           </div>
         )}
@@ -334,24 +218,6 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
       </form>
 
       <div className="xl:sticky xl:top-20 space-y-3">
-        {cfg.bullets && (
-          <div className="flex items-center gap-2 px-1">
-            <ScoreBubbleButton
-              state={isScoringAll ? "loading" : overallScore}
-              onClick={handleScoreAll}
-              disabled={isScoringAll || !bullets.some((b) => b.trim())}
-            />
-            {overallScore && !isScoringAll && (
-              "error" in overallScore ? (
-                <span className="text-xs text-destructive">{overallScore.error}</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  {overallScore.legend[String(Math.min(2, Math.max(0, Math.round(overallScore.score))))]} · {confidenceWord(overallScore.confidence)}
-                </span>
-              )
-            )}
-          </div>
-        )}
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Preview</p>
         <Card>
           <CardContent className="pt-5 pb-5 text-[13px] leading-snug space-y-2">
