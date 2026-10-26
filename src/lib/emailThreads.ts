@@ -868,25 +868,6 @@ export type EmailSyncStats = {
   total: number;
 };
 
-/** Powers the dashboard Statistics panel's email-sync tiles. */
-export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyncStats> {
-  const [account, grouped] = await Promise.all([
-    prisma.gmailAccount.findUnique({ where: { userId }, select: { lastSyncAt: true } }),
-    prisma.emailThread.groupBy({ by: ["matchStatus"], where: { userId }, _count: true }),
-  ]);
-
-  let needsReview = 0;
-  let matched = 0;
-  let total = 0;
-  for (const { matchStatus, _count } of grouped) {
-    total += _count;
-    if (matchStatus === "unmatched") needsReview += _count;
-    else if (matchStatus === "auto" || matchStatus === "confirmed") matched += _count;
-  }
-
-  return { connected: !!account, lastSyncAt: account?.lastSyncAt ?? null, needsReview, matched, total };
-}
-
 /**
  * Unmatched threads worth a human look — excludes anything Jev explicitly
  * classified as not recruiting-related, since the inbox scan (see "Gmail
@@ -899,7 +880,37 @@ export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyn
  * null covers not-yet-classified or Jev-unavailable threads (never hide a
  * thread just because classification didn't run); labelForced always wins
  * regardless of what Jev concluded — see GmailAccount.syncLabelIds.
+ *
+ * Shared by listTriageThreadsForUser (the actual queue) and
+ * getEmailSyncStatsForUser (the dashboard's "needs review" count) so the
+ * two never disagree about what counts as needing review.
  */
+function needsReviewWhere(userId: string) {
+  return {
+    userId,
+    matchStatus: "unmatched" as const,
+    OR: [{ jevRecruitingLikely: true }, { jevRecruitingLikely: null }, { labelForced: true }],
+  };
+}
+
+/** Powers the dashboard Statistics panel's email-sync tiles. */
+export async function getEmailSyncStatsForUser(userId: string): Promise<EmailSyncStats> {
+  const [account, grouped, needsReview] = await Promise.all([
+    prisma.gmailAccount.findUnique({ where: { userId }, select: { lastSyncAt: true } }),
+    prisma.emailThread.groupBy({ by: ["matchStatus"], where: { userId }, _count: true }),
+    prisma.emailThread.count({ where: needsReviewWhere(userId) }),
+  ]);
+
+  let matched = 0;
+  let total = 0;
+  for (const { matchStatus, _count } of grouped) {
+    total += _count;
+    if (matchStatus === "auto" || matchStatus === "confirmed") matched += _count;
+  }
+
+  return { connected: !!account, lastSyncAt: account?.lastSyncAt ?? null, needsReview, matched, total };
+}
+
 /**
  * Debug/reset tool: deletes every unmatched EmailThread row so the next
  * sync re-fetches and re-classifies them from scratch, for testing the
@@ -927,11 +938,7 @@ export async function clearUnmatchedThreadsForUser(userId: string): Promise<{ cl
 
 export async function listTriageThreadsForUser(userId: string) {
   return prisma.emailThread.findMany({
-    where: {
-      userId,
-      matchStatus: "unmatched",
-      OR: [{ jevRecruitingLikely: true }, { jevRecruitingLikely: null }, { labelForced: true }],
-    },
+    where: needsReviewWhere(userId),
     include: {
       matchedContact: { select: { id: true, name: true } },
       matchedApplication: { select: { id: true, roleTitle: true, company: { select: { name: true } } } },
