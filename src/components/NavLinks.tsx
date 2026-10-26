@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type NavLink = {
@@ -9,6 +10,8 @@ type NavLink = {
   label: string;
   /** Extra path prefixes (besides `href`) that should also count as "active" for this link. */
   matchPrefixes?: string[];
+  /** Optional count badge, e.g. pending email triage items. */
+  badge?: number;
 };
 
 export default function NavLinks({ links }: { links: NavLink[] }) {
@@ -24,11 +27,12 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             key={link.href}
             href={link.href}
             className={cn(
-              "hover:text-foreground transition-colors shrink-0",
+              "hover:text-foreground transition-colors shrink-0 inline-flex items-center gap-1.5",
               isActive && "text-foreground font-medium"
             )}
           >
             {link.label}
+            {!!link.badge && <Badge variant="secondary">{link.badge}</Badge>}
           </Link>
         );
       })}
