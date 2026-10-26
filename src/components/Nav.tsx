@@ -12,14 +12,7 @@ import { listTriageThreadsForUser } from "@/lib/emailThreads";
 const NAV_LINKS = [
   { href: "/applications", label: "Applications" },
   { href: "/contacts", label: "Contacts" },
-  {
-    label: "Resume Tools",
-    links: [
-      { href: "/resumes", label: "Resumes" },
-      { href: "/entries", label: "Entries" },
-      { href: "/categories", label: "Categories" },
-    ],
-  },
+  { href: "/resumes", label: "Resumes", matchPrefixes: ["/entries", "/categories"] },
 ];
 
 export default async function Nav() {
@@ -35,7 +28,7 @@ export default async function Nav() {
           ResumePress
         </Link>
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <NavLinks items={NAV_LINKS} />
+          <NavLinks links={NAV_LINKS} />
           {session?.user && (
             <>
               <form action="/search" method="GET" className="hidden sm:block shrink-0">

@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { deleteEntry, cloneEntry } from "./actions";
 import EntryList from "@/components/EntryList";
+import ResumeSectionTabs from "@/components/ResumeSectionTabs";
 
 export default async function EntriesPage({
   searchParams,
@@ -35,10 +36,17 @@ export default async function EntriesPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
+      <ResumeSectionTabs />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Entries</h1>
-          <p className="text-muted-foreground text-sm mt-1">{entries.length} total</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {entries.length} total ·{" "}
+            <Link href="/categories" className="underline-offset-4 hover:underline hover:text-foreground">
+              Manage categories
+            </Link>
+          </p>
         </div>
         <Link href="/entries/new" className={cn(buttonVariants())}>New Entry</Link>
       </div>
