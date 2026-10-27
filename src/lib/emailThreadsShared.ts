@@ -76,3 +76,33 @@ export function matchesApplicationSearch(option: ApplicationPickerOption, query:
 export function applicationOptionLabel(option: ApplicationPickerOption): string {
   return `${option.companyName} — ${option.roleTitle}`;
 }
+
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  mdash: "—",
+  ndash: "–",
+  hellip: "…",
+  rsquo: "’",
+  lsquo: "‘",
+  rdquo: "”",
+  ldquo: "“",
+};
+
+// Gmail's REST API returns subject/snippet text with HTML entities left
+// un-decoded (e.g. "you&#39;ll" instead of "you'll") — a known quirk of the
+// snippet field, not something this app's own code produces. Decoded only at
+// display time; the stored EmailThread row keeps the raw value from Gmail.
+export function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const code = entity[1]?.toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+    }
+    return NAMED_HTML_ENTITIES[entity.toLowerCase()] ?? match;
+  });
+}

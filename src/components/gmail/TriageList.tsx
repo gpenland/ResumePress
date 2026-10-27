@@ -2,14 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { ExternalLink } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
 import ContactPicker from "@/components/gmail/ContactPicker";
-import { applicationOptionLabel, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
+import { applicationOptionLabel, decodeHtmlEntities, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
 import { confidenceWord } from "@/lib/jev";
 
@@ -211,38 +212,51 @@ function TriageRow({
   }
 
   return (
-    <Card>
-      <CardContent className="py-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="mt-0.5 shrink-0" onClick={onToggleSelected}>
-              <Checkbox
-                checked={selected}
-                onCheckedChange={onToggleSelected}
-                aria-label="Select thread for bulk actions"
-                className="pointer-events-none"
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{thread.subject || "(no subject)"}</p>
-              <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
-              {thread.snippet && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{thread.snippet}</p>}
-            </div>
+    <Card className="py-0">
+      <CardContent className="space-y-3 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0" onClick={onToggleSelected}>
+            <Checkbox
+              checked={selected}
+              onCheckedChange={onToggleSelected}
+              aria-label="Select thread for bulk actions"
+              className="pointer-events-none"
+            />
           </div>
-          <div className="text-right shrink-0">
-            {thread.lastMessageAt && (
-              <p className="text-xs text-muted-foreground">{new Date(thread.lastMessageAt).toLocaleDateString()}</p>
-            )}
-            {thread.gmailUrl && (
-              <a href={thread.gmailUrl} target="_blank" rel="noopener noreferrer" className="text-xs underline hover:text-foreground">
-                Open in Gmail
-              </a>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 truncate text-sm font-medium">
+                {decodeHtmlEntities(thread.subject || "(no subject)")}
+              </p>
+              <div className="flex shrink-0 items-center gap-1">
+                {thread.lastMessageAt && (
+                  <p className="text-xs whitespace-nowrap text-muted-foreground">
+                    {new Date(thread.lastMessageAt).toLocaleDateString()}
+                  </p>
+                )}
+                {thread.gmailUrl && (
+                  <a
+                    href={thread.gmailUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open in Gmail"
+                    title="Open in Gmail"
+                    className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+            <p className="truncate text-xs text-muted-foreground">{thread.participants.join(", ")}</p>
+            {thread.snippet && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{decodeHtmlEntities(thread.snippet)}</p>
             )}
           </div>
         </div>
 
         {(thread.jevRecruitingLikely === true || jevSuggestedContactName || jevSuggestedApplicationLabel) && (
-          <div className="flex items-center gap-2 flex-wrap text-xs">
+          <div className="flex flex-wrap items-center gap-2 pl-7 text-xs">
             {thread.jevRecruitingLikely === true && (
               <Badge variant="secondary">
                 Likely recruiting-related
@@ -264,39 +278,41 @@ function TriageRow({
         )}
 
         {showNewOpportunityPrompt && (
-          <div className="rounded-md border border-dashed p-2.5 space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Looks recruiting-related but doesn&apos;t match anything you&apos;re tracking yet — may be a new
-              opportunity:
-            </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Input
-                value={newCompany}
-                onChange={(e) => setNewCompany(e.target.value)}
-                placeholder="Company"
-                className="h-7 w-36 text-xs"
-              />
-              <Input
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
-                placeholder="Role"
-                className="h-7 w-44 text-xs"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleCreateApplication}
-                disabled={isCreatingApplication || !newCompany.trim() || !newRole.trim()}
-              >
-                {isCreatingApplication ? "Creating…" : "Create application"}
-              </Button>
+          <div className="pl-7">
+            <div className="rounded-md border border-dashed p-2.5">
+              <p className="text-xs text-muted-foreground">
+                Looks recruiting-related but doesn&apos;t match anything you&apos;re tracking yet — may be a new
+                opportunity:
+              </p>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <Input
+                  value={newCompany}
+                  onChange={(e) => setNewCompany(e.target.value)}
+                  placeholder="Company"
+                  className="h-8 flex-1 min-w-32"
+                />
+                <Input
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  placeholder="Role"
+                  className="h-8 flex-[2] min-w-40"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreateApplication}
+                  disabled={isCreatingApplication || !newCompany.trim() || !newRole.trim()}
+                >
+                  {isCreatingApplication ? "Creating…" : "Create application"}
+                </Button>
+              </div>
             </div>
           </div>
         )}
 
         {showStatusSuggestion && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap pl-7 text-xs">
             <span className="text-muted-foreground">
               Jev suggests marking this application <span className="font-medium text-foreground">{thread.jevSuggestedStatus}</span>
               {thread.jevSuggestedStatusConf !== null && ` · ${confidenceWord(thread.jevSuggestedStatusConf)}`}
@@ -315,47 +331,47 @@ function TriageRow({
             )}
           </div>
         )}
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <ContactPicker
-            options={contactOptions}
-            value={contactId}
-            onChange={handleContactChange}
-            participants={thread.participants}
-            createContact={createContact}
-          />
-          <ApplicationPicker
-            options={visibleApplications}
-            participants={thread.participants}
-            value={applicationId}
-            onChange={handleApplicationChange}
-          />
-          {hasSuggestion ? (
-            <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
-              Confirm suggestion
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant={suggestFailed ? "ghost" : "outline"}
-                className={suggestFailed ? "text-muted-foreground" : undefined}
-                onClick={handleSuggest}
-                disabled={isSuggesting || suggestFailed}
-              >
-                {isSuggesting ? "Suggesting…" : suggestFailed ? "No match found" : "Suggest match"}
-              </Button>
-              <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
-                Confirm
-              </Button>
-            </>
-          )}
-          <Button type="button" size="sm" variant="ghost" onClick={handleIgnore} disabled={isPending}>
-            Ignore
-          </Button>
-        </div>
       </CardContent>
+
+      <CardFooter className="flex-wrap gap-2 px-5 py-3">
+        <ContactPicker
+          options={contactOptions}
+          value={contactId}
+          onChange={handleContactChange}
+          participants={thread.participants}
+          createContact={createContact}
+        />
+        <ApplicationPicker
+          options={visibleApplications}
+          participants={thread.participants}
+          value={applicationId}
+          onChange={handleApplicationChange}
+        />
+        {hasSuggestion ? (
+          <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
+            Confirm suggestion
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant={suggestFailed ? "ghost" : "outline"}
+              className={suggestFailed ? "text-muted-foreground" : undefined}
+              onClick={handleSuggest}
+              disabled={isSuggesting || suggestFailed}
+            >
+              {isSuggesting ? "Suggesting…" : suggestFailed ? "No match found" : "Suggest match"}
+            </Button>
+            <Button type="button" size="sm" onClick={handleConfirm} disabled={isPending}>
+              Confirm
+            </Button>
+          </>
+        )}
+        <Button type="button" size="sm" variant="ghost" onClick={handleIgnore} disabled={isPending} className="ml-auto">
+          Ignore
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

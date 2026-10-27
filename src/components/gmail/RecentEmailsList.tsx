@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { decodeHtmlEntities } from "@/lib/emailThreadsShared";
 
 export type RecentEmailThread = {
   id: string;
@@ -25,7 +26,7 @@ export default function RecentEmailsList({ threads }: { threads: RecentEmailThre
             <CardContent className="py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{thread.subject || "(no subject)"}</p>
+                  <p className="text-sm font-medium truncate">{decodeHtmlEntities(thread.subject || "(no subject)")}</p>
                   <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
                   {(thread.matchedContact || thread.matchedApplication) && (
                     <p className="text-xs text-muted-foreground mt-1">
