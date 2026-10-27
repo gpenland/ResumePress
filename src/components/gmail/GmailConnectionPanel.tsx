@@ -161,7 +161,7 @@ export default function GmailConnectionPanel(props: Props) {
         // Optimistic: stop reporting "running" immediately rather than
         // waiting for the next poll tick — the polling effect sees isRunning
         // flip to false and stops on its own.
-        setSyncStatus((prev) => ({ ...prev, status: "idle", startedAt: null, error: null }));
+        setSyncStatus((prev) => ({ ...prev, status: "idle", startedAt: null, error: null, total: null, done: null }));
       }
     });
   }
