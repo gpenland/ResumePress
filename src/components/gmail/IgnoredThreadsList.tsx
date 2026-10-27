@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { decodeHtmlEntities } from "@/lib/emailThreadsShared";
 
 export type IgnoredThread = {
   id: string;
@@ -53,7 +54,7 @@ export default function IgnoredThreadsList({ threads, restoreMatch }: Props) {
           {threads.map((thread) => (
             <div key={thread.id} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border">
               <div className="min-w-0 flex-1">
-                <p className="truncate">{thread.subject || "(no subject)"}</p>
+                <p className="truncate">{decodeHtmlEntities(thread.subject || "(no subject)")}</p>
                 <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
               </div>
               <Button
