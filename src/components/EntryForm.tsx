@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
-import { EMPHASIS_CONTENT_SOURCE } from "@/lib/richTextMarkers";
+import { parseRichText, type RichTextNode } from "@/lib/richTextMarkers";
 
 type Props = {
   category: Category;
@@ -318,21 +318,23 @@ function Ghost({ children }: { children: React.ReactNode }) {
   return <span className="text-muted-foreground/40 italic font-normal">{children}</span>;
 }
 
-const RICH_SPLIT_RE = new RegExp(
-  String.raw`(\*\*${EMPHASIS_CONTENT_SOURCE}\*\*|\*${EMPHASIS_CONTENT_SOURCE}\*)`,
-  "g"
-);
-
-// Parse **bold** and *italic* markers for the preview — mirrors jake.ts's
-// applyFormatting() exactly (shared EMPHASIS_CONTENT_SOURCE) so what the
-// preview shows always matches what the compiled PDF renders.
-function renderRich(text: string): React.ReactNode {
-  const parts = text.split(RICH_SPLIT_RE);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**"))
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith("*") && part.endsWith("*"))
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    return part;
+// Parse **bold** and *italic* markers for the preview by running
+// parseRichText — jake.ts's exact BOLD_RE-then-ITALIC_RE algorithm, not a
+// separate reimplementation — so what the preview shows always matches
+// what the compiled PDF renders, including jake.ts's own edge-case
+// behavior for adversarial input (see parseRichText's doc comment). A
+// previous version here reclassified each split segment by its own
+// leading/trailing characters, which was ambiguous (and wrong) whenever a
+// match's content legitimately started or ended with `*` itself.
+function renderRichNodes(nodes: RichTextNode[], keyPrefix: string): React.ReactNode[] {
+  return nodes.map((node, i) => {
+    if (node.kind === "text") return node.value; // plain strings need no key — only element children do
+    const key = `${keyPrefix}-${i}`;
+    const children = renderRichNodes(node.children, key);
+    return node.kind === "bold" ? <strong key={key}>{children}</strong> : <em key={key}>{children}</em>;
   });
+}
+
+function renderRich(text: string): React.ReactNode {
+  return renderRichNodes(parseRichText(text), "r");
 }
