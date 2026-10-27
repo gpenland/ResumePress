@@ -291,6 +291,14 @@ model Interaction {
 
   @@index([applicationId, occurredAt])
   @@index([contactId, occurredAt])
+  // Postgres unique indexes treat NULL as distinct from every other value,
+  // so this only ever enforces "at most one Interaction per Gmail thread per
+  // user" — it doesn't restrict how many non-email Interactions (NULL
+  // emailThreadId) a user can have. Backs createInteractionFromEmailThreadIfMissing's
+  // atomic upsert in emailThreads.ts, closing a check-then-insert race that
+  // could otherwise double-insert an Interaction if a sync ever ran twice
+  // concurrently for the same account.
+  @@unique([userId, emailThreadId])
 }
 
 model EmailThread {
