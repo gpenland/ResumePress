@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export type IgnoredThread = {
   id: string;
@@ -34,13 +37,16 @@ export default function IgnoredThreadsList({ threads, restoreMatch }: Props) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-xs text-muted-foreground hover:text-foreground underline"
+        aria-expanded={open}
+        className="flex items-center gap-2 text-left"
       >
-        {open ? "Hide" : "Show"} {threads.length} ignored thread(s)
+        <h2 className="text-lg font-semibold text-muted-foreground">Ignored</h2>
+        <Badge variant="secondary">{threads.length}</Badge>
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <div className="space-y-1.5">

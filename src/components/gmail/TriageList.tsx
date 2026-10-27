@@ -316,7 +316,7 @@ function TriageRow({
           </div>
         )}
 
-        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+        <div className="flex items-center gap-2 flex-wrap">
           <ContactPicker
             options={contactOptions}
             value={contactId}
@@ -409,17 +409,31 @@ export default function TriageList({
     });
   }
 
+  const allSelected = threads.length > 0 && selectedIds.size === threads.length;
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === threads.length ? new Set() : new Set(threads.map((t) => t.id))));
+  }
+
+  const selectedThreads = threads.filter((t) => selectedIds.has(t.id));
+  // How many of the current selection actually have a contact or
+  // application picked (including Jev's prefilled default) — bulk-confirming
+  // a row with neither just marks it reviewed-with-no-match, which is easy
+  // to do by accident when selecting a big batch without opening every row.
+  const selectedWithPickCount = selectedThreads.filter((t) => {
+    const pick = getPick(t);
+    return Boolean(pick.contactId || pick.applicationId);
+  }).length;
+
   function handleBulkConfirm() {
-    const items = threads
-      .filter((t) => selectedIds.has(t.id))
-      .map((t) => {
-        const pick = getPick(t);
-        return {
-          threadId: t.id,
-          contactId: pick.contactId || null,
-          applicationId: pick.applicationId || null,
-        };
-      });
+    const items = selectedThreads.map((t) => {
+      const pick = getPick(t);
+      return {
+        threadId: t.id,
+        contactId: pick.contactId || null,
+        applicationId: pick.applicationId || null,
+      };
+    });
     if (items.length === 0) return;
     startBulkTransition(async () => {
       await bulkConfirmMatches(items);
@@ -440,17 +454,39 @@ export default function TriageList({
 
   return (
     <div className="space-y-3">
-      {selectedIds.size > 0 && (
+      {threads.length > 0 && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
-          <p className="text-sm text-muted-foreground">{selectedIds.size} selected</p>
-          <div className="ml-auto flex gap-2">
-            <Button type="button" size="sm" onClick={handleBulkConfirm} disabled={isBulkPending}>
-              Confirm selected
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={handleBulkIgnore} disabled={isBulkPending}>
-              Ignore selected
-            </Button>
+          <div className="flex items-center gap-2" onClick={toggleSelectAll}>
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={toggleSelectAll}
+              aria-label="Select all threads"
+              className="pointer-events-none"
+            />
           </div>
+          <p className="text-sm text-muted-foreground">
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : `Select all ${threads.length}`}
+          </p>
+          {selectedIds.size > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              {selectedWithPickCount < selectedIds.size && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedWithPickCount} of {selectedIds.size} have a match picked
+                </p>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleBulkConfirm}
+                disabled={isBulkPending || selectedWithPickCount === 0}
+              >
+                Confirm selected
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={handleBulkIgnore} disabled={isBulkPending}>
+                Ignore selected
+              </Button>
+            </div>
+          )}
         </div>
       )}
       {threads.map((thread) => (
