@@ -140,7 +140,14 @@ function matchThread(
   return { contactId, applicationId, matchStatus: contactId ? "auto" : "unmatched" };
 }
 
-/** Mirrors a confirmed/auto match onto the contact's or application's interaction timeline. No-ops if already created (idempotent across resyncs). */
+/**
+ * Mirrors a confirmed/auto match onto the contact's or application's
+ * interaction timeline. No-ops if already created (idempotent across
+ * resyncs) — an atomic upsert on the (userId, emailThreadId) unique
+ * constraint rather than a separate findFirst-then-create, so two syncs
+ * racing on the same thread can't both pass a "not found yet" check and
+ * double-insert.
+ */
 async function createInteractionFromEmailThreadIfMissing(
   userId: string,
   emailThread: Pick<EmailThread, "id" | "subject" | "snippet" | "lastMessageAt">,
@@ -148,11 +155,11 @@ async function createInteractionFromEmailThreadIfMissing(
   applicationId: string | null
 ): Promise<void> {
   if (!contactId && !applicationId) return;
-  const existing = await prisma.interaction.findFirst({ where: { emailThreadId: emailThread.id, userId } });
-  if (existing) return;
 
-  await prisma.interaction.create({
-    data: {
+  await prisma.interaction.upsert({
+    where: { userId_emailThreadId: { userId, emailThreadId: emailThread.id } },
+    update: {}, // already exists — leave it as-is, don't overwrite a user-edited summary/timestamp
+    create: {
       type: "Email",
       occurredAt: emailThread.lastMessageAt ?? new Date(),
       summary: emailThread.subject || emailThread.snippet || "Email thread",
