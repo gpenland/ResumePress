@@ -31,6 +31,23 @@ type EntrySnapshotData = {
   categoryId: string;
 };
 
+// Treats an empty string the same as "not provided" for every optional text
+// field below. The web form's own actions.ts already does this itself
+// before calling create/updateEntryForUser (`(formData.get(...) as string)
+// || null`), but the MCP update_entry/create_entry tools pass their input
+// straight through — entryCoreFieldsSchema's zod shape allows "" (it's
+// .optional(), not .min(1)), so an agent-driven call with e.g.
+// organization: "" used to leave a bare `?? null` (which only catches
+// undefined) storing "" verbatim. That diverged from the web path's data
+// and, worse, made EntryHistory's diff view flag the field as "changed"
+// between a prior null and a new "" even though both render identically as
+// "—" — a changed-with-no-visible-difference badge. Normalizing once here,
+// for every caller, keeps web and MCP writes identical and keeps that diff
+// meaningful.
+function emptyToNull(value: string | null | undefined): string | null {
+  return value || null;
+}
+
 function snapshotFields(entry: Entry): EntrySnapshotData {
   return {
     title: entry.title,
@@ -65,13 +82,13 @@ export async function createEntryForUser(
   const entry = await prisma.entry.create({
     data: {
       title: data.title,
-      displayTitle: data.displayTitle ?? null,
-      organization: data.organization ?? null,
-      location: data.location ?? null,
-      startDate: data.startDate ?? null,
-      endDate: data.endDate ?? null,
-      description: data.description ?? null,
-      url: data.url ?? null,
+      displayTitle: emptyToNull(data.displayTitle),
+      organization: emptyToNull(data.organization),
+      location: emptyToNull(data.location),
+      startDate: emptyToNull(data.startDate),
+      endDate: emptyToNull(data.endDate),
+      description: emptyToNull(data.description),
+      url: emptyToNull(data.url),
       bullets: data.bullets ?? [],
       tags: data.tags ?? [],
       categoryId: data.categoryId,
@@ -117,13 +134,13 @@ export async function updateEntryForUser(
 
   const next: EntrySnapshotData = {
     title: data.title,
-    displayTitle: data.displayTitle ?? null,
-    organization: data.organization ?? null,
-    location: data.location ?? null,
-    startDate: data.startDate ?? null,
-    endDate: data.endDate ?? null,
-    description: data.description ?? null,
-    url: data.url ?? null,
+    displayTitle: emptyToNull(data.displayTitle),
+    organization: emptyToNull(data.organization),
+    location: emptyToNull(data.location),
+    startDate: emptyToNull(data.startDate),
+    endDate: emptyToNull(data.endDate),
+    description: emptyToNull(data.description),
+    url: emptyToNull(data.url),
     bullets: data.bullets ?? [],
     tags: data.tags ?? [],
     categoryId: data.categoryId,
