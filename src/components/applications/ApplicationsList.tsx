@@ -266,11 +266,12 @@ export default function ApplicationsList({
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {[
-                        [app.term, app.location].filter(Boolean).join(" · "),
+                        app.term,
+                        app.location,
                         formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
                       ]
                         .filter(Boolean)
-                        .join("  ")}
+                        .join(" · ")}
                     </p>
                   </div>
                 </Link>
