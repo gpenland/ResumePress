@@ -53,10 +53,10 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight font-heading">{application.roleTitle}</h1>
+            <h1 className="text-2xl font-bold tracking-tight font-heading break-words">{application.roleTitle}</h1>
             <EditableStatusBadge
               applicationId={application.id}
               status={application.status}
@@ -82,7 +82,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Link href={`/applications/${application.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Edit
           </Link>
