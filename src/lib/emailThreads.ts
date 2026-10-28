@@ -843,13 +843,16 @@ export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncRe
   }
 
   const controller = registerActiveSync(userId);
+  const startedAt = Date.now();
   try {
     const result = await syncGmailForUser(userId, trackSyncProgress(userId, claimedAt), controller.signal);
     await finalizeSyncStatus(userId, claimedAt, result);
+    console.log(`[gmail-sync] userId=${userId} ok=${result.ok} durationMs=${Date.now() - startedAt}`);
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed unexpectedly.";
     await finalizeSyncStatus(userId, claimedAt, null, message);
+    console.log(`[gmail-sync] userId=${userId} ok=false durationMs=${Date.now() - startedAt} error=${message}`);
     return { ok: false, error: message };
   } finally {
     unregisterActiveSync(userId, controller);
@@ -877,9 +880,17 @@ export async function startGmailSyncInBackgroundForUser(userId: string): Promise
   }
 
   const controller = registerActiveSync(userId);
+  const startedAt = Date.now();
   void syncGmailForUser(userId, trackSyncProgress(userId, claimedAt), controller.signal)
-    .then((result) => finalizeSyncStatus(userId, claimedAt, result))
-    .catch((err) => finalizeSyncStatus(userId, claimedAt, null, err instanceof Error ? err.message : "Sync failed unexpectedly."))
+    .then((result) => {
+      console.log(`[gmail-sync] userId=${userId} ok=${result.ok} durationMs=${Date.now() - startedAt}`);
+      return finalizeSyncStatus(userId, claimedAt, result);
+    })
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : "Sync failed unexpectedly.";
+      console.log(`[gmail-sync] userId=${userId} ok=false durationMs=${Date.now() - startedAt} error=${message}`);
+      return finalizeSyncStatus(userId, claimedAt, null, message);
+    })
     .finally(() => unregisterActiveSync(userId, controller));
 
   return { started: true };
