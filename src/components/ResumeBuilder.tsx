@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import type { Category, Entry, ResumeEntry } from "@prisma/client";
 import { updateResumeEntries } from "@/app/(protected)/resumes/actions";
 import { fetchResumePdf, triggerBlobDownload } from "@/lib/pdfDownloadClient";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronUp, ChevronDown, GripVertical, X } from "lucide-react";
+import { ChevronUp, ChevronDown, GripVertical, Pencil, X } from "lucide-react";
 
 type EntryWithCategory = Entry & { category: Category };
 
@@ -327,6 +328,16 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
                         </p>
                       )}
                     </div>
+
+                    {/* Edit entry */}
+                    <Link
+                      href={`/entries/${entry.id}/edit?resumeId=${resumeId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 shrink-0 self-center p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+                      aria-label={`Edit ${entry.displayTitle || entry.title}`}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Link>
 
                     {/* Reorder controls — only for selected entries */}
                     {isSelected && (
