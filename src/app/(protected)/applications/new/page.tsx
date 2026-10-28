@@ -2,12 +2,15 @@ export const dynamic = "force-dynamic";
 
 import { getUserId } from "@/lib/auth";
 import { listCompaniesForUser } from "@/lib/companies";
+import { listResumesForUser } from "@/lib/resumes";
 import ApplicationForm from "@/components/applications/ApplicationForm";
 import { createApplication, autofillApplicationFromUrl } from "../actions";
 
 export default async function NewApplicationPage() {
   const userId = await getUserId();
-  const companies = userId ? await listCompaniesForUser(userId) : [];
+  const [companies, resumes] = userId
+    ? await Promise.all([listCompaniesForUser(userId), listResumesForUser(userId)])
+    : [[], []];
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 space-y-6">
@@ -17,6 +20,7 @@ export default async function NewApplicationPage() {
       </div>
       <ApplicationForm
         companies={companies}
+        resumes={resumes}
         action={createApplication}
         submitLabel="Create Application"
         autofillFromUrl={autofillApplicationFromUrl}

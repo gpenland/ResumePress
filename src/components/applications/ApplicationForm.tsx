@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import StatusSelect from "@/components/applications/StatusSelect";
 import { findNearDuplicateCompanyName } from "@/lib/companiesShared";
 import type { JobPostingAutofill } from "@/lib/jobPosting";
+import { cn, nativeSelectClassName } from "@/lib/utils";
 
 type Props = {
   companies: Company[];
@@ -16,6 +17,7 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   submitLabel: string;
   autofillFromUrl: (url: string) => Promise<{ ok: true; data: JobPostingAutofill } | { ok: false; error: string }>;
+  resumes?: { id: string; name: string }[];
 };
 
 function toDateInputValue(d: Date | string | null | undefined): string {
@@ -29,7 +31,7 @@ function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ApplicationForm({ companies, application, action, submitLabel, autofillFromUrl }: Props) {
+export default function ApplicationForm({ companies, application, action, submitLabel, autofillFromUrl, resumes }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [isAutofilling, startAutofillTransition] = useTransition();
@@ -91,6 +93,27 @@ export default function ApplicationForm({ companies, application, action, submit
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-1.5">
+        <Label htmlFor="postingUrl">Have a posting link? Start here.</Label>
+        <div className="flex gap-2">
+          <Input
+            id="postingUrl"
+            name="postingUrl"
+            type="url"
+            placeholder="https://..."
+            defaultValue={application?.postingUrl ?? ""}
+            className="flex-1 bg-background"
+          />
+          <Button type="button" variant="default" size="sm" onClick={handleAutofill} disabled={isAutofilling}>
+            {isAutofilling ? "Fetching…" : "Autofill from link"}
+          </Button>
+        </div>
+        {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
+        <p className="text-xs text-muted-foreground">
+          Pulls company, role, location, and term from the posting — leaves anything you&apos;ve already typed below alone.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="companyName">Company *</Label>
@@ -163,33 +186,35 @@ export default function ApplicationForm({ companies, application, action, submit
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="postingUrl">Posting URL</Label>
-          <div className="flex gap-2">
-            <Input
-              id="postingUrl"
-              name="postingUrl"
-              type="url"
-              placeholder="https://..."
-              defaultValue={application?.postingUrl ?? ""}
-              className="flex-1"
-            />
-            <Button type="button" variant="outline" size="sm" onClick={handleAutofill} disabled={isAutofilling}>
-              {isAutofilling ? "Fetching…" : "Autofill from link"}
-            </Button>
-          </div>
-          {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
+          <Label htmlFor="source">Source</Label>
+          <Input id="source" name="source" placeholder="e.g. Career fair, referral" defaultValue={application?.source ?? ""} />
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="source">Source</Label>
-        <Input id="source" name="source" placeholder="e.g. Career fair, referral" defaultValue={application?.source ?? ""} />
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="notes">Notes</Label>
         <Textarea id="notes" name="notes" rows={4} defaultValue={application?.notes ?? ""} />
       </div>
+
+      {!application && resumes && resumes.length > 0 && (
+        <div className="space-y-1.5">
+          <Label htmlFor="resumeId">Attach resume</Label>
+          <select
+            id="resumeId"
+            name="resumeId"
+            defaultValue=""
+            className={cn(nativeSelectClassName(), "w-full")}
+          >
+            <option value="">No resume</option>
+            {resumes.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Pins a snapshot of this resume to the application, same as attaching it from the application page later.
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-3 pt-2">
         <Button type="submit" disabled={isPending}>{isPending ? "Saving…" : submitLabel}</Button>
