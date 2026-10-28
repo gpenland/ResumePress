@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, MessageSquarePlus, Briefcase, FileText } from "lucide-react";
+import { Plus, X, MessageSquarePlus, Briefcase, FileText, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -14,13 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import InteractionTypeSelect from "@/components/contacts/InteractionTypeSelect";
 import { cn, nativeSelectClassName } from "@/lib/utils";
 
@@ -34,28 +27,35 @@ function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Mounted once in (protected)/layout.tsx so creating an Application, Entry, or
-// Interaction is reachable from anywhere (PLAN.md §4: "quick-add available
-// everywhere"), via the floating button's menu or — for Log Interaction
-// specifically, the most frequent of the three — the "i" keyboard shortcut.
+// Mounted once in (protected)/layout.tsx so creating an Application, Entry,
+// Contact, or Interaction is reachable from anywhere (PLAN.md §4: "quick-add
+// available everywhere"), via the floating button's fan-out menu.
 export default function GlobalQuickAdd({ contactOptions, applicationOptions, logInteraction }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [fanOpen, setFanOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("Email");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key.toLowerCase() !== "i" || e.metaKey || e.ctrlKey || e.altKey) return;
-      const target = e.target as HTMLElement;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable) return;
-      e.preventDefault();
-      setOpen(true);
+    if (!fanOpen) return;
+    function handleOutside(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setFanOpen(false);
+      }
     }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setFanOpen(false);
+    }
+    document.addEventListener("pointerdown", handleOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [fanOpen]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -68,34 +68,80 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
     });
   }
 
+  const actions = [
+    { key: "application", label: "New Application", icon: Briefcase, href: "/applications/new" },
+    { key: "entry", label: "New Entry", icon: FileText, href: "/entries/new" },
+    { key: "contact", label: "New Contact", icon: UserPlus, href: "/contacts/new" },
+    {
+      key: "interaction",
+      label: "Log Interaction",
+      icon: MessageSquarePlus,
+      onClick: () => {
+        setFanOpen(false);
+        setOpen(true);
+      },
+    },
+  ];
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button
-              type="button"
-              aria-label="Create"
-              title="Create"
-              className="fixed bottom-6 right-6 z-40 flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+      <div ref={containerRef} className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        {actions.map((action, i) => {
+          const Icon = action.icon;
+          const content = (
+            <>
+              <span
+                className={cn(
+                  "rounded-md border bg-popover px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-md transition-all",
+                  fanOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2 pointer-events-none"
+                )}
+              >
+                {action.label}
+              </span>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-md transition-colors hover:bg-secondary/80">
+                <Icon className="size-4" />
+              </span>
+            </>
+          );
+          const style = {
+            transitionDelay: fanOpen ? `${(actions.length - 1 - i) * 30}ms` : "0ms",
+            transitionProperty: "opacity, transform",
+            transitionDuration: "150ms",
+          } as React.CSSProperties;
+
+          return (
+            <div
+              key={action.key}
+              style={style}
+              className={cn(
+                "flex items-center gap-2",
+                fanOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+              )}
             >
-              <Plus className="size-5" />
-            </button>
-          }
-        />
-        <DropdownMenuContent side="top" align="end" sideOffset={10}>
-          <DropdownMenuItem render={<Link href="/applications/new" />}>
-            <Briefcase /> New Application
-          </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/entries/new" />}>
-            <FileText /> New Entry
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setOpen(true)}>
-            <MessageSquarePlus /> Log Interaction
-            <DropdownMenuShortcut>i</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              {action.href ? (
+                <Link href={action.href} className="flex items-center gap-2" onClick={() => setFanOpen(false)}>
+                  {content}
+                </Link>
+              ) : (
+                <button type="button" className="flex items-center gap-2" onClick={action.onClick}>
+                  {content}
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          aria-label={fanOpen ? "Close create menu" : "Create"}
+          aria-expanded={fanOpen}
+          title="Create"
+          onClick={() => setFanOpen((v) => !v)}
+          className="flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+        >
+          {fanOpen ? <X className="size-5" /> : <Plus className="size-5" />}
+        </button>
+      </div>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="max-w-md">
