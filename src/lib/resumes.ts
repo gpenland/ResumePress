@@ -38,10 +38,14 @@ export async function createResumeForUser(
   });
 }
 
-export async function listResumesForUser(userId: string): Promise<Resume[]> {
+// Includes each resume's entry count so callers that only need a list
+// overview (e.g. the MCP list_resumes tool, GitHub issue #96) don't have to
+// fetch every resume's full entries just to show how big it is.
+export async function listResumesForUser(userId: string) {
   return prisma.resume.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
+    include: { _count: { select: { entries: true } } },
   });
 }
 
@@ -70,7 +74,10 @@ export type ResumeSnapshotSection = {
   entries: EntryLike[];
 };
 
-function buildSnapshotSections(resume: ResumeWithEntries): ResumeSnapshotSection[] {
+// Exported for reuse by the MCP export_resume_text tool (mcpTools.ts), which
+// needs the same category-grouped shape as the snapshot/PDF path but renders
+// it as plain text instead of freezing it or compiling LaTeX.
+export function buildSnapshotSections(resume: ResumeWithEntries): ResumeSnapshotSection[] {
   const byCategory = new Map<string, ResumeSnapshotSection>();
   for (const re of resume.entries) {
     const cat = re.entry.category;

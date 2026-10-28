@@ -16,7 +16,7 @@ import {
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
 } from "@/lib/emailThreads";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -120,13 +120,13 @@ export function registerEmailTools(server: McpServer, userId: string): void {
         "List unmatched email threads awaiting manual triage — excludes anything Jev explicitly classified as not recruiting-related, unless it carries the override label (see save_override_label).",
       inputSchema: {},
     },
-    async () => textResult(await listTriageThreadsForUser(userId))
+    async () => textResult(compact(await listTriageThreadsForUser(userId)))
   );
 
   server.registerTool(
     "list_ignored_threads",
     { description: "List email threads that were ignored (dismissed from triage).", inputSchema: {} },
-    async () => textResult(await listIgnoredThreadsForUser(userId))
+    async () => textResult(compact(await listIgnoredThreadsForUser(userId)))
   );
 
   server.registerTool(

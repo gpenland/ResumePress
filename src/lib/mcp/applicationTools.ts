@@ -16,6 +16,8 @@ import {
   getApplicationPipelineStatsForUser,
   getApplicationStatusFlowForUser,
   importMappedApplicationsForUser,
+  APPLICATION_STATUSES,
+  type ApplicationInput,
 } from "@/lib/applications";
 import { createResumeSnapshotForUser } from "@/lib/resumes";
 import { textResult, errorResult, compact } from "./shared";
@@ -62,7 +64,7 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
   server.registerTool(
     "list_companies",
     { description: "List this user's companies.", inputSchema: {} },
-    async () => textResult(await listCompaniesForUser(userId))
+    async () => textResult(compact(await listCompaniesForUser(userId)))
   );
 
   server.registerTool(
@@ -71,8 +73,21 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
     async ({ companyId }) => {
       const company = await getCompanyForUser(userId, companyId);
       if (!company) return errorResult(`Company ${companyId} not found`);
-      return textResult(company);
+      return textResult(compact(company));
     }
+  );
+
+  server.registerTool(
+    "list_application_statuses",
+    {
+      description:
+        "List the suggested application statuses. Status is still a free-form string (not a DB enum) — any value " +
+        "is accepted — but create/update tools case-fold a status against this list (e.g. \"interviewing\" -> " +
+        "\"Interviewing\") so pipeline stats and the status-flow view don't silently split the same status across " +
+        "two casings.",
+      inputSchema: {},
+    },
+    async () => textResult(APPLICATION_STATUSES)
   );
 
   server.registerTool(
@@ -84,7 +99,7 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
         companyId: z.string().optional(),
       },
     },
-    async (opts) => textResult(await listApplicationsForUser(userId, opts))
+    async (opts) => textResult(compact(await listApplicationsForUser(userId, opts)))
   );
 
   server.registerTool(
@@ -137,17 +152,46 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
         "Create a new application. companyName is matched case-insensitively to an existing company or creates a new one.",
       inputSchema: applicationFieldsSchema,
     },
-    async (data) => textResult(await createApplicationForUser(userId, data))
+    async (data) => textResult(compact(await createApplicationForUser(userId, data)))
   );
 
   server.registerTool(
     "update_application",
     {
-      description: "Update an application's fields. Changing status also writes a status-history entry.",
-      inputSchema: { applicationId: z.string(), ...applicationFieldsSchema },
+      description:
+        "Partially update an application — only pass the fields you want to change; anything you omit keeps its " +
+        "current value. Pass a field explicitly as null to clear it (where nullable). Changing status also writes " +
+        "a status-history entry.",
+      inputSchema: {
+        applicationId: z.string(),
+        ...applicationFieldsSchema,
+        // Unlike applicationFieldsSchema's own companyName/roleTitle (required —
+        // create_application needs them), both are optional here so a caller can
+        // change e.g. just a note without having to resend the whole record.
+        companyName: z.string().min(1).max(200).optional(),
+        roleTitle: z.string().min(1).max(200).optional(),
+      },
     },
     async ({ applicationId, ...data }) => {
-      const result = await updateApplicationForUser(userId, applicationId, data);
+      const existing = await prisma.application.findFirst({
+        where: { id: applicationId, userId },
+        include: { company: true },
+      });
+      if (!existing) return errorResult(`Application ${applicationId} not found`);
+
+      const merged: ApplicationInput = {
+        companyName: data.companyName ?? existing.company.name,
+        roleTitle: data.roleTitle ?? existing.roleTitle,
+        term: "term" in data ? data.term : existing.term,
+        status: data.status ?? existing.status,
+        appliedAt: "appliedAt" in data ? data.appliedAt : existing.appliedAt?.toISOString() ?? null,
+        postingUrl: "postingUrl" in data ? data.postingUrl : existing.postingUrl,
+        location: "location" in data ? data.location : existing.location,
+        source: "source" in data ? data.source : existing.source,
+        notes: "notes" in data ? data.notes : existing.notes,
+      };
+
+      const result = await updateApplicationForUser(userId, applicationId, merged);
       if (!result.ok) return errorResult(`Application ${applicationId} not found`);
       return textResult(result);
     }

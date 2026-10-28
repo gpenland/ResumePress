@@ -4,6 +4,7 @@ import type { Application, ApplicationStatusHistory } from "@prisma/client";
 import {
   APPLICATION_STATUSES,
   STATUS_DESCRIPTIONS,
+  normalizeStatus,
   type ApplicationStatus,
   type ApplicationWithCompany,
 } from "@/lib/applicationsShared";
@@ -43,7 +44,9 @@ export async function createApplicationForUser(
   data: ApplicationInput
 ): Promise<Application> {
   const company = await findOrCreateCompanyForUser(userId, data.companyName);
-  const statusChain = data.statusHistory?.length ? data.statusHistory : [data.status || "Applied"];
+  const statusChain = (data.statusHistory?.length ? data.statusHistory : [data.status || "Applied"]).map(
+    normalizeStatus
+  );
   const status = statusChain[statusChain.length - 1];
 
   return prisma.$transaction(async (tx) => {
@@ -84,7 +87,7 @@ export async function updateApplicationForUser(
   if (!existing) return { ok: false };
 
   const company = await findOrCreateCompanyForUser(userId, data.companyName);
-  const status = data.status || existing.status;
+  const status = normalizeStatus(data.status || existing.status);
 
   await prisma.$transaction(async (tx) => {
     const { count } = await tx.application.updateMany({
@@ -128,6 +131,7 @@ export async function updateApplicationStatusForUser(
     where: { id: applicationId, userId },
   });
   if (!existing) return { ok: false };
+  newStatus = normalizeStatus(newStatus);
   if (existing.status === newStatus) return { ok: true };
 
   await prisma.$transaction([
@@ -417,6 +421,7 @@ export async function bulkUpdateApplicationStatusForUser(
   ids: string[],
   status: string
 ): Promise<void> {
+  status = normalizeStatus(status);
   for (const id of ids) {
     const existing = await prisma.application.findFirst({ where: { id, userId } });
     if (!existing || existing.status === status) continue;

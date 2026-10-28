@@ -6,9 +6,10 @@ import {
   getEntryForUser,
   updateEntryForUser,
   listEntryVersionsForUser,
+  type EntryInput,
 } from "@/lib/entries";
 import { entryCoreFieldsSchema } from "@/lib/schemas/resumeEntry";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 /** Entry mutations/reads beyond the original create_entry/get_entry/list_entries, plus category management. */
 export function registerEntryManagementTools(server: McpServer, userId: string): void {
@@ -16,16 +17,42 @@ export function registerEntryManagementTools(server: McpServer, userId: string):
     "update_entry",
     {
       description:
-        "Update an existing entry's fields. Snapshots the entry's prior values into its edit history unless the edit is a no-op.",
+        "Partially update an existing entry — only pass the fields you want to change; anything omitted keeps " +
+        "its current value. Snapshots the entry's prior values into its edit history unless the edit is a no-op.",
       inputSchema: {
         entryId: z.string(),
-        ...entryCoreFieldsSchema.shape,
-        categoryId: z.string().min(1).max(100),
+        title: z.string().min(1).max(200).optional(),
+        organization: z.string().max(200).optional(),
+        location: z.string().max(200).optional(),
+        startDate: z.string().max(50).optional(),
+        endDate: z.string().max(50).optional(),
+        description: z.string().max(2000).optional(),
+        bullets: z.array(z.string().max(500)).max(20).optional(),
+        tags: z.array(z.string().max(100)).max(30).optional(),
+        url: z.string().max(500).optional(),
+        categoryId: z.string().min(1).max(100).optional(),
         displayTitle: z.string().max(200).optional(),
       },
     },
     async ({ entryId, ...data }) => {
-      const result = await updateEntryForUser(userId, entryId, data);
+      const existing = await getEntryForUser(userId, entryId);
+      if (!existing) return errorResult(`Entry ${entryId} not found`);
+
+      const merged: EntryInput = {
+        title: data.title ?? existing.title,
+        categoryId: data.categoryId ?? existing.categoryId,
+        displayTitle: data.displayTitle ?? existing.displayTitle,
+        organization: data.organization ?? existing.organization,
+        location: data.location ?? existing.location,
+        startDate: data.startDate ?? existing.startDate,
+        endDate: data.endDate ?? existing.endDate,
+        description: data.description ?? existing.description,
+        url: data.url ?? existing.url,
+        bullets: data.bullets ?? existing.bullets,
+        tags: data.tags ?? existing.tags,
+      };
+
+      const result = await updateEntryForUser(userId, entryId, merged);
       if (!result.ok) return errorResult(`Entry ${entryId} not found`);
       return textResult(result);
     }
@@ -68,7 +95,7 @@ export function registerEntryManagementTools(server: McpServer, userId: string):
         tags: source.tags,
       });
       if (!result.ok) return errorResult(result.error);
-      return textResult(result.entry);
+      return textResult(compact(result.entry));
     }
   );
 
@@ -78,7 +105,7 @@ export function registerEntryManagementTools(server: McpServer, userId: string):
       description: "List an entry's historical versions (pre-edit snapshots), most recent first.",
       inputSchema: { entryId: z.string() },
     },
-    async ({ entryId }) => textResult(await listEntryVersionsForUser(userId, entryId))
+    async ({ entryId }) => textResult(compact(await listEntryVersionsForUser(userId, entryId)))
   );
 
   server.registerTool(
@@ -92,7 +119,7 @@ export function registerEntryManagementTools(server: McpServer, userId: string):
       const category = await prisma.category.create({
         data: { name, slug, isBuiltIn: false, userId },
       });
-      return textResult(category);
+      return textResult(compact(category));
     }
   );
 
