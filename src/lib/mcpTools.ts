@@ -13,7 +13,7 @@ import {
 } from "@/lib/resumes";
 import { compileResumeSchema, entryCoreFieldsSchema, identitySchema } from "@/lib/schemas/resumeEntry";
 import { compileResumeToPdf, type EntriesByCategory } from "@/lib/resumeCompiler";
-import { textResult, errorResult } from "@/lib/mcp/shared";
+import { textResult, errorResult, compact } from "@/lib/mcp/shared";
 import { registerEntryManagementTools } from "@/lib/mcp/entryTools";
 import { registerResumeManagementTools } from "@/lib/mcp/resumeTools";
 import { registerCompanyApplicationTools } from "@/lib/mcp/applicationTools";
@@ -35,19 +35,41 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
   server.registerTool(
     "list_entries",
     {
-      description: "List this user's entries, optionally filtered by category.",
+      description:
+        "List this user's entries, optionally filtered by category or tag. Returns a compact summary " +
+        "(id, title, displayTitle, organization, location, dates, tags, categoryId) by default — pass " +
+        "full: true for complete fields including bullets/description/url, or use get_entry for one entry's full detail.",
       inputSchema: {
         categoryId: z.string().optional(),
+        tag: z.string().optional(),
+        full: z.boolean().optional(),
       },
     },
-    async ({ categoryId }) =>
-      textResult(await listEntriesForUser(userId, { categoryId }))
+    async ({ categoryId, tag, full }) => {
+      const entries = await listEntriesForUser(userId, { categoryId, tag });
+      if (full) return textResult(compact(entries));
+      return textResult(
+        compact(
+          entries.map((e) => ({
+            id: e.id,
+            title: e.title,
+            displayTitle: e.displayTitle,
+            organization: e.organization,
+            location: e.location,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            tags: e.tags,
+            categoryId: e.categoryId,
+          }))
+        )
+      );
+    }
   );
 
   server.registerTool(
     "get_entry",
     {
-      description: "Get a single entry by id.",
+      description: "Get a single entry by id, with full fields (bullets, description, url, tags, etc).",
       inputSchema: {
         entryId: z.string(),
       },
@@ -55,7 +77,7 @@ export function registerResumePressTools(server: McpServer, userId: string): voi
     async ({ entryId }) => {
       const entry = await getEntryForUser(userId, entryId);
       if (!entry) return errorResult(`Entry ${entryId} not found`);
-      return textResult(entry);
+      return textResult(compact(entry));
     }
   );
 

@@ -101,10 +101,14 @@ export async function createEntryForUser(
 
 export async function listEntriesForUser(
   userId: string,
-  opts?: { categoryId?: string }
+  opts?: { categoryId?: string; tag?: string }
 ): Promise<Entry[]> {
   return prisma.entry.findMany({
-    where: { userId, ...(opts?.categoryId ? { categoryId: opts.categoryId } : {}) },
+    where: {
+      userId,
+      ...(opts?.categoryId ? { categoryId: opts.categoryId } : {}),
+      ...(opts?.tag ? { tags: { has: opts.tag } } : {}),
+    },
     orderBy: { updatedAt: "desc" },
   });
 }

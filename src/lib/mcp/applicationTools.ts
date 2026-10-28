@@ -18,7 +18,7 @@ import {
   importMappedApplicationsForUser,
 } from "@/lib/applications";
 import { createResumeSnapshotForUser } from "@/lib/resumes";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 // Mirrors ApplicationInput (src/lib/applications.ts) with length caps, since
 // this path bypasses the ApplicationForm UI's own validation — same reasoning
@@ -91,13 +91,42 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
     "get_application",
     {
       description:
-        "Get an application by id, including its company, resume/snapshot, status history, linked contacts, and interactions.",
-      inputSchema: { applicationId: z.string() },
+        "Get an application by id. Returns a compact set of core fields (company, resume/snapshot ids, status, " +
+        "etc.) by default. Pass include to add status history, linked contacts, and/or interactions — e.g. " +
+        "include: ['interactions', 'threads'] also surfaces each interaction's linked Gmail thread (subject, " +
+        "gmailUrl). interactionsLimit caps how many interactions come back (most recent first, default 20).",
+      inputSchema: {
+        applicationId: z.string(),
+        include: z.array(z.enum(["history", "contacts", "interactions", "threads"])).optional(),
+        interactionsLimit: z.number().int().positive().max(100).optional(),
+      },
     },
-    async ({ applicationId }) => {
+    async ({ applicationId, include, interactionsLimit }) => {
       const application = await getApplicationForUser(userId, applicationId);
       if (!application) return errorResult(`Application ${applicationId} not found`);
-      return textResult(application);
+
+      const { statusHistory, contacts, interactions, ...core } = application;
+      const result: Record<string, unknown> = compact(core);
+
+      if (include?.includes("history")) {
+        result.statusHistory = compact(statusHistory);
+      }
+      if (include?.includes("contacts")) {
+        result.contacts = compact(contacts.map((ac) => ({ role: ac.role, contact: ac.contact })));
+      }
+      if (include?.includes("interactions")) {
+        const includeThreads = include.includes("threads");
+        result.interactions = compact(
+          interactions.slice(0, interactionsLimit ?? 20).map(({ emailThread, ...rest }) => ({
+            ...rest,
+            emailThread: includeThreads && emailThread
+              ? { subject: emailThread.subject, gmailUrl: emailThread.gmailUrl }
+              : undefined,
+          }))
+        );
+      }
+
+      return textResult(result);
     }
   );
 
