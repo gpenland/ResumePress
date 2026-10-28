@@ -16,10 +16,13 @@ import { cn } from "@/lib/utils";
 
 export default async function EditEntryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ resumeId?: string }>;
 }) {
   const { id } = await params;
+  const { resumeId } = await searchParams;
   const userId = await getUserId();
   if (!userId) notFound();
 
@@ -29,6 +32,10 @@ export default async function EditEntryPage({
   });
 
   if (!entry) notFound();
+
+  const resume = resumeId
+    ? await prisma.resume.findFirst({ where: { id: resumeId, userId }, select: { id: true, name: true } })
+    : null;
 
   const versions = await listEntryVersionsForUser(userId, id);
 
@@ -44,6 +51,11 @@ export default async function EditEntryPage({
           <Badge variant="secondary">{entry.category.name}</Badge>
         </div>
         <div className="flex items-center gap-2">
+          {resume && (
+            <Link href={`/resumes/${resume.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              Back to {resume.name}
+            </Link>
+          )}
           <Link href="/entries/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             New Entry
           </Link>
