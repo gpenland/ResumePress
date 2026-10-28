@@ -14,12 +14,13 @@ type Props = {
   name?: string;
   size?: "sm" | "default";
   disabled?: boolean;
+  className?: string;
 };
 
 // Select.Value renders the raw value string, not a label — since our values
 // already are the display labels (status names), we render `value` directly
 // in the trigger rather than relying on SelectValue (see CLAUDE.md base-ui note).
-export default function StatusSelect({ value, onValueChange, name, size = "default", disabled }: Props) {
+export default function StatusSelect({ value, onValueChange, name, size = "default", disabled, className }: Props) {
   return (
     <Select
       value={value}
@@ -27,7 +28,7 @@ export default function StatusSelect({ value, onValueChange, name, size = "defau
       name={name}
       disabled={disabled}
     >
-      <SelectTrigger size={size}>
+      <SelectTrigger size={size} className={className}>
         <span>{value}</span>
       </SelectTrigger>
       <SelectContent>

@@ -167,7 +167,7 @@ export default function ApplicationForm({ companies, application, action, submit
         <div className="space-y-1.5">
           <Label>Status</Label>
           <input type="hidden" name="status" value={status} />
-          <StatusSelect value={status} onValueChange={setStatus} />
+          <StatusSelect value={status} onValueChange={setStatus} className="w-full" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="location">Location</Label>
