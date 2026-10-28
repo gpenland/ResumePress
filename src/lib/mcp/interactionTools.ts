@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createInteractionForUser, deleteInteractionForUser } from "@/lib/interactions";
 import { ignoreEmailThreadMatchForUser } from "@/lib/emailThreads";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 /** Interactions: freeform logged touchpoints tied to a contact and/or application. */
 export function registerInteractionTools(server: McpServer, userId: string): void {
@@ -23,7 +23,7 @@ export function registerInteractionTools(server: McpServer, userId: string): voi
     async (data) => {
       const result = await createInteractionForUser(userId, data);
       if (!result.ok) return errorResult(result.error);
-      return textResult(result.interaction);
+      return textResult(compact(result.interaction));
     }
   );
 

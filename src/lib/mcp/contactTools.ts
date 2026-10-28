@@ -9,7 +9,7 @@ import {
   linkContactToApplicationForUser,
   unlinkContactFromApplicationForUser,
 } from "@/lib/contacts";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 // Mirrors ContactInput (src/lib/contacts.ts) with length caps — same reasoning
 // as compile_resume's inline schema, since this path bypasses the ContactForm UI.
@@ -35,7 +35,7 @@ export function registerContactTools(server: McpServer, userId: string): void {
       description: "List this user's contacts, optionally filtered to only those due for follow-up.",
       inputSchema: { followUpDue: z.boolean().optional() },
     },
-    async ({ followUpDue }) => textResult(await listContactsForUser(userId, { followUpDue }))
+    async ({ followUpDue }) => textResult(compact(await listContactsForUser(userId, { followUpDue })))
   );
 
   server.registerTool(
@@ -47,7 +47,7 @@ export function registerContactTools(server: McpServer, userId: string): void {
     async ({ contactId }) => {
       const contact = await getContactForUser(userId, contactId);
       if (!contact) return errorResult(`Contact ${contactId} not found`);
-      return textResult(contact);
+      return textResult(compact(contact));
     }
   );
 
@@ -58,7 +58,7 @@ export function registerContactTools(server: McpServer, userId: string): void {
         "Create a new contact. companyName (if given) is matched case-insensitively to an existing company or creates a new one.",
       inputSchema: contactFieldsSchema,
     },
-    async (data) => textResult(await createContactForUser(userId, data))
+    async (data) => textResult(compact(await createContactForUser(userId, data)))
   );
 
   server.registerTool(

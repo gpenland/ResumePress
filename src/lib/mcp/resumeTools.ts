@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { identitySchema } from "@/lib/schemas/resumeEntry";
-import { textResult, errorResult } from "./shared";
+import { textResult, errorResult, compact } from "./shared";
 
 /** Resume mutations beyond the original create_resume/get_resume/list_resumes/compile_resume. */
 export function registerResumeManagementTools(server: McpServer, userId: string): void {
@@ -84,7 +84,7 @@ export function registerResumeManagementTools(server: McpServer, userId: string)
         }
         return created;
       });
-      return textResult(copy);
+      return textResult(compact(copy));
     }
   );
 

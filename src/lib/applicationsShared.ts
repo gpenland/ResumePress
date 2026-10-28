@@ -21,6 +21,21 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+// Case-folds a status against the suggested list (e.g. "interviewing" ->
+// "Interviewing") so the pipeline stats and Sankey flow view don't silently
+// split a status across two casings (GitHub issue #96 — the MCP tools are
+// the main way a status can arrive in an unexpected casing, since the web
+// form's own StatusSelect only ever submits one of APPLICATION_STATUSES
+// verbatim). Anything that doesn't match one of the suggested statuses is
+// returned unchanged — status stays a free-form string by design (see the
+// comment on APPLICATION_STATUSES above); this only normalizes casing for
+// values that were clearly meant to be one of the suggested ones.
+export function normalizeStatus(status: string): string {
+  const trimmed = status.trim();
+  const match = APPLICATION_STATUSES.find((s) => s.toLowerCase() === trimmed.toLowerCase());
+  return match ?? trimmed;
+}
+
 // Shared between suggestApplicationStatusForUser (applications.ts, on-demand
 // "Suggest status" button) and the eager per-thread classification in
 // emailThreads.ts's sync — both ask Jev to choose a status from the same
