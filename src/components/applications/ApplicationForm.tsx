@@ -94,7 +94,7 @@ export default function ApplicationForm({ companies, application, action, submit
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-1.5">
-        <Label htmlFor="postingUrl">Have a posting link? Start here.</Label>
+        <Label htmlFor="postingUrl">Posting link</Label>
         <div className="flex gap-2">
           <Input
             id="postingUrl"
@@ -109,9 +109,6 @@ export default function ApplicationForm({ companies, application, action, submit
           </Button>
         </div>
         {autofillError && <p className="text-xs text-destructive">{autofillError}</p>}
-        <p className="text-xs text-muted-foreground">
-          Pulls company, role, location, and term from the posting — leaves anything you&apos;ve already typed below alone.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
