@@ -81,13 +81,23 @@ export default async function SearchPage({
                   );
                   return (
                     <Card key={i.id} className="py-0 hover:bg-muted/30 transition-colors">
-                      <CardContent className="py-3 px-4">
+                      <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
                         {href ? (
                           <Link href={href} className="text-sm hover:underline">
                             {content}
                           </Link>
                         ) : (
                           <span className="text-sm">{content}</span>
+                        )}
+                        {i.emailThreadGmailUrl && (
+                          <a
+                            href={i.emailThreadGmailUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs underline hover:text-foreground shrink-0"
+                          >
+                            Open email
+                          </a>
                         )}
                       </CardContent>
                     </Card>

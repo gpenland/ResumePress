@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prisma";
 export type SearchResults = {
   applications: Array<{ id: string; roleTitle: string; companyName: string }>;
   contacts: Array<{ id: string; name: string; companyName: string | null }>;
-  interactions: Array<{ id: string; type: string; summary: string; contactId: string | null; applicationId: string | null }>;
+  interactions: Array<{
+    id: string;
+    type: string;
+    summary: string;
+    contactId: string | null;
+    applicationId: string | null;
+    emailThreadGmailUrl: string | null;
+  }>;
 };
 
 const EMPTY_RESULTS: SearchResults = { applications: [], contacts: [], interactions: [] };
@@ -42,6 +49,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
     }),
     prisma.interaction.findMany({
       where: { userId, summary: { contains: q, mode: "insensitive" } },
+      include: { emailThread: true },
       orderBy: { occurredAt: "desc" },
       take: 20,
     }),
@@ -56,6 +64,7 @@ export async function globalSearch(userId: string, query: string): Promise<Searc
       summary: i.summary,
       contactId: i.contactId,
       applicationId: i.applicationId,
+      emailThreadGmailUrl: i.emailThread?.gmailUrl ?? null,
     })),
   };
 }
