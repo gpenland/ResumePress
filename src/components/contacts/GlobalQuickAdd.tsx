@@ -88,25 +88,27 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
       <div ref={containerRef} className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
         {actions.map((action, i) => {
           const Icon = action.icon;
+          // Label + icon live in one element with one transform, so they
+          // move as a single unit instead of drifting out of sync on their
+          // own separate transitions (the previous jitter). The icon sits
+          // in a size-12 box — matching the main button's own size — so its
+          // *center*, not its edge, lines up with the main button's center
+          // under the column's items-end alignment, regardless of the
+          // icon circle's own (smaller) diameter.
           const content = (
             <>
-              <span
-                className={cn(
-                  "rounded-md border bg-popover px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-md transition-all",
-                  fanOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2 pointer-events-none"
-                )}
-              >
+              <span className="rounded-md border bg-popover px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-md">
                 {action.label}
               </span>
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-md transition-colors hover:bg-secondary/80">
-                <Icon className="size-4" />
+              <span className="flex size-12 shrink-0 items-center justify-center">
+                <span className="flex size-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-md transition-colors hover:bg-secondary/80">
+                  <Icon className="size-4" />
+                </span>
               </span>
             </>
           );
           const style = {
             transitionDelay: fanOpen ? `${(actions.length - 1 - i) * 30}ms` : "0ms",
-            transitionProperty: "opacity, transform",
-            transitionDuration: "150ms",
           } as React.CSSProperties;
 
           return (
@@ -114,8 +116,8 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
               key={action.key}
               style={style}
               className={cn(
-                "flex items-center gap-2",
-                fanOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+                "flex items-center gap-2 transition-[opacity,transform] duration-150 ease-out",
+                fanOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5 pointer-events-none"
               )}
             >
               {action.href ? (
