@@ -16,6 +16,7 @@ import {
   type SuggestedStatus,
 } from "@/lib/applications";
 import { extractJobPostingFromUrl, type JobPostingAutofill } from "@/lib/jobPosting";
+import { attachResumeToApplication } from "./resumeActions";
 import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 
@@ -36,6 +37,11 @@ function inputFromFormData(formData: FormData): ApplicationInput {
 export async function createApplication(formData: FormData) {
   const userId = await requireUserId();
   const application = await createApplicationForUser(userId, inputFromFormData(formData));
+
+  const resumeId = (formData.get("resumeId") as string) || null;
+  if (resumeId) {
+    await attachResumeToApplication(application.id, resumeId);
+  }
 
   revalidatePath("/applications");
   redirect(`/applications/${application.id}`);
