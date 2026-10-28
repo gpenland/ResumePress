@@ -107,8 +107,12 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
               </span>
             </>
           );
+          // Close cascades in the opposite direction from open — the item
+          // farthest from the button leads, retracting back toward it — so
+          // it reads as one continuous reversal instead of the staggered
+          // reveal snapping shut all at once.
           const style = {
-            transitionDelay: fanOpen ? `${(actions.length - 1 - i) * 30}ms` : "0ms",
+            transitionDelay: fanOpen ? `${(actions.length - 1 - i) * 30}ms` : `${i * 30}ms`,
           } as React.CSSProperties;
 
           return (
@@ -116,8 +120,8 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
               key={action.key}
               style={style}
               className={cn(
-                "flex items-center gap-2 transition-[opacity,transform] duration-150 ease-out",
-                fanOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5 pointer-events-none"
+                "flex items-center gap-2 transition-[opacity,transform] duration-150",
+                fanOpen ? "opacity-100 translate-y-0 ease-out" : "opacity-0 translate-y-1.5 pointer-events-none ease-in"
               )}
             >
               {action.href ? (
