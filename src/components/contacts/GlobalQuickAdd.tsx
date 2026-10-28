@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, X, MessageSquarePlus, Briefcase, FileText, UserPlus } from "lucide-react";
+import { Plus, MessageSquarePlus, Briefcase, FileText, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -141,7 +141,7 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
           onClick={() => setFanOpen((v) => !v)}
           className="flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
         >
-          {fanOpen ? <X className="size-5" /> : <Plus className="size-5" />}
+          <Plus className={cn("size-5 transition-transform duration-200 ease-out", fanOpen && "rotate-45")} />
         </button>
       </div>
 
