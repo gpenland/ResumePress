@@ -19,7 +19,7 @@ type Props = {
   onChange: (id: string) => void;
 };
 
-const STALE_STATUSES = new Set(["Rejected", "Ghosted"]);
+const STALE_STATUSES = new Set(["Rejected", "Ghosted", "Withdrawn"]);
 const PANEL_WIDTH = 320;
 
 /**

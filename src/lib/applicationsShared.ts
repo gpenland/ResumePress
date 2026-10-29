@@ -17,6 +17,7 @@ export const APPLICATION_STATUSES = [
   "Offer",
   "Rejected",
   "Ghosted",
+  "Withdrawn",
 ] as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
@@ -48,6 +49,7 @@ export const STATUS_DESCRIPTIONS: Record<ApplicationStatus, string> = {
   Offer: "Received a job offer",
   Rejected: "Rejected, or explicitly turned down",
   Ghosted: "No response for a long time after applying or interviewing",
+  Withdrawn: "Withdrawn by the applicant before a final decision",
 };
 
 export type ApplicationWithCompany = Application & { company: Company };
@@ -64,6 +66,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   Offer: "emerald",
   Rejected: "destructive",
   Ghosted: "muted",
+  Withdrawn: "muted",
 };
 
 // Also used for the Sankey's synthetic "Start" node and any unrecognized status.

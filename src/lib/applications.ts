@@ -353,9 +353,10 @@ function statusRank(status: string): number {
 }
 
 /**
- * Powers the dashboard Statistics panel. "Active" means not Rejected/Ghosted
- * — an Offer still counts as active (there's no separate "accepted" status,
- * and the search isn't over until the user acts on the offer).
+ * Powers the dashboard Statistics panel. "Active" means not
+ * Rejected/Ghosted/Withdrawn — an Offer still counts as active (there's no
+ * separate "accepted" status, and the search isn't over until the user acts
+ * on the offer).
  * newThisWeek/newLastWeek are rolling 7-day windows off appliedAt (not
  * createdAt — when it was actually applied to, not when the row was logged
  * into the tracker, and not calendar weeks), so the "vs last week" delta is
@@ -381,7 +382,7 @@ export async function getApplicationPipelineStatsForUser(userId: string): Promis
 
   for (const { status, appliedAt } of applications) {
     counts.set(status, (counts.get(status) ?? 0) + 1);
-    if (status !== "Rejected" && status !== "Ghosted") active++;
+    if (status !== "Rejected" && status !== "Ghosted" && status !== "Withdrawn") active++;
     if (status === "Offer") offers++;
     if (status === "Rejected") rejections++;
 

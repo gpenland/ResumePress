@@ -16,7 +16,7 @@ export type ApplicationPickerOption = {
 // Statuses that are unlikely to be the right match for a *new* incoming email
 // unless something else (a domain match) says otherwise — used only as a
 // tie-breaker, never to hide an option outright.
-const STALE_STATUSES = new Set(["Rejected", "Ghosted"]);
+const STALE_STATUSES = new Set(["Rejected", "Ghosted", "Withdrawn"]);
 
 export function extractDomain(url: string): string | null {
   try {
