@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { EntryVersion } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { formatShortDateTime } from "@/lib/dateFormat";
 
 type SnapshotData = {
   title: string;
@@ -91,7 +92,7 @@ export default function EntryHistory({ versions }: { versions: EntryVersion[] })
                   className="flex items-center gap-2 w-full text-left py-1"
                 >
                   <span className="text-muted-foreground text-xs w-40 shrink-0">
-                    {new Date(v.createdAt).toLocaleString()}
+                    {formatShortDateTime(v.createdAt)}
                   </span>
                   <span className="truncate">{data.title}</span>
                   {previous && (

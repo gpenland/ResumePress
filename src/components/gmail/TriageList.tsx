@@ -13,6 +13,7 @@ import ContactPicker from "@/components/gmail/ContactPicker";
 import { applicationOptionLabel, decodeHtmlEntities, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
 import { confidenceWord } from "@/lib/jev";
+import { formatShortDate } from "@/lib/dateFormat";
 
 export type TriageThread = {
   id: string;
@@ -231,7 +232,7 @@ function TriageRow({
               <div className="flex shrink-0 items-center gap-1">
                 {thread.lastMessageAt && (
                   <p className="text-xs whitespace-nowrap text-muted-foreground">
-                    {new Date(thread.lastMessageAt).toLocaleDateString()}
+                    {formatShortDate(thread.lastMessageAt)}
                   </p>
                 )}
                 {thread.gmailUrl && (

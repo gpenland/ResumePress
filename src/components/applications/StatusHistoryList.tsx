@@ -6,6 +6,7 @@ import type { ApplicationStatusHistory } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DeleteItemButton from "@/components/DeleteItemButton";
+import { formatShortDateTime } from "@/lib/dateFormat";
 
 type Props = {
   applicationId: string;
@@ -89,7 +90,7 @@ export default function StatusHistoryList({
           <div key={h.id} className="text-sm px-1 py-1.5 border-b last:border-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-muted-foreground text-xs shrink-0">
-                {new Date(h.changedAt).toLocaleString()}
+                {formatShortDateTime(h.changedAt)}
               </span>
               <span>{describeChange(h)}</span>
               {editingId !== h.id && (
