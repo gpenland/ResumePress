@@ -275,7 +275,8 @@ export default function ApplicationsList({
                       {(() => {
                         const cycle = cycleForApplication(app.term, app.appliedAt);
                         return [
-                          [app.term, app.location].filter(Boolean).join(" · "),
+                          app.term,
+                          app.location,
                           formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
                           // Surfaces what the cycle filter actually computed for this
                           // row, so a misparsed term/appliedAt is visible while
@@ -284,7 +285,7 @@ export default function ApplicationsList({
                           cycle !== null && `Cycle ${cycleShortLabel(cycle)}`,
                         ]
                           .filter(Boolean)
-                          .join("  ");
+                          .join(" · ");
                       })()}
                     </p>
                   </div>
