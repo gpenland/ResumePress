@@ -3,7 +3,12 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
-import { listApplicationsForUser, getApplicationPipelineStatsForUser } from "@/lib/applications";
+import {
+  listApplicationsForUser,
+  getApplicationPipelineStatsForUser,
+  listApplicationCycleOptionsForUser,
+} from "@/lib/applications";
+import { parseCycleSearchParam } from "@/lib/recruitingCycleShared";
 import { listTriageThreadsForUser, getEmailSyncStatsForUser } from "@/lib/emailThreads";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +18,16 @@ import { entryLabel } from "@/lib/entries";
 import StatusBadge from "@/components/applications/StatusBadge";
 import StatisticsPanel from "@/components/dashboard/StatisticsPanel";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cycle?: string }>;
+}) {
+  const { cycle } = await searchParams;
   const userId = await getUserId();
+  const cycles = parseCycleSearchParam(cycle);
 
-  const [recentResumes, recentEntries, recentApplications, triageThreads, pipelineStats, emailStats] = userId
+  const [recentResumes, recentEntries, recentApplications, triageThreads, pipelineStats, emailStats, cycleOptions] = userId
     ? await Promise.all([
         prisma.resume.findMany({ where: { userId }, orderBy: { updatedAt: "desc" }, take: 5 }),
         prisma.entry.findMany({
@@ -27,10 +38,11 @@ export default async function HomePage() {
         }),
         listApplicationsForUser(userId),
         listTriageThreadsForUser(userId),
-        getApplicationPipelineStatsForUser(userId),
+        getApplicationPipelineStatsForUser(userId, { cycles }),
         getEmailSyncStatsForUser(userId),
+        listApplicationCycleOptionsForUser(userId),
       ])
-    : [[], [], [], [], null, null];
+    : [[], [], [], [], null, null, []];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-10">
@@ -39,7 +51,9 @@ export default async function HomePage() {
         <p className="text-muted-foreground mt-1 text-sm">Your applications, resumes, and what&apos;s pending review</p>
       </div>
 
-      {pipelineStats && emailStats && <StatisticsPanel pipeline={pipelineStats} email={emailStats} />}
+      {pipelineStats && emailStats && (
+        <StatisticsPanel pipeline={pipelineStats} email={emailStats} cycleOptions={cycleOptions} selectedCycles={cycles} />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         <section className="space-y-3">

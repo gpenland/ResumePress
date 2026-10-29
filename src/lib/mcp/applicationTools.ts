@@ -15,6 +15,7 @@ import {
   getApplicationForUser,
   getApplicationPipelineStatsForUser,
   getApplicationStatusFlowForUser,
+  listApplicationCycleOptionsForUser,
   importMappedApplicationsForUser,
   APPLICATION_STATUSES,
   type ApplicationInput,
@@ -93,10 +94,14 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
   server.registerTool(
     "list_applications",
     {
-      description: "List this user's applications, optionally filtered by status or company.",
+      description:
+        "List this user's applications, optionally filtered by status, company, or recruiting cycle. A cycle is named by its Fall's " +
+        "calendar year (e.g. 2026 covers Fall 2026 - Summer 2027) and is derived from each application's term field (falling back to " +
+        "appliedAt) — see get_application_pipeline_stats for the same concept applied to stats.",
       inputSchema: {
         status: z.string().max(50).optional(),
         companyId: z.string().optional(),
+        cycles: z.array(z.number().int()).optional(),
       },
     },
     async (opts) => textResult(compact(await listApplicationsForUser(userId, opts)))
@@ -287,19 +292,36 @@ export function registerCompanyApplicationTools(server: McpServer, userId: strin
   server.registerTool(
     "get_application_pipeline_stats",
     {
-      description: "Pipeline stats powering the dashboard: totals, active/offer counts, offer rate, and weekly new-application deltas.",
-      inputSchema: {},
+      description:
+        "Pipeline stats powering the dashboard: totals, active/offer counts, offer rate, and weekly new-application deltas. " +
+        "Pass cycles to scope stats to one or more recruiting cycles (each named by its Fall's calendar year, e.g. 2026 covers " +
+        "Fall 2026 - Summer 2027); omit for all cycles.",
+      inputSchema: { cycles: z.array(z.number().int()).optional() },
     },
-    async () => textResult(await getApplicationPipelineStatsForUser(userId))
+    async ({ cycles }) => textResult(await getApplicationPipelineStatsForUser(userId, { cycles }))
   );
 
   server.registerTool(
     "get_application_status_flow",
     {
-      description: "Aggregated status-transition edges (source -> target -> count) across all applications, for a Sankey-style flow view.",
+      description:
+        "Aggregated status-transition edges (source -> target -> count) across all applications, for a Sankey-style flow view. " +
+        "Pass cycles to scope to one or more recruiting cycles (see get_application_pipeline_stats); omit for all cycles.",
+      inputSchema: { cycles: z.array(z.number().int()).optional() },
+    },
+    async ({ cycles }) => textResult(await getApplicationStatusFlowForUser(userId, { cycles }))
+  );
+
+  server.registerTool(
+    "list_application_cycle_options",
+    {
+      description:
+        "List recruiting-cycle years present across this user's applications (plus the current cycle), newest first — the same " +
+        "options the dashboard/applications-page cycle filter offers. Each year names a cycle by its Fall (e.g. 2026 = Fall 2026 - " +
+        "Summer 2027).",
       inputSchema: {},
     },
-    async () => textResult(await getApplicationStatusFlowForUser(userId))
+    async () => textResult(await listApplicationCycleOptionsForUser(userId))
   );
 
   server.registerTool(

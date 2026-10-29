@@ -2,7 +2,12 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getUserId } from "@/lib/auth";
-import { listApplicationsForUser, getApplicationStatusFlowForUser } from "@/lib/applications";
+import {
+  listApplicationsForUser,
+  getApplicationStatusFlowForUser,
+  listApplicationCycleOptionsForUser,
+} from "@/lib/applications";
+import { parseCycleSearchParam } from "@/lib/recruitingCycleShared";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -14,21 +19,26 @@ import {
 import ApplicationsList from "@/components/applications/ApplicationsList";
 import ApplicationsKanban from "@/components/applications/ApplicationsKanban";
 import ApplicationStatusSankey from "@/components/applications/ApplicationStatusSankey";
+import CycleFilter from "@/components/applications/CycleFilter";
 
 export default async function ApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; view?: string }>;
+  searchParams: Promise<{ status?: string; view?: string; cycle?: string }>;
 }) {
-  const { status, view } = await searchParams;
+  const { status, view, cycle } = await searchParams;
   const userId = await getUserId();
   const isKanban = view === "kanban";
   const isFlow = view === "flow";
+  const cycles = parseCycleSearchParam(cycle);
 
-  const applications = userId
-    ? await listApplicationsForUser(userId, { status: isKanban || isFlow ? undefined : status })
-    : [];
-  const statusFlow = isFlow && userId ? await getApplicationStatusFlowForUser(userId) : [];
+  const [applications, cycleOptions] = userId
+    ? await Promise.all([
+        listApplicationsForUser(userId, { status: isKanban || isFlow ? undefined : status, cycles }),
+        listApplicationCycleOptionsForUser(userId),
+      ])
+    : [[], []];
+  const statusFlow = isFlow && userId ? await getApplicationStatusFlowForUser(userId, { cycles }) : [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
@@ -38,21 +48,22 @@ export default async function ApplicationsPage({
           <p className="text-muted-foreground text-sm mt-1">{applications.length} total</p>
         </div>
         <div className="flex items-center gap-2">
+          <CycleFilter options={cycleOptions} selected={cycles} />
           <div className="flex rounded-lg border p-0.5">
             <Link
-              href={{ pathname: "/applications", query: status ? { status } : {} }}
+              href={{ pathname: "/applications", query: { ...(status ? { status } : {}), ...(cycle ? { cycle } : {}) } }}
               className={cn(buttonVariants({ variant: !isKanban && !isFlow ? "default" : "ghost", size: "sm" }))}
             >
               List
             </Link>
             <Link
-              href={{ pathname: "/applications", query: { view: "kanban" } }}
+              href={{ pathname: "/applications", query: { view: "kanban", ...(cycle ? { cycle } : {}) } }}
               className={cn(buttonVariants({ variant: isKanban ? "default" : "ghost", size: "sm" }))}
             >
               Kanban
             </Link>
             <Link
-              href={{ pathname: "/applications", query: { view: "flow" } }}
+              href={{ pathname: "/applications", query: { view: "flow", ...(cycle ? { cycle } : {}) } }}
               className={cn(buttonVariants({ variant: isFlow ? "default" : "ghost", size: "sm" }))}
             >
               Flow

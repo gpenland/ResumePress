@@ -10,11 +10,13 @@ import {
 } from "@/lib/applicationsShared";
 import { parseStatusHistory, type MappedApplicationRow } from "@/lib/notionImportShared";
 import { askJev } from "@/lib/jev";
+import { cycleForApplication, currentCycle } from "@/lib/recruitingCycleShared";
 
 // Re-exported so server code (actions.ts) can import everything it needs from
 // this one module. Client components should import the shared module
 // directly instead — see applicationsShared.ts's header comment for why.
 export * from "@/lib/applicationsShared";
+export * from "@/lib/recruitingCycleShared";
 
 export type ApplicationInput = {
   companyName: string;
@@ -290,11 +292,15 @@ export async function deleteApplicationStatusHistoryEntryForUser(
   return { ok: true };
 }
 
+// cycles is undefined for "all cycles" (no filtering, see
+// parseCycleSearchParam) — applied in-memory rather than in the Prisma
+// `where` since a cycle isn't a stored column, just term/appliedAt run
+// through cycleForApplication (GitHub issue #106).
 export async function listApplicationsForUser(
   userId: string,
-  opts?: { status?: string; companyId?: string }
+  opts?: { status?: string; companyId?: string; cycles?: number[] }
 ): Promise<ApplicationWithCompany[]> {
-  return prisma.application.findMany({
+  const applications = await prisma.application.findMany({
     where: {
       userId,
       ...(opts?.status ? { status: opts.status } : {}),
@@ -303,6 +309,28 @@ export async function listApplicationsForUser(
     include: { company: true },
     orderBy: { updatedAt: "desc" },
   });
+  if (!opts?.cycles) return applications;
+  const wanted = new Set(opts.cycles);
+  return applications.filter((a) => {
+    const cycle = cycleForApplication(a.term, a.appliedAt);
+    return cycle !== null && wanted.has(cycle);
+  });
+}
+
+// Cycle options for the filter dropdown: every cycle actually present in the
+// user's applications, plus the current cycle even if it's still empty (so
+// a user starting a fresh cycle isn't offered an empty list), newest first.
+export async function listApplicationCycleOptionsForUser(userId: string): Promise<number[]> {
+  const rows = await prisma.application.findMany({
+    where: { userId },
+    select: { term: true, appliedAt: true },
+  });
+  const cycles = new Set<number>([currentCycle()]);
+  for (const { term, appliedAt } of rows) {
+    const cycle = cycleForApplication(term, appliedAt);
+    if (cycle !== null) cycles.add(cycle);
+  }
+  return Array.from(cycles).sort((a, b) => b - a);
 }
 
 export type StatusFlowLink = { source: string; target: string; value: number };
@@ -316,9 +344,27 @@ export type StatusFlowLink = { source: string; target: string; value: number };
  * aggregate the rest. A null fromStatus (the application's creation) becomes
  * the synthetic "Start" source.
  */
-export async function getApplicationStatusFlowForUser(userId: string): Promise<StatusFlowLink[]> {
+export async function getApplicationStatusFlowForUser(
+  userId: string,
+  opts?: { cycles?: number[] }
+): Promise<StatusFlowLink[]> {
+  let applicationIds: string[] | undefined;
+  if (opts?.cycles) {
+    const apps = await prisma.application.findMany({
+      where: { userId },
+      select: { id: true, term: true, appliedAt: true },
+    });
+    const wanted = new Set(opts.cycles);
+    applicationIds = apps
+      .filter((a) => {
+        const cycle = cycleForApplication(a.term, a.appliedAt);
+        return cycle !== null && wanted.has(cycle);
+      })
+      .map((a) => a.id);
+  }
+
   const history = await prisma.applicationStatusHistory.findMany({
-    where: { userId },
+    where: { userId, ...(applicationIds ? { applicationId: { in: applicationIds } } : {}) },
     select: { fromStatus: true, toStatus: true },
   });
 
@@ -364,11 +410,23 @@ function statusRank(status: string): number {
  * Applications with no appliedAt yet (tracked before applying) don't count
  * toward either bucket.
  */
-export async function getApplicationPipelineStatsForUser(userId: string): Promise<ApplicationPipelineStats> {
-  const applications = await prisma.application.findMany({
+export async function getApplicationPipelineStatsForUser(
+  userId: string,
+  opts?: { cycles?: number[] }
+): Promise<ApplicationPipelineStats> {
+  const rows = await prisma.application.findMany({
     where: { userId },
-    select: { status: true, appliedAt: true },
+    select: { status: true, appliedAt: true, term: true },
   });
+  const applications = opts?.cycles
+    ? (() => {
+        const wanted = new Set(opts.cycles);
+        return rows.filter((r) => {
+          const cycle = cycleForApplication(r.term, r.appliedAt);
+          return cycle !== null && wanted.has(cycle);
+        });
+      })()
+    : rows;
 
   const now = Date.now();
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
