@@ -33,5 +33,6 @@ export function formatShortDateTime(d: Date | string | null | undefined): string
     hour: "numeric",
     minute: "2-digit",
     timeZone: "UTC",
+    timeZoneName: "short",
   });
 }
