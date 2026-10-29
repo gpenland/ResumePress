@@ -21,10 +21,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } from "@/lib/applicationsShared";
+import { cycleForApplication, cycleShortLabel } from "@/lib/recruitingCycleShared";
 
 type Props = {
   applications: ApplicationWithCompany[];
   status?: string;
+  // The resolved `?cycle=` value (never the possibly-absent raw param — see
+  // applications/page.tsx) carried into these status-filter links so
+  // switching status doesn't silently reset the cycle filter back to its
+  // current-cycle default (GitHub issue #106 follow-up).
+  cycle: string;
   deleteApplication: (id: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<void>;
@@ -44,6 +50,7 @@ function sortKey(app: ApplicationWithCompany): number {
 export default function ApplicationsList({
   applications,
   status,
+  cycle,
   deleteApplication,
   updateStatus,
   bulkUpdateStatus,
@@ -122,7 +129,7 @@ export default function ApplicationsList({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-2 flex-wrap">
           <Link
-            href="/applications"
+            href={`/applications?cycle=${encodeURIComponent(cycle)}`}
             className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
           >
             All
@@ -130,7 +137,7 @@ export default function ApplicationsList({
           {APPLICATION_STATUSES.map((s) => (
             <Link
               key={s}
-              href={`/applications?status=${encodeURIComponent(s)}`}
+              href={`/applications?status=${encodeURIComponent(s)}&cycle=${encodeURIComponent(cycle)}`}
               className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
             >
               {s}
@@ -265,13 +272,21 @@ export default function ApplicationsList({
                       {app.company.name} <span className="text-muted-foreground font-normal">— {app.roleTitle}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {[
-                        app.term,
-                        app.location,
-                        formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      {(() => {
+                        const cycle = cycleForApplication(app.term, app.appliedAt);
+                        return [
+                          app.term,
+                          app.location,
+                          formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
+                          // Surfaces what the cycle filter actually computed for this
+                          // row, so a misparsed term/appliedAt is visible while
+                          // scanning the list, not just invisibly wrong (issue #106
+                          // follow-up).
+                          cycle !== null && `Cycle ${cycleShortLabel(cycle)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+                      })()}
                     </p>
                   </div>
                 </Link>

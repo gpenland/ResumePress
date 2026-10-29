@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { statusBarClass } from "@/lib/applicationsShared";
 import type { ApplicationPipelineStats } from "@/lib/applications";
 import type { EmailSyncStats } from "@/lib/emailThreads";
+import CycleFilter from "@/components/applications/CycleFilter";
+import { serializeCycleSearchParam } from "@/lib/recruitingCycleShared";
 
 function StatTile({
   label,
@@ -68,23 +70,34 @@ function formatRelativeTime(date: Date | null): string {
 export default function StatisticsPanel({
   pipeline,
   email,
+  cycleOptions,
+  selectedCycles,
 }: {
   pipeline: ApplicationPipelineStats;
   email: EmailSyncStats;
+  cycleOptions: number[];
+  selectedCycles: number[] | undefined;
 }) {
   const maxStatusCount = Math.max(1, ...pipeline.byStatus.map((s) => s.count));
+  // Carried into the "Total applications"/"Active" tiles below so clicking
+  // through to the applications list doesn't silently reset the cycle
+  // filter back to its current-cycle default (GitHub issue #106 follow-up).
+  const applicationsHref = `/applications?cycle=${encodeURIComponent(serializeCycleSearchParam(selectedCycles))}`;
 
   return (
     <section className="space-y-3">
-      <h2 className="font-semibold">Statistics</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">Statistics</h2>
+        <CycleFilter options={cycleOptions} selected={selectedCycles} />
+      </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatTile label="Total applications" value={pipeline.total} href="/applications" />
+        <StatTile label="Total applications" value={pipeline.total} href={applicationsHref} />
         <StatTile
           label="Active"
           value={pipeline.active}
-          hint="not rejected/ghosted"
-          href="/applications"
+          hint="not rejected/ghosted/withdrawn"
+          href={applicationsHref}
         />
         <StatTile
           label="Rejection rate"
