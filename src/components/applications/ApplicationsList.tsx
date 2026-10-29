@@ -25,6 +25,11 @@ import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } fr
 type Props = {
   applications: ApplicationWithCompany[];
   status?: string;
+  // The resolved `?cycle=` value (never the possibly-absent raw param — see
+  // applications/page.tsx) carried into these status-filter links so
+  // switching status doesn't silently reset the cycle filter back to its
+  // current-cycle default (GitHub issue #106 follow-up).
+  cycle: string;
   deleteApplication: (id: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<void>;
@@ -44,6 +49,7 @@ function sortKey(app: ApplicationWithCompany): number {
 export default function ApplicationsList({
   applications,
   status,
+  cycle,
   deleteApplication,
   updateStatus,
   bulkUpdateStatus,
@@ -122,7 +128,7 @@ export default function ApplicationsList({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-2 flex-wrap">
           <Link
-            href="/applications"
+            href={`/applications?cycle=${encodeURIComponent(cycle)}`}
             className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
           >
             All
@@ -130,7 +136,7 @@ export default function ApplicationsList({
           {APPLICATION_STATUSES.map((s) => (
             <Link
               key={s}
-              href={`/applications?status=${encodeURIComponent(s)}`}
+              href={`/applications?status=${encodeURIComponent(s)}&cycle=${encodeURIComponent(cycle)}`}
               className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
             >
               {s}

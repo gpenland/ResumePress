@@ -7,7 +7,7 @@ import {
   getApplicationStatusFlowForUser,
   listApplicationCycleOptionsForUser,
 } from "@/lib/applications";
-import { parseCycleSearchParam } from "@/lib/recruitingCycleShared";
+import { parseCycleSearchParam, serializeCycleSearchParam } from "@/lib/recruitingCycleShared";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -31,6 +31,11 @@ export default async function ApplicationsPage({
   const isKanban = view === "kanban";
   const isFlow = view === "flow";
   const cycles = parseCycleSearchParam(cycle);
+  // Resolved rather than the raw (possibly absent) `cycle` param, so every
+  // link below carries forward whatever cycle is actually in effect —
+  // including the "all cycles" and the implicit-current-cycle-by-default
+  // cases — instead of silently resetting to the default on navigation.
+  const resolvedCycle = serializeCycleSearchParam(cycles);
 
   const [applications, cycleOptions] = userId
     ? await Promise.all([
@@ -51,19 +56,19 @@ export default async function ApplicationsPage({
           <CycleFilter options={cycleOptions} selected={cycles} />
           <div className="flex rounded-lg border p-0.5">
             <Link
-              href={{ pathname: "/applications", query: { ...(status ? { status } : {}), ...(cycle ? { cycle } : {}) } }}
+              href={{ pathname: "/applications", query: { ...(status ? { status } : {}), cycle: resolvedCycle } }}
               className={cn(buttonVariants({ variant: !isKanban && !isFlow ? "default" : "ghost", size: "sm" }))}
             >
               List
             </Link>
             <Link
-              href={{ pathname: "/applications", query: { view: "kanban", ...(cycle ? { cycle } : {}) } }}
+              href={{ pathname: "/applications", query: { view: "kanban", cycle: resolvedCycle } }}
               className={cn(buttonVariants({ variant: isKanban ? "default" : "ghost", size: "sm" }))}
             >
               Kanban
             </Link>
             <Link
-              href={{ pathname: "/applications", query: { view: "flow", ...(cycle ? { cycle } : {}) } }}
+              href={{ pathname: "/applications", query: { view: "flow", cycle: resolvedCycle } }}
               className={cn(buttonVariants({ variant: isFlow ? "default" : "ghost", size: "sm" }))}
             >
               Flow
@@ -84,6 +89,7 @@ export default async function ApplicationsPage({
         <ApplicationsList
           applications={applications}
           status={status}
+          cycle={resolvedCycle}
           deleteApplication={deleteApplication}
           updateStatus={updateApplicationStatus}
           bulkUpdateStatus={bulkUpdateApplicationStatus}
