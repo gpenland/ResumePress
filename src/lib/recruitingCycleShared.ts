@@ -8,13 +8,26 @@
 // roughly August 2026 - August 2027), since Spring/Summer following a Fall
 // belong to that same recruiting cycle, not the next one.
 
-const SEASON_RE = /\b(fall|spring|summer)\b/i;
-const YEAR_RE = /\b(20\d{2}|\d{2})\b/;
+const SEASON = "(fall|spring|summer)";
+const YEAR = "(\\d{4}|\\d{2})";
+// Season and year must sit next to each other (up to 15 non-digit
+// characters apart, to tolerate "Fall of '26", "Fall, 2026", etc.) rather
+// than being found independently anywhere in the string — an earlier
+// version matched a season word and the *first* 2-or-4-digit number in the
+// whole term separately, which misparsed something like "12-week Fall 2026
+// internship" as the year 12 (from "12-week") instead of 2026. Checked in
+// both orders since "2026 Fall" is also plausible input.
+const SEASON_THEN_YEAR_RE = new RegExp(`\\b${SEASON}\\b[^0-9]{0,15}${YEAR}\\b`, "i");
+const YEAR_THEN_SEASON_RE = new RegExp(`\\b${YEAR}\\b[^0-9]{0,15}${SEASON}\\b`, "i");
 
 type Season = "Fall" | "Spring" | "Summer";
 
 function normalizeYear(raw: string): number {
   return raw.length === 2 ? 2000 + parseInt(raw, 10) : parseInt(raw, 10);
+}
+
+function toSeason(raw: string): Season {
+  return (raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()) as Season;
 }
 
 // Spring/Summer belong to the cycle whose Fall preceded them.
@@ -27,11 +40,11 @@ function cycleYearForSeason(season: Season, year: number): number {
 // (callers fall back to appliedAt in that case).
 export function parseTermToCycle(term: string | null | undefined): number | null {
   if (!term) return null;
-  const seasonMatch = term.match(SEASON_RE);
-  const yearMatch = term.match(YEAR_RE);
-  if (!seasonMatch || !yearMatch) return null;
-  const season = (seasonMatch[1].charAt(0).toUpperCase() + seasonMatch[1].slice(1).toLowerCase()) as Season;
-  return cycleYearForSeason(season, normalizeYear(yearMatch[1]));
+  const forward = term.match(SEASON_THEN_YEAR_RE);
+  if (forward) return cycleYearForSeason(toSeason(forward[1]), normalizeYear(forward[2]));
+  const backward = term.match(YEAR_THEN_SEASON_RE);
+  if (backward) return cycleYearForSeason(toSeason(backward[2]), normalizeYear(backward[1]));
+  return null;
 }
 
 // Maps an arbitrary date to the cycle someone would be applying for at that

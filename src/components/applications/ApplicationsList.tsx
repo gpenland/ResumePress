@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { APPLICATION_STATUSES, formatShortDate, type ApplicationWithCompany } from "@/lib/applicationsShared";
+import { cycleForApplication, cycleShortLabel } from "@/lib/recruitingCycleShared";
 
 type Props = {
   applications: ApplicationWithCompany[];
@@ -271,12 +272,20 @@ export default function ApplicationsList({
                       {app.company.name} <span className="text-muted-foreground font-normal">— {app.roleTitle}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {[
-                        [app.term, app.location].filter(Boolean).join(" · "),
-                        formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
-                      ]
-                        .filter(Boolean)
-                        .join("  ")}
+                      {(() => {
+                        const cycle = cycleForApplication(app.term, app.appliedAt);
+                        return [
+                          [app.term, app.location].filter(Boolean).join(" · "),
+                          formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
+                          // Surfaces what the cycle filter actually computed for this
+                          // row, so a misparsed term/appliedAt is visible while
+                          // scanning the list, not just invisibly wrong (issue #106
+                          // follow-up).
+                          cycle !== null && `Cycle ${cycleShortLabel(cycle)}`,
+                        ]
+                          .filter(Boolean)
+                          .join("  ");
+                      })()}
                     </p>
                   </div>
                 </Link>

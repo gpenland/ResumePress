@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
 import { formatShortDate } from "@/lib/applicationsShared";
+import { cycleForApplication, cycleLabel } from "@/lib/recruitingCycleShared";
 import { listResumesForUser } from "@/lib/resumes";
 import { listContactOptionsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
@@ -44,8 +45,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   ]);
   if (!application) notFound();
 
+  // Surfaces the cycle the filter dropdown actually computed for this
+  // application — otherwise there's no way to tell, from the UI, whether a
+  // term like "Summer 2027" parsed the way you'd expect (GitHub issue #106
+  // follow-up: visibility into the computed cycle, not just the filter).
+  const cycle = cycleForApplication(application.term, application.appliedAt);
+
   const details: Array<[string, string | null]> = [
     ["Term", application.term],
+    ["Recruiting cycle", cycle !== null ? cycleLabel(cycle) : null],
     ["Location", application.location],
     ["Applied", formatShortDate(application.appliedAt)],
     ["Source", application.source],
