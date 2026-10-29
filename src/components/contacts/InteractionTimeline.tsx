@@ -2,6 +2,7 @@
 
 import type { Interaction } from "@prisma/client";
 import DeleteItemButton from "@/components/DeleteItemButton";
+import { formatShortDate } from "@/lib/dateFormat";
 
 type Props = {
   interactions: (Interaction & { emailThread?: { gmailUrl: string | null } | null })[];
@@ -18,7 +19,7 @@ export default function InteractionTimeline({ interactions, deleteInteraction }:
       {interactions.map((i) => (
         <div key={i.id} className="flex items-start gap-3 text-sm px-1 py-1.5 border-b last:border-0">
           <span className="text-muted-foreground text-xs w-32 shrink-0 mt-0.5">
-            {new Date(i.occurredAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+            {formatShortDate(i.occurredAt)}
           </span>
           <div className="flex-1 min-w-0">
             <span className="font-medium">{i.type}</span>
@@ -34,7 +35,7 @@ export default function InteractionTimeline({ interactions, deleteInteraction }:
               Open email
             </a>
           )}
-          <DeleteItemButton action={deleteInteraction.bind(null, i.id)} itemName={`${i.type} on ${new Date(i.occurredAt).toLocaleDateString()}`} />
+          <DeleteItemButton action={deleteInteraction.bind(null, i.id)} itemName={`${i.type} on ${formatShortDate(i.occurredAt)}`} />
         </div>
       ))}
     </div>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn, nativeSelectClassName } from "@/lib/utils";
 import { fetchResumePdf, triggerBlobDownload } from "@/lib/pdfDownloadClient";
+import { formatShortDate } from "@/lib/dateFormat";
 
 // Extension point for Module D (Resume integration, docs/MIGRATION_PLAN.md §5).
 // Rendered from applications/[id]/page.tsx (Module A). Do not add contact/
@@ -109,7 +110,7 @@ export default function ResumeSection({
           )}
           {snapshot && (
             <span className="text-xs text-muted-foreground basis-full">
-              Pinned to the version from {new Date(snapshot.createdAt).toLocaleDateString()}. Editing the
+              Pinned to the version from {formatShortDate(snapshot.createdAt)}. Editing the
               resume won&apos;t change this until you refresh the snapshot.
             </span>
           )}

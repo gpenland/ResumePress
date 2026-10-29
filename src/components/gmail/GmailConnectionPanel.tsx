@@ -8,6 +8,7 @@ import Link from "next/link";
 import { cn, nativeSelectClassName } from "@/lib/utils";
 import type { GmailSyncStatus } from "@/lib/emailThreads";
 import type { GmailLabel } from "@/lib/gmail";
+import { formatShortDate } from "@/lib/dateFormat";
 
 type ConnectedProps = {
   connected: true;
@@ -184,7 +185,7 @@ export default function GmailConnectionPanel(props: Props) {
       return "Syncing…";
     }
     if (syncStatus.status === "error") return "Last sync failed";
-    return syncStatus.lastSyncAt ? `Synced ${syncStatus.lastSyncAt.toLocaleDateString()}` : "Never synced";
+    return syncStatus.lastSyncAt ? `Synced ${formatShortDate(syncStatus.lastSyncAt)}` : "Never synced";
   }
 
   return (
@@ -250,7 +251,7 @@ export default function GmailConnectionPanel(props: Props) {
 
       {expanded && (
         <div className="space-y-3 border-t pt-3">
-          <p className="text-xs text-muted-foreground">Connected {connectedAt.toLocaleDateString()}</p>
+          <p className="text-xs text-muted-foreground">Connected {formatShortDate(connectedAt)}</p>
 
           <div className="space-y-1.5">
             <p className="text-sm font-medium">Always include a label</p>

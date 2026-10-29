@@ -120,8 +120,7 @@ export function statusBarClass(status: string): string {
   return TONE_BAR_CLASSES[toneFor(status)];
 }
 
-// Shared date formatting for application dates (e.g. "Applied Jan 5, 2026").
-export function formatShortDate(d: Date | string | null | undefined): string | null {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+// Re-exported for existing callers (e.g. "Applied Jan 5, 2026") — the
+// formatter itself now lives in dateFormat.ts, shared by every domain
+// that renders a date in a client component, not just applications.
+export { formatShortDate } from "./dateFormat";
