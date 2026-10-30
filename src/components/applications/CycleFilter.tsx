@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -67,16 +68,21 @@ export default function CycleFilter({
         }
       />
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Recruiting cycle</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem checked={isAll} onCheckedChange={() => setCycles(undefined)}>
-          All cycles
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        {options.map((year) => (
-          <DropdownMenuCheckboxItem key={year} checked={!isAll && selectedSet.has(year)} onCheckedChange={() => toggle(year)}>
-            {cycleShortLabel(year)}
+        {/* DropdownMenuLabel wraps Base UI's Menu.GroupLabel, which requires a
+            surrounding Menu.Group (its MenuGroupContext) — omitting this
+            wrapper throws Base UI error #31 as soon as the menu opens. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Recruiting cycle</DropdownMenuLabel>
+          <DropdownMenuCheckboxItem checked={isAll} onCheckedChange={() => setCycles(undefined)}>
+            All cycles
           </DropdownMenuCheckboxItem>
-        ))}
+          <DropdownMenuSeparator />
+          {options.map((year) => (
+            <DropdownMenuCheckboxItem key={year} checked={!isAll && selectedSet.has(year)} onCheckedChange={() => toggle(year)}>
+              {cycleShortLabel(year)}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
