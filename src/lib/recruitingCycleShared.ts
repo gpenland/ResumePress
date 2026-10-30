@@ -86,7 +86,7 @@ export function cycleLabel(year: number): string {
 }
 
 export function cycleShortLabel(year: number): string {
-  return `'${String(year).slice(-2)}–'${String(year + 1).slice(-2)}`;
+  return `${year}-${year + 1}`;
 }
 
 // Parses the `?cycle=` search param used by the dashboard Statistics panel
