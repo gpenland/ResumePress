@@ -184,6 +184,7 @@ export default function GmailConnectionPanel(props: Props) {
       if (isFirstSync) return "Running your first sync…";
       return "Syncing…";
     }
+    if (syncStatus.needsReauth) return "Disconnected — reconnect needed";
     if (syncStatus.status === "error") return "Last sync failed";
     return syncStatus.lastSyncAt ? `Synced ${formatShortDate(syncStatus.lastSyncAt)}` : "Never synced";
   }
@@ -196,9 +197,15 @@ export default function GmailConnectionPanel(props: Props) {
           <p className="text-xs text-muted-foreground truncate">{statusLine()}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Button type="button" size="sm" onClick={handleSync} disabled={isRunning || isStarting}>
-            {isRunning || isStarting ? "Syncing…" : "Sync now"}
-          </Button>
+          {syncStatus.needsReauth ? (
+            <Link href="/api/gmail/oauth/start" className={cn(buttonVariants({ size: "sm" }))}>
+              Reconnect Gmail
+            </Link>
+          ) : (
+            <Button type="button" size="sm" onClick={handleSync} disabled={isRunning || isStarting}>
+              {isRunning || isStarting ? "Syncing…" : "Sync now"}
+            </Button>
+          )}
           <button
             type="button"
             onClick={() => setExpanded((o) => !o)}
@@ -297,7 +304,23 @@ export default function GmailConnectionPanel(props: Props) {
             {clearResult && <p className="text-xs text-muted-foreground">{clearResult}</p>}
           </div>
 
+          <div className="space-y-1 pt-2 border-t">
+            <Link
+              href="/api/gmail/oauth/start"
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+            >
+              Reconnect Gmail
+            </Link>
+            <p className="text-xs text-muted-foreground">
+              Use this if access expired — it keeps your sync progress, so only new mail is fetched.
+            </p>
+          </div>
+
           <form action={disconnect} className="pt-2 border-t">
+            <p className="text-xs text-muted-foreground pb-2">
+              Disconnecting clears sync progress, so reconnecting afterward rescans the whole inbox. To refresh
+              an expired connection, use Reconnect above instead.
+            </p>
             <SubmitButton
               variant="ghost"
               size="sm"

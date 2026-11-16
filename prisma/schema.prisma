@@ -380,4 +380,11 @@ model GmailAccount {
   syncTotal     Int?
   syncDone      Int?
   syncError     String?
+
+  // Set when the refresh token is dead (invalid_grant: Google "Testing"-mode
+  // 7-day expiry, revoked access, etc.) so the UI can prompt a reconnect
+  // instead of burying a generic sync error. Cleared on a successful token
+  // refresh or reconnect. See "Gmail sync" in CLAUDE.md.
+  needsReauth Boolean   @default(false)
+  reauthAt    DateTime?
 }

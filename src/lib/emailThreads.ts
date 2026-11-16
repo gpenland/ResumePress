@@ -8,9 +8,11 @@ import {
   getThreadDetails,
   gmailThreadUrl,
   GmailApiError,
+  GmailAuthError,
   type GmailLabel,
   type GmailThread,
 } from "@/lib/gmail";
+import { markGmailNeedsReauth, clearGmailNeedsReauth } from "@/lib/gmailAccount";
 import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import { listContactsForUser } from "@/lib/contacts";
 import { askJev, type JevQuestion } from "@/lib/jev";
@@ -243,7 +245,7 @@ async function rematchUnmatchedThreadsForUser(userId: string, candidates: MatchC
 
 export type SyncResult =
   | { ok: true; threadsUpserted: number; rematched: number }
-  | { ok: false; error: string };
+  | { ok: false; error: string; needsReauth?: boolean };
 
 // Lowered from 8: with up to ~1500 threads in a single sync (the 1000-thread
 // inbox cap plus however many carry the override label) each costing a
@@ -504,7 +506,12 @@ export async function syncGmailForUser(
   let accessToken: string;
   try {
     accessToken = await refreshAccessToken(decrypt(account.encryptedRefreshToken));
+    if (account.needsReauth) await clearGmailNeedsReauth(userId);
   } catch (err) {
+    if (err instanceof GmailAuthError) {
+      await markGmailNeedsReauth(userId);
+      return { ok: false, error: err.message, needsReauth: true };
+    }
     return { ok: false, error: err instanceof Error ? err.message : "Failed to refresh Gmail access." };
   }
 
@@ -535,7 +542,10 @@ export async function syncGmailForUser(
   // edges is harmless (needsJevPass still skips reclassifying anything
   // that hasn't changed; the upsert is idempotent either way).
   const RESYNC_OVERLAP_BUFFER_MS = 15 * 60 * 1000;
-  const sinceEpochSeconds = account.lastSyncAt
+  // Past ~60 days an `after:` window is no cheaper than the capped full scan
+  // and risks a stale anchor, so fall back to a first-sync-style scan.
+  const MAX_INCREMENTAL_AGE_MS = 60 * 24 * 60 * 60 * 1000;
+  const sinceEpochSeconds = account.lastSyncAt && Date.now() - account.lastSyncAt.getTime() < MAX_INCREMENTAL_AGE_MS
     ? Math.floor((account.lastSyncAt.getTime() - RESYNC_OVERLAP_BUFFER_MS) / 1000)
     : undefined;
 
@@ -837,6 +847,9 @@ function trackSyncProgress(userId: string, claimedAt: Date): (done: number, tota
 export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncResult> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { ok: false, error: "Gmail is not connected." };
+  if (account.needsReauth) {
+    return { ok: false, error: "Gmail access has expired — reconnect Gmail to resume syncing.", needsReauth: true };
+  }
   const claimedAt = await markSyncRunningForUser(userId);
   if (!claimedAt) {
     return { ok: false, error: "A sync is already in progress for this account." };
@@ -874,6 +887,7 @@ export async function runTrackedGmailSyncForUser(userId: string): Promise<SyncRe
 export async function startGmailSyncInBackgroundForUser(userId: string): Promise<{ started: boolean; error?: string }> {
   const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account) return { started: false, error: "Gmail is not connected." };
+  if (account.needsReauth) return { started: false, error: "Gmail access has expired — reconnect Gmail to resume syncing." };
   const claimedAt = await markSyncRunningForUser(userId);
   if (!claimedAt) {
     return { started: false, error: "A sync is already in progress." };
@@ -903,16 +917,17 @@ export type GmailSyncStatus = {
   done: number | null;
   error: string | null;
   lastSyncAt: Date | null;
+  needsReauth: boolean;
 };
 
 /** Polled by the browser while a background sync (started above) is running, to drive the progress UI and know when to refresh. */
 export async function getGmailSyncStatusForUser(userId: string): Promise<GmailSyncStatus> {
   const account = await prisma.gmailAccount.findUnique({
     where: { userId },
-    select: { syncStatus: true, syncStartedAt: true, syncTotal: true, syncDone: true, syncError: true, lastSyncAt: true },
+    select: { syncStatus: true, syncStartedAt: true, syncTotal: true, syncDone: true, syncError: true, lastSyncAt: true, needsReauth: true },
   });
   if (!account) {
-    return { status: "idle", startedAt: null, total: null, done: null, error: null, lastSyncAt: null };
+    return { status: "idle", startedAt: null, total: null, done: null, error: null, lastSyncAt: null, needsReauth: false };
   }
 
   // A "running" status past STALE_SYNC_THRESHOLD_MS means the process that
@@ -935,6 +950,7 @@ export async function getGmailSyncStatusForUser(userId: string): Promise<GmailSy
       done: account.syncDone,
       error: message,
       lastSyncAt: account.lastSyncAt,
+      needsReauth: account.needsReauth,
     };
   }
 
@@ -945,6 +961,7 @@ export async function getGmailSyncStatusForUser(userId: string): Promise<GmailSy
     done: account.syncDone,
     error: account.syncError,
     lastSyncAt: account.lastSyncAt,
+    needsReauth: account.needsReauth,
   };
 }
 

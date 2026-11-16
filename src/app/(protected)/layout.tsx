@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, isAllowedEmail } from "@/lib/auth";
+import Link from "next/link";
+import { gmailNeedsReauth } from "@/lib/gmailAccount";
 import { listContactOptionsForUser } from "@/lib/contacts";
 import { listApplicationOptionsForUser } from "@/lib/interactions";
 import { logInteraction } from "./contacts/actions";
@@ -21,13 +23,22 @@ export default async function ProtectedLayout({
   }
 
   const userId = session.user.id;
-  const [contactOptions, applicationOptions] = await Promise.all([
+  const [contactOptions, applicationOptions, emailNeedsReauth] = await Promise.all([
     listContactOptionsForUser(userId),
     listApplicationOptionsForUser(userId),
+    gmailNeedsReauth(userId),
   ]);
 
   return (
     <>
+      {emailNeedsReauth && (
+        <div role="alert" className="bg-destructive/10 text-destructive text-sm px-4 py-2 text-center">
+          Gmail access has expired and email sync is paused.{" "}
+          <Link href="/api/gmail/oauth/start" className="font-medium underline">
+            Reconnect Gmail
+          </Link>
+        </div>
+      )}
       {children}
       <GlobalQuickAdd
         contactOptions={contactOptions}

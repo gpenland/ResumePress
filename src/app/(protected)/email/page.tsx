@@ -49,6 +49,7 @@ export default async function EmailPage() {
     done: null,
     error: null,
     lastSyncAt: null,
+    needsReauth: false,
   };
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];

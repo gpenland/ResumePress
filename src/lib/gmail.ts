@@ -13,6 +13,20 @@ export class GmailApiError extends Error {
   }
 }
 
+/**
+ * The refresh token itself is dead (expired, revoked, or capped out) — not a
+ * transient failure. Retrying never helps; only a fresh OAuth consent does.
+ */
+export class GmailAuthError extends Error {
+  constructor(message: string, public status?: number) {
+    super(message);
+  }
+}
+
+// Google's token endpoint error codes that mean "this credential will never
+// work again" as opposed to a network blip or 5xx.
+const DEAD_GRANT_ERRORS = new Set(["invalid_grant", "invalid_client", "unauthorized_client"]);
+
 function isRateLimitResponse(status: number, bodyText: string): boolean {
   if (status === 429) return true;
   // Gmail reports quota exhaustion as a 403 with a reason in the body
@@ -112,6 +126,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
 
   const data = (await res.json()) as { access_token?: string; error?: string; error_description?: string };
   if (!res.ok || !data.access_token) {
+    if (data.error && DEAD_GRANT_ERRORS.has(data.error)) {
+      throw new GmailAuthError(
+        "Gmail access has expired or been revoked — reconnect Gmail to resume syncing.",
+        res.status
+      );
+    }
     throw new GmailApiError(
       data.error_description ?? data.error ?? "Failed to refresh Gmail access token — reconnect Gmail.",
       res.status
