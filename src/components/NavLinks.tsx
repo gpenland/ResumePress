@@ -20,6 +20,8 @@ type NavLink = {
   matchPrefixes?: string[];
   /** Optional count badge, e.g. pending email triage items. */
   badge?: number;
+  /** Needs-attention marker (e.g. Gmail connection expired) — rendered as a destructive dot. */
+  alert?: boolean;
 };
 
 function isLinkActive(pathname: string, link: NavLink): boolean {
@@ -33,7 +35,7 @@ function isLinkActive(pathname: string, link: NavLink): boolean {
 // renders and this never mounts its trigger.
 function MobileNavMenu({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
-  const activeCount = links.reduce((sum, l) => sum + (l.badge ?? 0), 0);
+  const activeCount = links.reduce((sum, l) => sum + (l.badge ?? 0) + (l.alert ? 1 : 0), 0);
 
   return (
     <DropdownMenu>
@@ -54,6 +56,7 @@ function MobileNavMenu({ links }: { links: NavLink[] }) {
               {link.label}
             </span>
             {!!link.badge && <Badge variant="secondary">{link.badge}</Badge>}
+            {link.alert && <span aria-label="Needs attention" className="size-2 rounded-full bg-destructive" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -80,6 +83,7 @@ export default function NavLinks({ links }: { links: NavLink[] }) {
             >
               {link.label}
               {!!link.badge && <Badge variant="secondary">{link.badge}</Badge>}
+              {link.alert && <span aria-label="Needs attention" className="size-2 rounded-full bg-destructive" />}
             </Link>
           );
         })}

@@ -8,6 +8,7 @@ import UserMenu from "@/components/UserMenu";
 import ThemeToggle from "@/components/ThemeToggle";
 import NavLinks from "@/components/NavLinks";
 import { listTriageThreadsForUser } from "@/lib/emailThreads";
+import { gmailNeedsReauth } from "@/lib/gmailAccount";
 import { cn } from "@/lib/utils";
 
 export default async function Nav() {
@@ -16,11 +17,13 @@ export default async function Nav() {
     ? (await listTriageThreadsForUser(session.user.id)).length
     : 0;
 
+  const emailNeedsReauth = session?.user?.id ? await gmailNeedsReauth(session.user.id) : false;
+
   const navLinks = [
     { href: "/applications", label: "Applications" },
     { href: "/contacts", label: "Contacts" },
     { href: "/resumes", label: "Resumes", matchPrefixes: ["/entries", "/categories"] },
-    { href: "/email", label: "Email", badge: triageCount },
+    { href: "/email", label: "Email", badge: triageCount, alert: emailNeedsReauth },
   ];
 
   return (
