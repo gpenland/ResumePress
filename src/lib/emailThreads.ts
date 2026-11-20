@@ -15,6 +15,7 @@ import {
 import { markGmailNeedsReauth, clearGmailNeedsReauth } from "@/lib/gmailAccount";
 import { extractDomain, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import { listContactsForUser } from "@/lib/contacts";
+import { updateApplicationStatusForUser } from "@/lib/applications";
 import { askJev, type JevQuestion } from "@/lib/jev";
 import { APPLICATION_STATUSES, STATUS_DESCRIPTIONS, type ApplicationStatus } from "@/lib/applicationsShared";
 import type { EmailThread } from "@prisma/client";
@@ -1092,6 +1093,104 @@ export async function listRecentMatchedThreadsForUser(userId: string, limit = 5)
     orderBy: { lastMessageAt: "desc" },
     take: limit,
   });
+}
+
+/**
+ * Already-matched (auto/confirmed) threads carrying a pending Jev status-change
+ * suggestion for their matched application — e.g. a rejection email
+ * auto-matched to an application still marked "Applied". These never show in
+ * the triage queue (that's unmatched-only), so without this list the
+ * suggestion classifyThreadForTriage wrote at sync time would be invisible
+ * for exactly the threads it's most likely to be right about.
+ *
+ * Filtered in-memory (needs a cross-row comparison Prisma's `where` can't
+ * express) to drop suggestions that no longer apply:
+ * - the application is already at the suggested status;
+ * - the application's status was changed (by anyone, any path) after this
+ *   thread's last message — a later manual change supersedes an older email.
+ */
+export async function listStatusSuggestionThreadsForUser(userId: string) {
+  const threads = await prisma.emailThread.findMany({
+    where: {
+      userId,
+      matchStatus: { in: ["auto", "confirmed"] },
+      matchedApplicationId: { not: null },
+      jevSuggestedStatus: { not: null },
+    },
+    include: {
+      matchedContact: { select: { id: true, name: true } },
+      matchedApplication: {
+        select: {
+          id: true,
+          roleTitle: true,
+          status: true,
+          company: { select: { name: true } },
+          statusHistory: { select: { changedAt: true }, orderBy: { changedAt: "desc" }, take: 1 },
+        },
+      },
+    },
+    orderBy: { lastMessageAt: "desc" },
+  });
+
+  return threads
+    .filter((t) => {
+      const app = t.matchedApplication;
+      if (!app || !t.jevSuggestedStatus) return false;
+      if (app.status === t.jevSuggestedStatus) return false;
+      const lastChange = app.statusHistory[0]?.changedAt;
+      if (lastChange && t.lastMessageAt && lastChange >= t.lastMessageAt) return false;
+      return true;
+    })
+    .map(({ matchedApplication, ...t }) => ({
+      ...t,
+      matchedApplication: matchedApplication && {
+        id: matchedApplication.id,
+        roleTitle: matchedApplication.roleTitle,
+        status: matchedApplication.status,
+        company: matchedApplication.company,
+      },
+    }));
+}
+
+/**
+ * Applies a thread's stored Jev status suggestion to an application. The
+ * status comes from the thread row itself, never from the caller, so this
+ * can only ever apply what Jev actually suggested. `applicationId` defaults
+ * to the thread's matched application; the triage queue passes the row's
+ * current pick instead (an unmatched thread has no matched application yet).
+ * Ownership of that application is checked by updateApplicationStatusForUser.
+ * Clears the suggestion afterwards so it doesn't reappear on reload.
+ */
+export async function applyEmailThreadStatusSuggestionForUser(
+  userId: string,
+  emailThreadId: string,
+  applicationId?: string | null
+): Promise<{ ok: boolean; status?: string; applicationId?: string }> {
+  const thread = await prisma.emailThread.findFirst({ where: { id: emailThreadId, userId } });
+  const targetApplicationId = applicationId || thread?.matchedApplicationId;
+  if (!thread || !thread.jevSuggestedStatus || !targetApplicationId) return { ok: false };
+
+  const result = await updateApplicationStatusForUser(userId, targetApplicationId, thread.jevSuggestedStatus);
+  if (!result.ok) return { ok: false };
+
+  await dismissEmailThreadStatusSuggestionForUser(userId, emailThreadId);
+  return { ok: true, status: thread.jevSuggestedStatus, applicationId: targetApplicationId };
+}
+
+/**
+ * Clears a thread's Jev status suggestion without applying it. Persisted (not
+ * just hidden client-side) so a dismissed suggestion stays dismissed; a later
+ * message on the thread re-runs classification and may suggest again.
+ */
+export async function dismissEmailThreadStatusSuggestionForUser(
+  userId: string,
+  emailThreadId: string
+): Promise<{ ok: boolean }> {
+  const { count } = await prisma.emailThread.updateMany({
+    where: { id: emailThreadId, userId },
+    data: { jevSuggestedStatus: null, jevSuggestedStatusConf: null },
+  });
+  return { ok: count > 0 };
 }
 
 export async function listIgnoredThreadsForUser(userId: string) {

@@ -7,15 +7,16 @@ import {
   listAvailableLabelsForUser,
   listTriageThreadsForUser,
   listRecentMatchedThreadsForUser,
+  listStatusSuggestionThreadsForUser,
   listIgnoredThreadsForUser,
   listApplicationPickerOptionsForUser,
   getGmailSyncStatusForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
-import { updateApplicationStatus } from "@/app/(protected)/applications/actions";
 import { Badge } from "@/components/ui/badge";
 import GmailConnectionPanel from "@/components/gmail/GmailConnectionPanel";
 import TriageList from "@/components/gmail/TriageList";
+import StatusSuggestionsList from "@/components/gmail/StatusSuggestionsList";
 import RecentEmailsList from "@/components/gmail/RecentEmailsList";
 import IgnoredThreadsList from "@/components/gmail/IgnoredThreadsList";
 import {
@@ -33,6 +34,8 @@ import {
   bulkConfirmEmailThreadMatches,
   bulkIgnoreEmailThreadMatches,
   suggestMatchForThread,
+  applyEmailThreadStatusSuggestion,
+  dismissEmailThreadStatusSuggestion,
 } from "./actions";
 
 export default async function EmailPage() {
@@ -53,6 +56,7 @@ export default async function EmailPage() {
   };
   let threads: Awaited<ReturnType<typeof listTriageThreadsForUser>> = [];
   let recentThreads: Awaited<ReturnType<typeof listRecentMatchedThreadsForUser>> = [];
+  let statusSuggestionThreads: Awaited<ReturnType<typeof listStatusSuggestionThreadsForUser>> = [];
   let ignoredThreads: Awaited<ReturnType<typeof listIgnoredThreadsForUser>> = [];
   let contactOptions: Awaited<ReturnType<typeof listContactOptionsForUser>> = [];
   let applications: Awaited<ReturnType<typeof listApplicationPickerOptionsForUser>> = [];
@@ -63,6 +67,7 @@ export default async function EmailPage() {
       account,
       syncStatusResult,
       threadsResult,
+      statusSuggestionsResult,
       ignoredResult,
       contactOptionsResult,
       applicationsResult,
@@ -71,6 +76,7 @@ export default async function EmailPage() {
       prisma.gmailAccount.findUnique({ where: { userId }, select: { syncLabelIds: true } }),
       getGmailSyncStatusForUser(userId),
       listTriageThreadsForUser(userId),
+      listStatusSuggestionThreadsForUser(userId),
       listIgnoredThreadsForUser(userId),
       listContactOptionsForUser(userId),
       listApplicationPickerOptionsForUser(userId),
@@ -79,6 +85,7 @@ export default async function EmailPage() {
     overrideLabelId = account?.syncLabelIds[0] ?? null;
     syncStatus = syncStatusResult;
     threads = threadsResult;
+    statusSuggestionThreads = statusSuggestionsResult;
     ignoredThreads = ignoredResult;
     contactOptions = contactOptionsResult;
     applications = applicationsResult;
@@ -128,6 +135,12 @@ export default async function EmailPage() {
 
       {status.connected && (
         <>
+          <StatusSuggestionsList
+            threads={statusSuggestionThreads}
+            applySuggestion={applyEmailThreadStatusSuggestion}
+            dismissSuggestion={dismissEmailThreadStatusSuggestion}
+          />
+
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">Needs review</h2>
@@ -147,7 +160,8 @@ export default async function EmailPage() {
                 bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
                 createContact={createContactFromTriage}
                 createApplication={createApplicationFromTriage}
-                updateApplicationStatus={updateApplicationStatus}
+                applyStatusSuggestion={applyEmailThreadStatusSuggestion}
+                dismissStatusSuggestion={dismissEmailThreadStatusSuggestion}
                 suggestMatch={suggestMatchForThread}
               />
             )}
