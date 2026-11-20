@@ -58,7 +58,8 @@ type Props = {
   bulkIgnoreMatches: (threadIds: string[]) => Promise<void>;
   createContact: CreateContact;
   createApplication: CreateApplication;
-  updateApplicationStatus: (applicationId: string, status: string) => Promise<void>;
+  applyStatusSuggestion: (threadId: string, applicationId?: string | null) => Promise<void>;
+  dismissStatusSuggestion: (threadId: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
 };
 
@@ -71,7 +72,8 @@ type RowProps = {
   ignoreMatch: (threadId: string) => Promise<void>;
   createContact: CreateContact;
   createApplication: CreateApplication;
-  updateApplicationStatus: (applicationId: string, status: string) => Promise<void>;
+  applyStatusSuggestion: (threadId: string, applicationId?: string | null) => Promise<void>;
+  dismissStatusSuggestion: (threadId: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
   selected: boolean;
   onToggleSelected: () => void;
@@ -88,7 +90,8 @@ function TriageRow({
   ignoreMatch,
   createContact,
   createApplication,
-  updateApplicationStatus,
+  applyStatusSuggestion,
+  dismissStatusSuggestion,
   suggestMatch,
   selected,
   onToggleSelected,
@@ -123,9 +126,9 @@ function TriageRow({
   }
 
   // Status-change suggestion (e.g. a rejection for an app marked Applied) —
-  // dismissible, applies via the same action the application detail page's
-  // own "Suggest status" button uses. Only ever shown once; Dismiss or
-  // Apply both end it for this render (no "ask again" loop here).
+  // dismissible. Apply/Dismiss both clear the suggestion server-side (see
+  // applyEmailThreadStatusSuggestionForUser), so it stays gone on reload; the
+  // local flag just hides it immediately.
   const [statusDismissed, setStatusDismissed] = useState(false);
   const [isApplyingStatus, startApplyStatusTransition] = useTransition();
   const suggestedStatusApplicationId = applicationId || thread.matchedApplication?.id || null;
@@ -133,9 +136,16 @@ function TriageRow({
   function handleApplyStatus() {
     if (!thread.jevSuggestedStatus || !suggestedStatusApplicationId) return;
     startApplyStatusTransition(async () => {
-      await updateApplicationStatus(suggestedStatusApplicationId, thread.jevSuggestedStatus!);
+      await applyStatusSuggestion(thread.id, suggestedStatusApplicationId);
       setStatusDismissed(true);
       router.refresh();
+    });
+  }
+
+  function handleDismissStatus() {
+    setStatusDismissed(true);
+    startApplyStatusTransition(async () => {
+      await dismissStatusSuggestion(thread.id);
     });
   }
 
@@ -323,7 +333,7 @@ function TriageRow({
                 <Button type="button" size="sm" onClick={handleApplyStatus} disabled={isApplyingStatus}>
                   {isApplyingStatus ? "Applying…" : "Apply"}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setStatusDismissed(true)}>
+                <Button type="button" size="sm" variant="ghost" onClick={handleDismissStatus} disabled={isApplyingStatus}>
                   Dismiss
                 </Button>
               </>
@@ -388,7 +398,8 @@ export default function TriageList({
   bulkIgnoreMatches,
   createContact,
   createApplication,
-  updateApplicationStatus,
+  applyStatusSuggestion,
+  dismissStatusSuggestion,
   suggestMatch,
 }: Props) {
   const router = useRouter();
@@ -517,7 +528,8 @@ export default function TriageList({
           ignoreMatch={ignoreMatch}
           createContact={createContact}
           createApplication={createApplication}
-          updateApplicationStatus={updateApplicationStatus}
+          applyStatusSuggestion={applyStatusSuggestion}
+          dismissStatusSuggestion={dismissStatusSuggestion}
           suggestMatch={suggestMatch}
           selected={selectedIds.has(thread.id)}
           onToggleSelected={() => toggleSelected(thread.id)}

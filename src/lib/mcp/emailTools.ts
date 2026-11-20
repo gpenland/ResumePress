@@ -15,6 +15,9 @@ import {
   confirmEmailThreadMatchForUser,
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
+  listStatusSuggestionThreadsForUser,
+  applyEmailThreadStatusSuggestionForUser,
+  dismissEmailThreadStatusSuggestionForUser,
 } from "@/lib/emailThreads";
 import { textResult, errorResult, compact } from "./shared";
 
@@ -127,6 +130,43 @@ export function registerEmailTools(server: McpServer, userId: string): void {
     "list_ignored_threads",
     { description: "List email threads that were ignored (dismissed from triage).", inputSchema: {} },
     async () => textResult(compact(await listIgnoredThreadsForUser(userId)))
+  );
+
+  server.registerTool(
+    "list_email_status_suggestions",
+    {
+      description:
+        "List already-matched email threads where Jev suggests changing the matched application's status (e.g. a rejection email for an application still marked Applied). Excludes suggestions already at the current status or superseded by a later status change.",
+      inputSchema: {},
+    },
+    async () => textResult(compact(await listStatusSuggestionThreadsForUser(userId)))
+  );
+
+  server.registerTool(
+    "apply_email_status_suggestion",
+    {
+      description:
+        "Apply an email thread's stored Jev status suggestion to its matched application (or to applicationId, if given), then clear the suggestion. The status applied is always the thread's own stored suggestion.",
+      inputSchema: { threadId: z.string(), applicationId: z.string().nullable().optional() },
+    },
+    async ({ threadId, applicationId }) => {
+      const result = await applyEmailThreadStatusSuggestionForUser(userId, threadId, applicationId);
+      if (!result.ok) return errorResult(`Thread ${threadId} not found, has no pending status suggestion, or has no application to apply it to`);
+      return textResult(result);
+    }
+  );
+
+  server.registerTool(
+    "dismiss_email_status_suggestion",
+    {
+      description: "Dismiss an email thread's Jev status suggestion without applying it.",
+      inputSchema: { threadId: z.string() },
+    },
+    async ({ threadId }) => {
+      const result = await dismissEmailThreadStatusSuggestionForUser(userId, threadId);
+      if (!result.ok) return errorResult(`Thread ${threadId} not found`);
+      return textResult(result);
+    }
   );
 
   server.registerTool(

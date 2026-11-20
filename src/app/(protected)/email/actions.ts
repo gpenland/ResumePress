@@ -12,6 +12,8 @@ import {
   ignoreEmailThreadMatchForUser,
   restoreEmailThreadMatchForUser,
   suggestMatchForThreadForUser,
+  applyEmailThreadStatusSuggestionForUser,
+  dismissEmailThreadStatusSuggestionForUser,
   type GmailSyncStatus,
   type SuggestedMatch,
 } from "@/lib/emailThreads";
@@ -153,4 +155,26 @@ export async function createApplicationFromTriage(companyName: string, roleTitle
   revalidatePath("/email");
   revalidatePath("/applications");
   return { id: application.id, roleTitle: application.roleTitle, companyName };
+}
+
+// Applies the thread's own stored Jev status suggestion (never a
+// client-supplied status) — see applyEmailThreadStatusSuggestionForUser.
+// applicationId is only passed by the triage queue, where the thread has no
+// matched application yet and the row's current pick stands in for it.
+export async function applyEmailThreadStatusSuggestion(threadId: string, applicationId?: string | null) {
+  const userId = await requireUserId();
+  const result = await applyEmailThreadStatusSuggestionForUser(userId, threadId, applicationId);
+  if (!result.ok) notFound();
+
+  revalidatePath("/email");
+  revalidatePath("/applications");
+  revalidatePath(`/applications/${result.applicationId}`);
+}
+
+export async function dismissEmailThreadStatusSuggestion(threadId: string) {
+  const userId = await requireUserId();
+  const result = await dismissEmailThreadStatusSuggestionForUser(userId, threadId);
+  if (!result.ok) notFound();
+
+  revalidatePath("/email");
 }
