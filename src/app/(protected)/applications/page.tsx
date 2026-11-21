@@ -20,6 +20,8 @@ import ApplicationsList from "@/components/applications/ApplicationsList";
 import ApplicationsKanban from "@/components/applications/ApplicationsKanban";
 import ApplicationStatusSankey from "@/components/applications/ApplicationStatusSankey";
 import CycleFilter from "@/components/applications/CycleFilter";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
 
 export default async function ApplicationsPage({
   searchParams,
@@ -45,42 +47,40 @@ export default async function ApplicationsPage({
     : [[], []];
   const statusFlow = isFlow && userId ? await getApplicationStatusFlowForUser(userId, { cycles }) : [];
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight font-heading">Applications</h1>
-          <p className="text-muted-foreground text-sm mt-1">{applications.length} total</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CycleFilter options={cycleOptions} selected={cycles} />
-          <div className="flex rounded-lg border p-0.5">
-            <Link
-              href={{ pathname: "/applications", query: { ...(status ? { status } : {}), cycle: resolvedCycle } }}
-              className={cn(buttonVariants({ variant: !isKanban && !isFlow ? "default" : "ghost", size: "sm" }))}
-            >
-              List
-            </Link>
-            <Link
-              href={{ pathname: "/applications", query: { view: "kanban", cycle: resolvedCycle } }}
-              className={cn(buttonVariants({ variant: isKanban ? "default" : "ghost", size: "sm" }))}
-            >
-              Kanban
-            </Link>
-            <Link
-              href={{ pathname: "/applications", query: { view: "flow", cycle: resolvedCycle } }}
-              className={cn(buttonVariants({ variant: isFlow ? "default" : "ghost", size: "sm" }))}
-            >
-              Flow
-            </Link>
-          </div>
-          <Link href="/applications/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            Import
-          </Link>
-          <Link href="/applications/new" className={cn(buttonVariants())}>New Application</Link>
-        </div>
-      </div>
+  const viewTab = (label: string, active: boolean, query: Record<string, string>) => (
+    <Link
+      href={{ pathname: "/applications", query }}
+      aria-current={active ? "page" : undefined}
+      className={cn(buttonVariants({ variant: active ? "default" : "ghost", size: "sm" }))}
+    >
+      {label}
+    </Link>
+  );
 
+  return (
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Pipeline"
+          title="Applications"
+          description={`${applications.length} total`}
+          actions={
+            <>
+              <CycleFilter options={cycleOptions} selected={cycles} />
+              <div className="flex border bg-card p-0.5">
+                {viewTab("List", !isKanban && !isFlow, { ...(status ? { status } : {}), cycle: resolvedCycle })}
+                {viewTab("Kanban", isKanban, { view: "kanban", cycle: resolvedCycle })}
+                {viewTab("Flow", isFlow, { view: "flow", cycle: resolvedCycle })}
+              </div>
+              <Link href="/applications/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                Import
+              </Link>
+              <Link href="/applications/new" className={cn(buttonVariants())}>New application</Link>
+            </>
+          }
+        />
+      }
+    >
       {isFlow ? (
         <ApplicationStatusSankey links={statusFlow} />
       ) : isKanban ? (
@@ -96,6 +96,6 @@ export default async function ApplicationsPage({
           bulkDelete={bulkDeleteApplications}
         />
       )}
-    </div>
+    </PageGrid>
   );
 }

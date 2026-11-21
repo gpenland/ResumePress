@@ -135,6 +135,8 @@ Built so far (suggestion-only; one runs automatically):
 
 Run `npm run check:jake-template` after any change to `jake.ts` — it renders the template with fixed dummy data and diffs against the golden fixture `src/templates/__fixtures__/jake.golden.tex`, failing with a line-level diff on any unintended change. If a static-LaTeX change is genuinely needed, update the golden fixture *and* add the discrepancy to the list above in the same commit.
 
+**"Nord Paper" design system** — tokens in `globals.css` (Nord palette, `--radius: 0.125rem` for sharp corners, `--grid` for the dashed grid hairline, lifted further in dark mode so it stays visible). Headings use `font-heading` = Instrument Serif Italic, which has only a 400 weight; an unlayered `.font-heading` rule forces italic 400 so a stray `font-bold` can't produce faux bold. Page titles are `text-3xl tracking-tight font-heading`. `PageGrid` (`src/components/PageGrid.tsx`) is the **opt-in** page scaffold: a dashed four-column grid behind the page (`lg+` only), a header band, and the body; used by the dashboard and `/applications`. Opt-in because the lines only work on pages laid out on that grid — on a gridded page, every surface must be opaque (`bg-card`/`bg-background`) so lines stop at surfaces instead of running under text, and text sits `GRID_INSET` (24px at `lg`) inside its column. `PageHeader` puts its title and actions on opaque label boxes for the same reason. Statuses render as `StatusBadge` = `StatusDot` + label (tones in `applicationsShared.ts`; Rejected is a hollow ring so it never reads as Interviewing's amber). `SiteFooter` (protected layout) carries the daily-rotating colophon line.
+
 **Card spacing gotcha:** the shadcn Card applies `py-(--card-spacing)` (16px) to itself plus `gap-(--card-spacing)` between children. For list-row cards using `CardContent` with its own `py-*`, add `py-0` to the `Card` to avoid double-stacking vertical padding.
 
 ## Data Model
@@ -193,3 +195,13 @@ Built-in category slugs: `experience`, `education`, `projects`, `skills` — mat
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

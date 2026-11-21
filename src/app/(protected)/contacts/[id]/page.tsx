@@ -41,7 +41,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight font-heading">{contact.name}</h1>
+          <h1 className="text-3xl tracking-tight font-heading">{contact.name}</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {contact.emails.map((email, idx) => (
               <span key={email}>

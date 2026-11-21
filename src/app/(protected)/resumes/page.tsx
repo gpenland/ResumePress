@@ -28,7 +28,7 @@ export default async function ResumesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight font-heading">Resumes</h1>
+          <h1 className="text-3xl tracking-tight font-heading">Resumes</h1>
           <p className="text-muted-foreground text-sm mt-1">{resumes.length} saved</p>
         </div>
         <Link href="/resumes/new" className={cn(buttonVariants())}>New Resume</Link>

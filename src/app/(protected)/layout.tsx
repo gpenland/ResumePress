@@ -7,6 +7,7 @@ import { listApplicationOptionsForUser } from "@/lib/interactions";
 import { logInteraction } from "./contacts/actions";
 import GlobalQuickAdd from "@/components/contacts/GlobalQuickAdd";
 import ResumeFlourish from "@/components/ResumeFlourish";
+import SiteFooter from "@/components/SiteFooter";
 
 export default async function ProtectedLayout({
   children,
@@ -32,14 +33,15 @@ export default async function ProtectedLayout({
   return (
     <>
       {emailNeedsReauth && (
-        <div role="alert" className="bg-destructive/10 text-destructive text-sm px-4 py-2 text-center">
+        <div role="alert" className="border-b border-dashed border-destructive/40 bg-destructive/10 text-destructive text-sm px-4 py-2 text-center">
           Gmail access has expired and email sync is paused.{" "}
           <Link href="/api/gmail/oauth/start" className="font-medium underline">
             Reconnect Gmail
           </Link>
         </div>
       )}
-      {children}
+      <div className="flex-1">{children}</div>
+      <SiteFooter />
       <GlobalQuickAdd
         contactOptions={contactOptions}
         applicationOptions={applicationOptions}

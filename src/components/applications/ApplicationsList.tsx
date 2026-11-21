@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { GRID_INSET } from "@/components/PageGrid";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { buttonVariants } from "@/components/ui/button";
@@ -117,45 +117,49 @@ export default function ApplicationsList({
     });
   }
 
+  // One surface — toolbar, selection bar and rows — so nothing in the list
+  // view sits on bare background over the page grid.
   return (
-    <>
-      <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search applications..."
-        aria-label="Search applications"
-      />
+    <div className="border bg-card">
+      <div className={cn("space-y-3 border-b py-4", GRID_INSET)}>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search applications..."
+          aria-label="Search applications"
+        />
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-2 flex-wrap">
-          <Link
-            href={`/applications?cycle=${encodeURIComponent(cycle)}`}
-            className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
-          >
-            All
-          </Link>
-          {APPLICATION_STATUSES.map((s) => (
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Link
-              key={s}
-              href={`/applications?status=${encodeURIComponent(s)}&cycle=${encodeURIComponent(cycle)}`}
-              className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
+              href={`/applications?cycle=${encodeURIComponent(cycle)}`}
+              className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
             >
-              {s}
+              All
             </Link>
-          ))}
+            {APPLICATION_STATUSES.map((s) => (
+              <Link
+                key={s}
+                href={`/applications?status=${encodeURIComponent(s)}&cycle=${encodeURIComponent(cycle)}`}
+                className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
+              >
+                {s}
+              </Link>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            aria-label={`Sort by date, currently ${sortDir === "desc" ? "newest first" : "oldest first"}`}
+          >
+            Date {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          aria-label={`Sort by date, currently ${sortDir === "desc" ? "newest first" : "oldest first"}`}
-        >
-          Date {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
-        </button>
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 flex-wrap rounded-lg border bg-muted/30 px-3 py-2">
+        <div className={cn("flex items-center gap-3 flex-wrap border-b bg-muted/40 py-2", GRID_INSET)}>
           <span className="text-sm font-medium">{selected.size} selected</span>
           <select
             defaultValue=""
@@ -214,8 +218,7 @@ export default function ApplicationsList({
       </AlertDialog>
 
       {filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center py-16 text-center gap-3">
+        <div className="flex flex-col items-center py-16 text-center gap-3">
             {applications.length === 0 ? (
               <>
                 <p className="text-muted-foreground text-sm">No applications yet</p>
@@ -235,11 +238,10 @@ export default function ApplicationsList({
                 </button>
               </>
             )}
-          </CardContent>
-        </Card>
+        </div>
       ) : (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
+        <div className="divide-y">
+          <div className={cn("flex items-center gap-2 py-2", GRID_INSET)}>
             <div onClick={toggleAllFiltered} className="cursor-pointer p-0.5">
               <Checkbox
                 checked={allFilteredSelected}
@@ -253,8 +255,7 @@ export default function ApplicationsList({
             </span>
           </div>
           {filtered.map((app) => (
-            <Card key={app.id} className="py-0 hover:bg-muted/30 transition-colors">
-              <CardContent className="flex items-center gap-2 py-3 px-5">
+            <div key={app.id} className={cn("flex items-center gap-2 py-3 hover:bg-muted/40 transition-colors", GRID_INSET)}>
                 <div
                   onClick={(e) => { e.stopPropagation(); toggleOne(app.id); }}
                   className="shrink-0 p-1"
@@ -297,11 +298,10 @@ export default function ApplicationsList({
                   action={deleteApplication.bind(null, app.id)}
                   itemName={`${app.company.name} — ${app.roleTitle}`}
                 />
-              </CardContent>
-            </Card>
+            </div>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

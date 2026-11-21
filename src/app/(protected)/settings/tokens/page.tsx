@@ -18,7 +18,7 @@ export default async function ApiTokensPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight font-heading">API Tokens</h1>
+        <h1 className="text-3xl tracking-tight font-heading">API Tokens</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Use a token to connect an MCP client (e.g. Claude) to your ResumePress data at{" "}
           <code className="text-xs">/api/mcp</code>.

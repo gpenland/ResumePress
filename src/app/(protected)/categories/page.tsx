@@ -27,7 +27,7 @@ export default async function CategoriesPage() {
         <Link href="/entries" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to Entries
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight font-heading mt-3">Categories</h1>
+        <h1 className="text-3xl tracking-tight font-heading mt-3">Categories</h1>
         <p className="text-muted-foreground text-sm mt-1">Built-in categories cannot be deleted</p>
       </div>
 
