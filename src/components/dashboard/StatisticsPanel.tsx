@@ -98,8 +98,10 @@ export default function StatisticsPanel({
   return (
     <section className="space-y-3">
       <div className="flex items-end justify-between gap-3">
-        <h2 className="bg-background text-2xl font-heading lg:px-6">Statistics</h2>
-        <div className="bg-background lg:px-6">
+        {/* No opaque label boxes here (unlike PageHeader): both sit well inside
+            their grid columns, and a box would just cut a gap in the grid line. */}
+        <h2 className="text-2xl font-heading lg:px-6">Statistics</h2>
+        <div className="lg:px-6">
           <CycleFilter options={cycleOptions} selected={selectedCycles} />
         </div>
       </div>
