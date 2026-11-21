@@ -89,10 +89,10 @@
 }
 
 .dark {
-  /* Nord dark — nord0 page, nord1 surfaces, nord2/3 rules. Muted text and
-     the grid hairline are lifted further than a straight palette swap would
-     give: at nord3 the dashed grid all but vanished on nord0, and muted
-     labels/tags went muddy. */
+  /* Nord dark — nord0 page, nord1 surfaces, nord2/3 rules. Muted text is
+     lifted further than a straight palette swap would give (labels/tags went
+     muddy at nord4-on-nord1). The grid hairline stays at nord3: deliberately
+     quiet, a lighter line read as too heavy. */
   --background:          #2E3440;
   --foreground:          #ECEFF4;
   --card:                #3B4252;
@@ -111,7 +111,7 @@
   --border:              #4C566A;
   --input:               #56617A;
   --ring:                #88A6C6;
-  --grid:                #64708A;
+  --grid:                #4C566A;
   --chart-1:             #88A6C6;
   --chart-2:             #88C0D0;
   --chart-3:             #8FBCBB;
