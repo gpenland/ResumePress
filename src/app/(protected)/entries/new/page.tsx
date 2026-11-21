@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import EntryForm from "@/components/EntryForm";
 import { createEntry } from "../actions";
-import { Card, CardContent } from "@/components/ui/card";
+import PageGrid, { GRID_INSET } from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { cn } from "@/lib/utils";
 import { Briefcase, GraduationCap, Code2, Wrench, FolderOpen } from "lucide-react";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
@@ -34,54 +36,40 @@ export default async function NewEntryPage({
     if (!category) notFound();
 
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="flex items-center gap-3 mb-8">
-          <Link href="/entries/new" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Back
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <h1 className="text-3xl tracking-tight font-heading">New {category.name} Entry</h1>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <EntryForm category={category} action={createEntry} submitLabel="Create Entry" />
-          </CardContent>
-        </Card>
-      </div>
+      <PageGrid
+        header={<PageHeader back={{ href: "/entries/new", label: "Entry type" }} title="New entry" description={category.name} />}
+      >
+        <EntryForm category={category} action={createEntry} submitLabel="Create entry" />
+      </PageGrid>
     );
   }
 
   // Step 1: pick a category
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
-      <div>
-        <h1 className="text-3xl tracking-tight font-heading">New Entry</h1>
-        <p className="text-muted-foreground text-sm mt-1">Choose a type to get started</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <PageGrid
+      header={<PageHeader back={{ href: "/entries", label: "Entries" }} title="New entry" description="Choose a type to get started" />}
+    >
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {categories.map((cat) => {
           const Icon = CATEGORY_ICONS[cat.slug] ?? FolderOpen;
           return (
-            <Link key={cat.id} href={`/entries/new?cat=${cat.slug}`}>
-              <Card className="hover:bg-muted/40 transition-colors cursor-pointer h-full py-0">
-                <CardContent className="flex items-center gap-4 py-5 px-5">
-                  <div className="rounded-lg bg-primary/10 p-2.5 shrink-0">
-                    <Icon className="size-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">{cat.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {DESCRIPTIONS[cat.slug] ?? "Custom category"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+            <Link
+              key={cat.id}
+              href={`/entries/new?cat=${cat.slug}`}
+              className={cn("flex items-center gap-4 border bg-card py-5 transition-colors hover:bg-muted/40", GRID_INSET)}
+            >
+              <div className="shrink-0 bg-primary/10 p-2.5">
+                <Icon className="size-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{cat.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{DESCRIPTIONS[cat.slug] ?? "Custom category"}</p>
+              </div>
             </Link>
           );
         })}
       </div>
-    </div>
+    </PageGrid>
   );
 }
 

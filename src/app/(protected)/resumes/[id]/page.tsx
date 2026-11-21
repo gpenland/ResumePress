@@ -1,17 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import { deleteResume } from "../actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import SubmitButton from "@/components/SubmitButton";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel, FactList } from "@/components/Panel";
+import DeleteItemButton from "@/components/DeleteItemButton";
+
+// Display names for template ids — "jake" is an internal key, not a label.
+const TEMPLATE_NAMES: Record<string, string> = { jake: "Jake's Resume" };
 
 export default async function ResumeDetailPage({
   params,
@@ -41,70 +41,48 @@ export default async function ResumeDetailPage({
   if (!resume) notFound();
 
   const identity = resume.identity as Record<string, string> | null;
+  const identityFacts = identity
+    ? (
+        [
+          ["Name", identity.name],
+          ["Email", identity.email],
+          ["Phone", identity.phone],
+          ["Website", identity.website],
+          ["LinkedIn", identity.linkedin],
+          ["GitHub", identity.github],
+        ] as Array<[string, string | undefined]>
+      ).filter((f): f is [string, string] => Boolean(f[1]))
+    : [];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl tracking-tight font-heading">{resume.name}</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline">{resume.templateId} template</Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <form action={deleteResume.bind(null, id)}>
-            <SubmitButton variant="destructive" size="sm" pendingText="Deleting…">
-              Delete
-            </SubmitButton>
-          </form>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <ResumeBuilder
-            resumeId={id}
-            allEntries={allEntries}
-            selectedEntries={resume.entries}
-            categories={categories}
-          />
-        </div>
-
-        <aside>
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Identity</CardTitle>
-                <Link href={`/resumes/${id}/edit`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
-                  Edit
-                </Link>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent className="pt-4 space-y-3">
-              {identity ? (
-                [
-                  ["Name", identity.name],
-                  ["Email", identity.email],
-                  ["Phone", identity.phone],
-                  ["Website", identity.website],
-                  ["LinkedIn", identity.linkedin],
-                  ["GitHub", identity.github],
-                ]
-                  .filter(([, v]) => v)
-                  .map(([label, value]) => (
-                    <div key={label}>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                      <p className="text-sm truncate">{value}</p>
-                    </div>
-                  ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No identity set</p>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
-    </div>
+    <PageGrid
+      header={
+        <PageHeader
+          back={{ href: "/resumes", label: "Resumes" }}
+          title={resume.name}
+          description={`${TEMPLATE_NAMES[resume.templateId] ?? resume.templateId} template`}
+          // Delete is a quiet outline button with a confirmation, not the
+          // loudest thing on the page; Save / Preview / Download live with
+          // the list and preview they act on.
+          actions={<DeleteItemButton label="Delete" action={deleteResume.bind(null, id)} itemName={resume.name} />}
+        />
+      }
+    >
+      <ResumeBuilder
+        resumeId={id}
+        allEntries={allEntries}
+        selectedEntries={resume.entries}
+        categories={categories}
+        identityPanel={
+          <Panel title="Identity" action={{ label: "Edit", href: `/resumes/${id}/edit` }} padded>
+            {identityFacts.length > 0 ? (
+              <FactList facts={identityFacts} />
+            ) : (
+              <p className="text-sm text-muted-foreground">No identity set</p>
+            )}
+          </Panel>
+        }
+      />
+    </PageGrid>
   );
 }

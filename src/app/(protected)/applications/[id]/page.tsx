@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { getApplicationForUser } from "@/lib/applications";
 import { formatShortDate } from "@/lib/applicationsShared";
@@ -9,8 +10,10 @@ import { cycleForApplication, cycleLabel } from "@/lib/recruitingCycleShared";
 import { listResumesForUser } from "@/lib/resumes";
 import { listContactOptionsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel, FactList } from "@/components/Panel";
 import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
 import SuggestStatusButton from "@/components/applications/SuggestStatusButton";
 import ResumeSection from "@/components/applications/ResumeSection";
@@ -35,6 +38,13 @@ import {
   deleteInteraction,
 } from "@/app/(protected)/contacts/actions";
 
+const SECTIONS = [
+  { id: "resume", label: "Resume" },
+  { id: "contacts", label: "Contacts" },
+  { id: "interactions", label: "Interactions" },
+  { id: "status-history", label: "Status history" },
+];
+
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
@@ -51,129 +61,131 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   // follow-up: visibility into the computed cycle, not just the filter).
   const cycle = cycleForApplication(application.term, application.appliedAt);
 
-  const details: Array<[string, string | null]> = [
-    ["Term", application.term],
-    ["Recruiting cycle", cycle !== null ? cycleLabel(cycle) : null],
-    ["Location", application.location],
-    ["Applied", formatShortDate(application.appliedAt)],
-    ["Source", application.source],
-  ].filter(([, v]) => v) as Array<[string, string]>;
+  const facts = (
+    [
+      ["Applied", formatShortDate(application.appliedAt)],
+      ["Term", application.term],
+      ["Recruiting cycle", cycle !== null ? cycleLabel(cycle) : null],
+      ["Location", application.location],
+      ["Source", application.source],
+    ] as Array<[string, string | null]>
+  ).filter((f): f is [string, string] => Boolean(f[1]));
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-3xl tracking-tight font-heading break-words">{application.roleTitle}</h1>
-            <EditableStatusBadge
-              applicationId={application.id}
-              status={application.status}
-              updateStatus={updateApplicationStatus}
-            />
-          </div>
-          <p className="text-muted-foreground text-sm mt-1">
-            {application.company.name}
-            {application.postingUrl && (
-              <>
-                {" · "}
-                <a href={application.postingUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-                  Posting
+    <PageGrid
+      header={
+        <PageHeader
+          back={{ href: "/applications", label: "Applications" }}
+          // The company leads, as it does in the list ("Brex — SWE") and on
+          // the dashboard; the role is the subtitle.
+          title={application.company.name}
+          description={
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-base text-foreground">{application.roleTitle}</span>
+              <EditableStatusBadge applicationId={application.id} status={application.status} updateStatus={updateApplicationStatus} />
+              {application.postingUrl && (
+                <a
+                  href={application.postingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Job posting
+                  <ExternalLink className="size-3" aria-hidden="true" />
                 </a>
-              </>
+              )}
+            </div>
+          }
+          actions={
+            <>
+              <SuggestStatusButton
+                applicationId={application.id}
+                suggestStatus={suggestApplicationStatus}
+                updateStatus={updateApplicationStatus}
+              />
+              <Link href={`/applications/${application.id}/edit`} className={cn(buttonVariants({ variant: "outline" }))}>
+                Edit
+              </Link>
+              <DeleteItemButton
+                label="Delete"
+                action={deleteApplication.bind(null, application.id)}
+                itemName={`${application.roleTitle} @ ${application.company.name}`}
+              />
+            </>
+          }
+        />
+      }
+    >
+      {/* Three grid columns of content, one of facts — the facts sit beside
+          the work instead of in a mostly-empty card above it. */}
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-4">
+        <aside className="space-y-8 lg:sticky lg:top-20 lg:order-last">
+          <Panel title="Details" padded>
+            {facts.length > 0 ? (
+              <FactList facts={facts} />
+            ) : (
+              <p className="text-sm text-muted-foreground">No details yet.</p>
             )}
-          </p>
-          <div className="mt-2">
-            <SuggestStatusButton
+            <nav aria-label="On this page" className="mt-5 hidden space-y-1 border-t pt-4 lg:block">
+              {SECTIONS.map((s) => (
+                <a key={s.id} href={`#${s.id}`} className="block text-sm text-muted-foreground transition-colors hover:text-foreground">
+                  {s.label}
+                </a>
+              ))}
+            </nav>
+          </Panel>
+        </aside>
+
+        <div className="space-y-8 lg:col-span-3">
+          {application.notes && (
+            <Panel title="Notes" padded>
+              <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
+            </Panel>
+          )}
+
+          <Panel id="resume" title="Resume" padded>
+            <ResumeSection
               applicationId={application.id}
-              suggestStatus={suggestApplicationStatus}
-              updateStatus={updateApplicationStatus}
+              resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
+              snapshot={application.resumeSnapshot ? { id: application.resumeSnapshot.id, createdAt: application.resumeSnapshot.createdAt } : null}
+              resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
+              attach={attachResumeToApplication}
+              detach={detachResumeFromApplication}
             />
-          </div>
+          </Panel>
+
+          <Panel id="contacts" title="Contacts" padded>
+            <ContactLinks
+              applicationId={application.id}
+              linked={application.contacts.map((ac) => ({
+                contactId: ac.contactId,
+                role: ac.role,
+                name: ac.contact.name,
+              }))}
+              contactOptions={contactOptions}
+              link={linkContactToApplication}
+              unlink={unlinkContactFromApplication}
+            />
+          </Panel>
+
+          <Panel id="interactions" title="Interactions" padded>
+            <div className="space-y-4">
+              <LogInteractionForm applicationId={application.id} logInteraction={logInteraction} />
+              <InteractionTimeline interactions={application.interactions} deleteInteraction={deleteInteraction} />
+            </div>
+          </Panel>
+
+          <Panel id="status-history" title="Status history" padded>
+            <StatusHistoryList
+              applicationId={application.id}
+              history={application.statusHistory}
+              logUpdate={logApplicationUpdate}
+              setNote={setApplicationHistoryNote}
+              deleteEntry={deleteApplicationStatusHistoryEntry}
+            />
+          </Panel>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/applications/${application.id}/edit`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            Edit
-          </Link>
-          <DeleteItemButton
-            action={deleteApplication.bind(null, application.id)}
-            itemName={`${application.roleTitle} @ ${application.company.name}`}
-          />
-        </div>
       </div>
-
-      <nav className="sticky top-14 z-10 -mx-4 flex items-center gap-4 border-b bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <a href="#resume" className="text-sm text-muted-foreground hover:text-foreground">Resume</a>
-        <a href="#contacts" className="text-sm text-muted-foreground hover:text-foreground">Contacts</a>
-        <a href="#interactions" className="text-sm text-muted-foreground hover:text-foreground">Interactions</a>
-        <a href="#status-history" className="text-sm text-muted-foreground hover:text-foreground">Status History</a>
-      </nav>
-
-      {details.length > 0 && (
-        <Card>
-          <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-5">
-            {details.map(([label, value]) => (
-              <div key={label}>
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="text-sm font-medium mt-0.5">{value}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {application.notes && (
-        <Card>
-          <CardContent className="py-5">
-            <p className="text-xs text-muted-foreground mb-2">Notes</p>
-            <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div id="resume" className="scroll-mt-24">
-        <ResumeSection
-          applicationId={application.id}
-          resume={application.resume ? { id: application.resume.id, name: application.resume.name } : null}
-          snapshot={application.resumeSnapshot ? { id: application.resumeSnapshot.id, createdAt: application.resumeSnapshot.createdAt } : null}
-          resumes={resumes.map((r) => ({ id: r.id, name: r.name }))}
-          attach={attachResumeToApplication}
-          detach={detachResumeFromApplication}
-        />
-      </div>
-
-      <div id="contacts" className="space-y-2 scroll-mt-24">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Contacts</p>
-        <ContactLinks
-          applicationId={application.id}
-          linked={application.contacts.map((ac) => ({
-            contactId: ac.contactId,
-            role: ac.role,
-            name: ac.contact.name,
-          }))}
-          contactOptions={contactOptions}
-          link={linkContactToApplication}
-          unlink={unlinkContactFromApplication}
-        />
-      </div>
-
-      <div id="interactions" className="space-y-2 scroll-mt-24">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Interactions</p>
-        <LogInteractionForm applicationId={application.id} logInteraction={logInteraction} />
-        <InteractionTimeline interactions={application.interactions} deleteInteraction={deleteInteraction} />
-      </div>
-
-      <div id="status-history" className="space-y-2 scroll-mt-24">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-          Status History
-        </p>
-        <StatusHistoryList
-          applicationId={application.id}
-          history={application.statusHistory}
-          logUpdate={logApplicationUpdate}
-          setNote={setApplicationHistoryNote}
-          deleteEntry={deleteApplicationStatusHistoryEntry}
-        />
-      </div>
-    </div>
+    </PageGrid>
   );
 }

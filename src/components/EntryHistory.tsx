@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { EntryVersion } from "@prisma/client";
 import { Button } from "@/components/ui/button";
-import { formatShortDateTime } from "@/lib/dateFormat";
+import { Panel } from "@/components/Panel";
+import LocalDateTime from "@/components/LocalDateTime";
 
 type SnapshotData = {
   title: string;
@@ -68,13 +69,20 @@ export default function EntryHistory({ versions }: { versions: EntryVersion[] })
   if (versions.length === 0) return null;
 
   return (
-    <div className="mt-6 border-t pt-4">
-      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen((o) => !o)}>
-        {open ? "Hide" : "Show"} history ({versions.length})
-      </Button>
-
+    <Panel
+      title="Edit history"
+      badge={versions.length}
+      className="lg:w-1/2"
+      padded
+      actions={
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen((o) => !o)}>
+          {open ? "Hide" : "Show"}
+        </Button>
+      }
+    >
+      {!open && <p className="text-sm text-muted-foreground">Earlier versions of this entry, newest first.</p>}
       {open && (
-        <div className="mt-2 space-y-2">
+        <div className="space-y-2">
           {versions.map((v, i) => {
             const data = v.data as SnapshotData;
             // versions is newest-first, so the version "before" this one in
@@ -92,7 +100,7 @@ export default function EntryHistory({ versions }: { versions: EntryVersion[] })
                   className="flex items-center gap-2 w-full text-left py-1"
                 >
                   <span className="text-muted-foreground text-xs w-40 shrink-0">
-                    {formatShortDateTime(v.createdAt)}
+                    <LocalDateTime value={v.createdAt} />
                   </span>
                   <span className="truncate">{data.title}</span>
                   {previous && (
@@ -132,6 +140,6 @@ export default function EntryHistory({ versions }: { versions: EntryVersion[] })
           })}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

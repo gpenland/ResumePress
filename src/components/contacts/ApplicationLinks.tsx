@@ -54,11 +54,11 @@ export default function ApplicationLinks({ contactId, linked, applicationOptions
   return (
     <div className="space-y-2">
       {linked.length === 0 ? (
-        <p className="text-muted-foreground text-sm px-1">Not linked to any applications.</p>
+        <p className="text-muted-foreground text-sm">Not linked to any applications.</p>
       ) : (
         <div className="space-y-1.5">
           {linked.map((l) => (
-            <div key={l.applicationId} className="flex items-center gap-2 text-sm px-1">
+            <div key={l.applicationId} className="flex items-center gap-2 text-sm">
               <Link href={`/applications/${l.applicationId}`} className="hover:underline">
                 {l.roleTitle} @ {l.companyName}
               </Link>
@@ -94,8 +94,8 @@ export default function ApplicationLinks({ contactId, linked, applicationOptions
               </option>
             ))}
           </select>
-          <Input name="role" placeholder="Role (e.g. Recruiter)" className="w-44 h-8" />
-          <Button type="submit" size="sm" variant="outline" disabled={isPending}>
+          <Input name="role" placeholder="Role (e.g. Recruiter)" className="w-44" />
+          <Button type="submit" variant="outline" disabled={isPending}>
             Link
           </Button>
         </form>

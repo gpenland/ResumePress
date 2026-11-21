@@ -36,10 +36,12 @@ export default function PageGrid({
           </div>
         </div>
       </div>
-      <div className="relative border-b border-dashed border-grid">
+      {/* Opaque masthead: the column lines start below it, so the header
+          never shows a partial set of lines that don't match the body's. */}
+      <div className="relative border-b border-dashed border-grid bg-background">
         <div className="mx-auto max-w-6xl px-4">{header}</div>
       </div>
-      <div className="relative mx-auto max-w-6xl space-y-8 px-4 py-8">{children}</div>
+      <div className="relative mx-auto max-w-6xl space-y-8 px-4 pt-8 pb-24">{children}</div>
     </div>
   );
 }

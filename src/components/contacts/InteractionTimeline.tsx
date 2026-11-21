@@ -11,13 +11,13 @@ type Props = {
 
 export default function InteractionTimeline({ interactions, deleteInteraction }: Props) {
   if (interactions.length === 0) {
-    return <p className="text-muted-foreground text-sm px-1">No interactions logged yet.</p>;
+    return <p className="text-muted-foreground text-sm">No interactions logged yet.</p>;
   }
 
   return (
     <div className="space-y-2">
       {interactions.map((i) => (
-        <div key={i.id} className="flex items-start gap-3 text-sm px-1 py-1.5 border-b last:border-0">
+        <div key={i.id} className="flex items-start gap-3 text-sm py-1.5 border-b last:border-0">
           <span className="text-muted-foreground text-xs w-32 shrink-0 mt-0.5">
             {formatShortDate(i.occurredAt)}
           </span>

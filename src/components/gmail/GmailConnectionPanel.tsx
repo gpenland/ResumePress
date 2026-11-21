@@ -53,9 +53,9 @@ const POLL_INTERVAL_MS = 1500;
 export default function GmailConnectionPanel(props: Props) {
   if (!props.connected) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3">
+      <div className="space-y-3">
         <p className="text-sm text-muted-foreground">Gmail not connected</p>
-        <Link href="/api/gmail/oauth/start" className={cn(buttonVariants({ size: "sm" }))}>
+        <Link href="/api/gmail/oauth/start" className={cn(buttonVariants())}>
           Connect Gmail
         </Link>
       </div>
@@ -190,19 +190,20 @@ export default function GmailConnectionPanel(props: Props) {
   }
 
   return (
-    <div className="rounded-lg border px-4 py-3 space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    // Rendered inside the email page's "Gmail" panel, which supplies the box.
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{email}</p>
           <p className="text-xs text-muted-foreground truncate">{statusLine()}</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {syncStatus.needsReauth ? (
-            <Link href="/api/gmail/oauth/start" className={cn(buttonVariants({ size: "sm" }))}>
+            <Link href="/api/gmail/oauth/start" className={cn(buttonVariants())}>
               Reconnect Gmail
             </Link>
           ) : (
-            <Button type="button" size="sm" onClick={handleSync} disabled={isRunning || isStarting}>
+            <Button type="button" onClick={handleSync} disabled={isRunning || isStarting}>
               {isRunning || isStarting ? "Syncing…" : "Sync now"}
             </Button>
           )}
@@ -252,7 +253,7 @@ export default function GmailConnectionPanel(props: Props) {
         <p className="text-xs text-destructive">{syncStatus.error}</p>
       )}
       {!isRunning && !syncStatus.error && syncStatus.total !== null && (
-        <p className="text-xs text-muted-foreground">Checked {syncStatus.total} thread(s) on the last sync.</p>
+        <p className="text-xs text-muted-foreground">Checked {syncStatus.total} {syncStatus.total === 1 ? "thread" : "threads"} on the last sync.</p>
       )}
       {startError && <p className="text-xs text-destructive">{startError}</p>}
 

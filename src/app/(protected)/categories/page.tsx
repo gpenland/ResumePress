@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { createCategory, deleteCategory } from "./actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PageGrid, { GRID_INSET } from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
+import { cn } from "@/lib/utils";
 import SubmitButton from "@/components/SubmitButton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -22,28 +24,28 @@ export default async function CategoriesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
-      <div>
-        <Link href="/entries" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          ← Back to Entries
-        </Link>
-        <h1 className="text-3xl tracking-tight font-heading mt-3">Categories</h1>
-        <p className="text-muted-foreground text-sm mt-1">Built-in categories cannot be deleted</p>
-      </div>
-
-      {/* Category list — plain rows so spacing is fully controlled */}
-      <Card className="py-0 gap-0">
+    <PageGrid
+      header={
+        <PageHeader
+          back={{ href: "/entries", label: "Entries" }}
+          title="Categories"
+          description="Built-in categories cannot be deleted"
+        />
+      }
+    >
+      <div className="space-y-8 lg:w-1/2">
+      <Panel>
         {categories.map((cat, i) => (
           <div
             key={cat.id}
-            className={`flex items-center justify-between px-5 py-3 ${
-              i > 0 ? "border-t border-border" : ""
-            }`}
+            className={cn("flex items-center justify-between py-3", GRID_INSET, i > 0 && "border-t")}
           >
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">{cat.name}</span>
               {cat.isBuiltIn && <Badge variant="secondary">built-in</Badge>}
-              <span className="text-xs text-muted-foreground">{cat._count.entries} entries</span>
+              <span className="text-xs text-muted-foreground">
+                {cat._count.entries} {cat._count.entries === 1 ? "entry" : "entries"}
+              </span>
             </div>
             {!cat.isBuiltIn && (
               <form action={deleteCategory.bind(null, cat.id)}>
@@ -59,19 +61,15 @@ export default async function CategoriesPage() {
             )}
           </div>
         ))}
-      </Card>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Add Custom Category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={createCategory} className="flex gap-3">
-            <Input name="name" required placeholder="Category name..." className="flex-1" />
-            <SubmitButton pendingText="Adding…">Add</SubmitButton>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+      <Panel title="Add a custom category" padded>
+        <form action={createCategory} className="flex gap-2">
+          <Input name="name" required placeholder="Category name..." aria-label="Category name" autoComplete="off" data-1p-ignore className="flex-1" />
+          <SubmitButton variant="outline" pendingText="Adding…">Add</SubmitButton>
+        </form>
+      </Panel>
+      </div>
+    </PageGrid>
   );
 }

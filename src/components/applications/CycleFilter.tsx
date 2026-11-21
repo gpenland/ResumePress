@@ -61,7 +61,7 @@ export default function CycleFilter({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="outline" size="sm">
+          <Button variant="outline">
             {label}
             <ChevronDown className="size-3.5" />
           </Button>

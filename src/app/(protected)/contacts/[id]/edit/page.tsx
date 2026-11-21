@@ -5,6 +5,9 @@ import { requireUserId } from "@/lib/auth";
 import { getContactForUser } from "@/lib/contacts";
 import { listCompaniesForUser } from "@/lib/companies";
 import ContactForm from "@/components/contacts/ContactForm";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import { updateContact } from "../../actions";
 
 export default async function EditContactPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,17 +20,17 @@ export default async function EditContactPage({ params }: { params: Promise<{ id
   if (!contact) notFound();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 space-y-6">
-      <div>
-        <h1 className="text-3xl tracking-tight font-heading">Edit Contact</h1>
-        <p className="text-muted-foreground text-sm mt-1">{contact.name}</p>
-      </div>
-      <ContactForm
-        companies={companies}
-        contact={contact}
-        action={updateContact.bind(null, contact.id)}
-        submitLabel="Save Changes"
-      />
-    </div>
+    <PageGrid
+      header={<PageHeader back={{ href: `/contacts/${contact.id}`, label: contact.name }} title="Edit contact" />}
+    >
+      <Panel padded className="lg:w-1/2">
+        <ContactForm
+          companies={companies}
+          contact={contact}
+          action={updateContact.bind(null, contact.id)}
+          submitLabel="Save changes"
+        />
+      </Panel>
+    </PageGrid>
   );
 }

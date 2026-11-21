@@ -106,3 +106,15 @@ export function decodeHtmlEntities(text: string): string {
     return NAMED_HTML_ENTITIES[entity.toLowerCase()] ?? match;
   });
 }
+
+/**
+ * A thread's participants minus the connected Gmail account itself — every
+ * thread includes you, so listing your own address is noise. Falls back to
+ * the full list if filtering would leave nothing (a note-to-self thread).
+ */
+export function otherParticipants(participants: string[], selfEmail: string | null | undefined): string[] {
+  if (!selfEmail) return participants;
+  const self = selfEmail.toLowerCase();
+  const others = participants.filter((p) => !p.toLowerCase().includes(self));
+  return others.length > 0 ? others : participants;
+}

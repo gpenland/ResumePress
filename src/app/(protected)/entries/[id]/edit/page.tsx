@@ -1,18 +1,16 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
-import { listEntryVersionsForUser } from "@/lib/entries";
+import { listEntryVersionsForUser, entryLabel } from "@/lib/entries";
 import EntryForm from "@/components/EntryForm";
 import EntryHistory from "@/components/EntryHistory";
 import { updateEntry, deleteEntry, cloneEntry } from "../../actions";
-import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import DeleteItemButton from "@/components/DeleteItemButton";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
 
 export default async function EditEntryPage({
   params,
@@ -44,44 +42,27 @@ export default async function EditEntryPage({
   const cloneWithId = cloneEntry.bind(null, id);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl tracking-tight font-heading">Edit Entry</h1>
-          <Badge variant="secondary">{entry.category.name}</Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          {resume && (
-            <Link href={`/resumes/${resume.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-              Back to {resume.name}
-            </Link>
-          )}
-          <Link href="/entries/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            New Entry
-          </Link>
-          <form action={cloneWithId}>
-            <SubmitButton variant="outline" size="sm" pendingText="Cloning…">
-              Clone Entry
-            </SubmitButton>
-          </form>
-          <form action={deleteWithId}>
-            <SubmitButton variant="destructive" size="sm" pendingText="Deleting…">
-              Delete Entry
-            </SubmitButton>
-          </form>
-        </div>
-      </div>
-      <Card>
-        <CardContent className="pt-6">
-          <EntryForm
-            category={entry.category}
-            entry={entry}
-            action={updateWithId}
-            submitLabel="Save Changes"
-          />
-          <EntryHistory versions={versions} />
-        </CardContent>
-      </Card>
-    </div>
+    <PageGrid
+      header={
+        <PageHeader
+          back={resume ? { href: `/resumes/${resume.id}`, label: resume.name } : { href: "/entries", label: "Entries" }}
+          title={entryLabel(entry)}
+          description={entry.category.name}
+          actions={
+            <>
+              <form action={cloneWithId}>
+                <SubmitButton variant="outline" pendingText="Cloning…">
+                  Clone
+                </SubmitButton>
+              </form>
+              <DeleteItemButton label="Delete" action={deleteWithId} itemName={entryLabel(entry)} />
+            </>
+          }
+        />
+      }
+    >
+      <EntryForm category={entry.category} entry={entry} action={updateWithId} submitLabel="Save changes" />
+      <EntryHistory versions={versions} />
+    </PageGrid>
   );
 }

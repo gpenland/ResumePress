@@ -2,18 +2,16 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import DeleteItemButton from "@/components/DeleteItemButton";
+import { GRID_INSET } from "@/components/PageGrid";
 import type { ContactWithCompany } from "@/lib/contacts";
 
 type Props = {
   contacts: ContactWithCompany[];
   followUpDue?: boolean;
-  deleteContact: (id: string) => Promise<void>;
 };
 
 function matchesQuery(contact: ContactWithCompany, query: string): boolean {
@@ -21,7 +19,10 @@ function matchesQuery(contact: ContactWithCompany, query: string): boolean {
   return haystacks.some((v) => v?.toLowerCase().includes(query));
 }
 
-export default function ContactsList({ contacts, followUpDue, deleteContact }: Props) {
+// Same single-surface layout as the applications list: toolbar on top, rows
+// below, all on one opaque panel over the page grid. No per-row delete —
+// delete from the contact's own page.
+export default function ContactsList({ contacts, followUpDue }: Props) {
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -31,70 +32,75 @@ export default function ContactsList({ contacts, followUpDue, deleteContact }: P
   }, [contacts, search]);
 
   return (
-    <>
-      <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search contacts..."
-        aria-label="Search contacts"
-      />
-
-      <div className="flex gap-2 flex-wrap">
-        <Link href="/contacts" className={cn(buttonVariants({ variant: !followUpDue ? "default" : "outline", size: "sm" }))}>
-          All
-        </Link>
-        <Link
-          href="/contacts?followUp=due"
-          className={cn(buttonVariants({ variant: followUpDue ? "default" : "outline", size: "sm" }))}
-        >
-          Follow-up due
-        </Link>
+    <div className="border bg-card">
+      <div className={cn("space-y-3 border-b py-4", GRID_INSET)}>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search contacts..."
+          aria-label="Search contacts"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/contacts"
+            aria-current={!followUpDue ? "page" : undefined}
+            className={cn(buttonVariants({ variant: !followUpDue ? "default" : "outline", size: "sm" }))}
+          >
+            All
+          </Link>
+          <Link
+            href="/contacts?followUp=due"
+            aria-current={followUpDue ? "page" : undefined}
+            className={cn(buttonVariants({ variant: followUpDue ? "default" : "outline", size: "sm" }))}
+          >
+            Follow-up due
+          </Link>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center py-16 text-center gap-3">
-            {contacts.length === 0 ? (
-              <>
-                <p className="text-muted-foreground text-sm">No contacts yet</p>
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          {contacts.length === 0 ? (
+            <>
+              <p className="text-sm text-muted-foreground">{followUpDue ? "No follow-ups due" : "No contacts yet"}</p>
+              {!followUpDue && (
                 <Link href="/contacts/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                   Add your first contact
                 </Link>
-              </>
-            ) : (
-              <>
-                <p className="text-muted-foreground text-sm">No contacts match</p>
-                <button type="button" onClick={() => setSearch("")} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                  Clear search
-                </button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">No contacts match</p>
+              <button type="button" onClick={() => setSearch("")} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                Clear search
+              </button>
+            </>
+          )}
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y">
           {filtered.map((contact) => (
-            <Card key={contact.id} className="py-0 hover:bg-muted/30 transition-colors">
-              <CardContent className="flex items-center gap-2 py-3 px-5">
-                <Link href={`/contacts/${contact.id}`} className="flex items-center justify-between flex-1 min-w-0 gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{contact.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {[contact.title, contact.company?.name].filter(Boolean).join(" @ ")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {contact.tags.slice(0, 2).map((tag) => (
-                      <Badge key={tag} variant="secondary">{tag}</Badge>
-                    ))}
-                  </div>
-                </Link>
-                <DeleteItemButton action={deleteContact.bind(null, contact.id)} itemName={contact.name} />
-              </CardContent>
-            </Card>
+            <Link
+              key={contact.id}
+              href={`/contacts/${contact.id}`}
+              className={cn("flex items-center justify-between gap-3 py-3 transition-colors hover:bg-muted/40", GRID_INSET)}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{contact.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {[contact.title, contact.company?.name].filter(Boolean).join(" @ ")}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {contact.tags.slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="secondary">{tag}</Badge>
+                ))}
+              </div>
+            </Link>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -13,14 +13,15 @@ type Props = {
   onValueChange: (value: string) => void;
   name?: string;
   size?: "sm" | "default";
+  className?: string;
 };
 
 // See StatusSelect.tsx: Select.Value renders the raw value, not a label — our
 // values already are the labels, so we render `value` directly in the trigger.
-export default function InteractionTypeSelect({ value, onValueChange, name, size = "default" }: Props) {
+export default function InteractionTypeSelect({ value, onValueChange, name, size = "default", className }: Props) {
   return (
     <Select value={value} onValueChange={(v) => onValueChange(v as string)} name={name}>
-      <SelectTrigger size={size}>
+      <SelectTrigger size={size} className={className}>
         <span>{value}</span>
       </SelectTrigger>
       <SelectContent>

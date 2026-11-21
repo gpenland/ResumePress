@@ -1,38 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import SegmentedLinks from "@/components/SegmentedLinks";
 
-const TABS = [
-  { href: "/resumes", label: "Resumes" },
-  { href: "/entries", label: "Entries" },
-];
-
+// Resumes / Entries switch, shown in both pages' header actions — the same
+// control the applications page uses for List / Kanban / Flow.
 export default function ResumeSectionTabs() {
   const pathname = usePathname();
-
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   return (
-    <div className="border-b border-border">
-      <nav className="flex gap-6 -mb-px">
-        {TABS.map((tab) => {
-          const isActive = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={cn(
-                "pb-3 text-sm border-b-2 transition-colors",
-                isActive
-                  ? "border-foreground text-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    <SegmentedLinks
+      label="Resume builder"
+      items={[
+        { label: "Resumes", href: "/resumes", active: isActive("/resumes") },
+        { label: "Entries", href: "/entries", active: isActive("/entries") },
+      ]}
+    />
   );
 }

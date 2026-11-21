@@ -5,7 +5,8 @@ import { getUserId } from "@/lib/auth";
 import { listContactsForUser } from "@/lib/contacts";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { deleteContact } from "./actions";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
 import ContactsList from "@/components/contacts/ContactsList";
 
 export default async function ContactsPage({
@@ -20,16 +21,21 @@ export default async function ContactsPage({
   const contacts = userId ? await listContactsForUser(userId, { followUpDue }) : [];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-3xl tracking-tight font-heading">Contacts</h1>
-          <p className="text-muted-foreground text-sm mt-1">{contacts.length} total</p>
-        </div>
-        <Link href="/contacts/new" className={cn(buttonVariants())}>New Contact</Link>
-      </div>
-
-      <ContactsList contacts={contacts} followUpDue={followUpDue} deleteContact={deleteContact} />
-    </div>
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Network"
+          title="Contacts"
+          description={`${contacts.length} total`}
+          actions={
+            <Link href="/contacts/new" className={cn(buttonVariants())}>
+              New contact
+            </Link>
+          }
+        />
+      }
+    >
+      <ContactsList contacts={contacts} followUpDue={followUpDue} />
+    </PageGrid>
   );
 }

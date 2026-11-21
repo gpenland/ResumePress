@@ -3,7 +3,11 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
 import { revokeApiToken } from "./actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PageGrid, { GRID_INSET } from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
+import { formatShortDate } from "@/lib/dateFormat";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import SubmitButton from "@/components/SubmitButton";
 import TokenCreateForm from "./TokenCreateForm";
@@ -16,18 +20,24 @@ export default async function ApiTokensPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
-      <div>
-        <h1 className="text-3xl tracking-tight font-heading">API Tokens</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Use a token to connect an MCP client (e.g. Claude) to your ResumePress data at{" "}
-          <code className="text-xs">/api/mcp</code>.
-        </p>
-      </div>
-
-      <Card className="py-0 gap-0">
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Settings"
+          title="API tokens"
+          description={
+            <p>
+              Use a token to connect an MCP client (e.g. Claude) to your ResumePress data at{" "}
+              <code className="text-xs">/api/mcp</code>.
+            </p>
+          }
+        />
+      }
+    >
+      <div className="space-y-8 lg:w-3/4">
+      <Panel title="Tokens">
         {tokens.length === 0 && (
-          <div className="px-5 py-6 text-sm text-muted-foreground">No tokens yet</div>
+          <p className={cn("pb-3 text-sm text-muted-foreground", GRID_INSET)}>No tokens yet</p>
         )}
         {tokens.map((t, i) => {
           const revoked = !!t.revokedAt;
@@ -35,9 +45,7 @@ export default async function ApiTokensPage() {
           return (
             <div
               key={t.id}
-              className={`flex items-center justify-between px-5 py-3 ${
-                i > 0 ? "border-t border-border" : ""
-              }`}
+              className={cn("flex items-center justify-between py-3", GRID_INSET, i > 0 && "border-t")}
             >
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
@@ -46,8 +54,8 @@ export default async function ApiTokensPage() {
                   {!revoked && expired && <Badge variant="secondary">expired</Badge>}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  Created {t.createdAt.toLocaleDateString()}
-                  {t.lastUsedAt ? ` · Last used ${t.lastUsedAt.toLocaleDateString()}` : " · Never used"}
+                  Created {formatShortDate(t.createdAt)}
+                  {t.lastUsedAt ? ` · Last used ${formatShortDate(t.lastUsedAt)}` : " · Never used"}
                 </span>
               </div>
               {!revoked && (
@@ -65,16 +73,12 @@ export default async function ApiTokensPage() {
             </div>
           );
         })}
-      </Card>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Create Token</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TokenCreateForm />
-        </CardContent>
-      </Card>
-    </div>
+      <Panel title="Create token" padded>
+        <TokenCreateForm />
+      </Panel>
+      </div>
+    </PageGrid>
   );
 }

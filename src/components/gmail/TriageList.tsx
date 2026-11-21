@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import ApplicationPicker from "@/components/gmail/ApplicationPicker";
 import ContactPicker from "@/components/gmail/ContactPicker";
-import { applicationOptionLabel, decodeHtmlEntities, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
+import { applicationOptionLabel, decodeHtmlEntities, otherParticipants, type ApplicationPickerOption } from "@/lib/emailThreadsShared";
 import type { SuggestedMatch } from "@/lib/emailThreads";
 import { confidenceWord } from "@/lib/jev";
+import { cn } from "@/lib/utils";
 import { formatShortDate } from "@/lib/dateFormat";
 
 export type TriageThread = {
@@ -61,6 +62,8 @@ type Props = {
   applyStatusSuggestion: (threadId: string, applicationId?: string | null) => Promise<void>;
   dismissStatusSuggestion: (threadId: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
+  /** The connected Gmail address, left out of each thread's participant line. */
+  selfEmail: string | null;
 };
 
 type RowProps = {
@@ -75,6 +78,9 @@ type RowProps = {
   applyStatusSuggestion: (threadId: string, applicationId?: string | null) => Promise<void>;
   dismissStatusSuggestion: (threadId: string) => Promise<void>;
   suggestMatch: (threadId: string) => Promise<SuggestedMatch>;
+  selfEmail: string | null;
+  /** False when there's only one thread — no bulk actions, so no checkbox. */
+  selectable: boolean;
   selected: boolean;
   onToggleSelected: () => void;
   pick: Pick;
@@ -93,6 +99,8 @@ function TriageRow({
   applyStatusSuggestion,
   dismissStatusSuggestion,
   suggestMatch,
+  selfEmail,
+  selectable,
   selected,
   onToggleSelected,
   pick,
@@ -226,14 +234,16 @@ function TriageRow({
     <Card className="py-0">
       <CardContent className="space-y-3 px-5 py-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 shrink-0" onClick={onToggleSelected}>
-            <Checkbox
-              checked={selected}
-              onCheckedChange={onToggleSelected}
-              aria-label="Select thread for bulk actions"
-              className="pointer-events-none"
-            />
-          </div>
+          {selectable && (
+            <div className="mt-0.5 shrink-0" onClick={onToggleSelected}>
+              <Checkbox
+                checked={selected}
+                onCheckedChange={onToggleSelected}
+                aria-label="Select thread for bulk actions"
+                className="pointer-events-none"
+              />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <p className="min-w-0 truncate text-sm font-medium">
@@ -259,7 +269,7 @@ function TriageRow({
                 )}
               </div>
             </div>
-            <p className="truncate text-xs text-muted-foreground">{thread.participants.join(", ")}</p>
+            <p className="truncate text-xs text-muted-foreground">{otherParticipants(thread.participants, selfEmail).join(", ")}</p>
             {thread.snippet && (
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{decodeHtmlEntities(thread.snippet)}</p>
             )}
@@ -267,7 +277,7 @@ function TriageRow({
         </div>
 
         {(thread.jevRecruitingLikely === true || jevSuggestedContactName || jevSuggestedApplicationLabel) && (
-          <div className="flex flex-wrap items-center gap-2 pl-7 text-xs">
+          <div className={cn("flex flex-wrap items-center gap-2 text-xs", selectable && "pl-7")}>
             {thread.jevRecruitingLikely === true && (
               <Badge variant="secondary">
                 Likely recruiting-related
@@ -289,7 +299,7 @@ function TriageRow({
         )}
 
         {showNewOpportunityPrompt && (
-          <div className="pl-7">
+          <div className={cn(selectable && "pl-7")}>
             <div className="rounded-md border border-dashed p-2.5">
               <p className="text-xs text-muted-foreground">
                 Looks recruiting-related but doesn&apos;t match anything you&apos;re tracking yet — may be a new
@@ -323,7 +333,7 @@ function TriageRow({
         )}
 
         {showStatusSuggestion && (
-          <div className="flex items-center gap-2 flex-wrap pl-7 text-xs">
+          <div className={cn("flex items-center gap-2 flex-wrap text-xs", selectable && "pl-7")}>
             <span className="text-muted-foreground">
               Jev suggests marking this application <span className="font-medium text-foreground">{thread.jevSuggestedStatus}</span>
               {thread.jevSuggestedStatusConf !== null && ` · ${confidenceWord(thread.jevSuggestedStatusConf)}`}
@@ -401,6 +411,7 @@ export default function TriageList({
   applyStatusSuggestion,
   dismissStatusSuggestion,
   suggestMatch,
+  selfEmail,
 }: Props) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -482,8 +493,9 @@ export default function TriageList({
 
   return (
     <div className="space-y-3">
-      {threads.length > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
+      {/* Bulk selection only earns its space with more than one thread. */}
+      {threads.length > 1 && (
+        <div className="flex items-center gap-3 border bg-muted/40 px-3 py-2">
           <div className="flex items-center gap-2" onClick={toggleSelectAll}>
             <Checkbox
               checked={allSelected}
@@ -493,7 +505,7 @@ export default function TriageList({
             />
           </div>
           <p className="text-sm text-muted-foreground">
-            {selectedIds.size > 0 ? `${selectedIds.size} selected` : `Select all ${threads.length}`}
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
           </p>
           {selectedIds.size > 0 && (
             <div className="ml-auto flex items-center gap-2">
@@ -531,6 +543,8 @@ export default function TriageList({
           applyStatusSuggestion={applyStatusSuggestion}
           dismissStatusSuggestion={dismissStatusSuggestion}
           suggestMatch={suggestMatch}
+          selfEmail={selfEmail}
+          selectable={threads.length > 1}
           selected={selectedIds.has(thread.id)}
           onToggleSelected={() => toggleSelected(thread.id)}
           pick={getPick(thread)}
