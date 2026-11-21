@@ -1,39 +1,49 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ArrowDown, ArrowRight, ArrowUp, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { statusBarClass } from "@/lib/applicationsShared";
 import type { ApplicationPipelineStats } from "@/lib/applications";
 import type { EmailSyncStats } from "@/lib/emailThreads";
 import CycleFilter from "@/components/applications/CycleFilter";
+import StatusDot from "@/components/applications/StatusDot";
+import { Eyebrow } from "@/components/PageHeader";
+import { GRID_INSET } from "@/components/PageGrid";
 import { serializeCycleSearchParam } from "@/lib/recruitingCycleShared";
+
+// Every cell sits in one `gap-px` grid over a border-colored background, so
+// neighbouring cells share a single 1px rule and, at lg, each column edge
+// lands on a PageGrid line. Rows are always full (4 + 3/1) so no empty cell
+// ever shows the border color through.
+const CELL = cn("bg-card py-4", GRID_INSET);
 
 function StatTile({
   label,
   value,
   hint,
   href,
+  emphasize = false,
+  className,
 }: {
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
   href?: string;
+  emphasize?: boolean;
+  className?: string;
 }) {
   const body = (
-    <Card className={cn("py-0 h-full", href && "hover:bg-muted/40 transition-colors cursor-pointer")}>
-      <CardContent className="py-3 px-4">
-        <p className="text-xs text-muted-foreground truncate">{label}</p>
-        <p className="text-2xl font-semibold tracking-tight mt-1">{value}</p>
-        {hint && <p className="text-xs text-muted-foreground mt-1 truncate">{hint}</p>}
-      </CardContent>
-    </Card>
+    <>
+      <Eyebrow className={cn("truncate", emphasize && "text-primary")}>{label}</Eyebrow>
+      <p className={cn("mt-2 text-4xl font-light tracking-tight tabular-nums", emphasize && "text-primary")}>{value}</p>
+      {hint && <div className="mt-1.5 truncate text-xs text-muted-foreground">{hint}</div>}
+    </>
   );
   return href ? (
-    <Link href={href} className="block h-full">
+    <Link href={href} className={cn(CELL, "block min-w-0 transition-colors hover:bg-muted/50", className)}>
       {body}
     </Link>
   ) : (
-    body
+    <div className={cn(CELL, "min-w-0", className)}>{body}</div>
   );
 }
 
@@ -57,10 +67,10 @@ function WeekDelta({ thisWeek, lastWeek }: { thisWeek: number; lastWeek: number 
 }
 
 function formatRelativeTime(date: Date | null): string {
-  if (!date) return "Never";
+  if (!date) return "never";
   const ms = Date.now() - new Date(date).getTime();
   const mins = Math.round(ms / 60_000);
-  if (mins < 1) return "Just now";
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -83,53 +93,66 @@ export default function StatisticsPanel({
   // through to the applications list doesn't silently reset the cycle
   // filter back to its current-cycle default (GitHub issue #106 follow-up).
   const applicationsHref = `/applications?cycle=${encodeURIComponent(serializeCycleSearchParam(selectedCycles))}`;
+  const needsReview = email.needsReview > 0;
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Statistics</h2>
-        <CycleFilter options={cycleOptions} selected={selectedCycles} />
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="bg-background text-2xl font-heading lg:px-6">Statistics</h2>
+        <div className="bg-background lg:px-6">
+          <CycleFilter options={cycleOptions} selected={selectedCycles} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 gap-px overflow-hidden border bg-border sm:grid-cols-2 lg:grid-cols-4">
+        {/* The one actionable number leads, in the brand color when there's
+            something to do. Last-synced rides along as its hint rather than
+            taking a tile of its own. */}
+        <StatTile
+          label="Email needs review"
+          value={email.needsReview}
+          href="/email"
+          emphasize={needsReview}
+          hint={
+            email.connected ? (
+              <span className="inline-flex items-center gap-1">
+                {needsReview && (
+                  <>
+                    <span className="font-medium text-primary">Review</span>
+                    <ArrowRight className="size-3 text-primary" />
+                    <span aria-hidden="true">·</span>
+                  </>
+                )}
+                Last synced {formatRelativeTime(email.lastSyncAt)}
+              </span>
+            ) : (
+              "Gmail not connected"
+            )
+          }
+        />
         <StatTile label="Total applications" value={pipeline.total} href={applicationsHref} />
-        <StatTile
-          label="Active"
-          value={pipeline.active}
-          hint="not rejected/ghosted/withdrawn"
-          href={applicationsHref}
-        />
-        <StatTile
-          label="Rejection rate"
-          value={pipeline.rejectionRate === null ? "—" : `${Math.round(pipeline.rejectionRate * 100)}%`}
-          hint={`${pipeline.rejections} rejection${pipeline.rejections === 1 ? "" : "s"}`}
-        />
+        <StatTile label="Active" value={pipeline.active} hint="not rejected/ghosted/withdrawn" href={applicationsHref} />
         <StatTile
           label="Applied this week"
           value={pipeline.newThisWeek}
           hint={<WeekDelta thisWeek={pipeline.newThisWeek} lastWeek={pipeline.newLastWeek} />}
         />
-        <StatTile label="Email needs review" value={email.needsReview} href="/email" />
-        <StatTile
-          label="Last synced"
-          value={email.connected ? formatRelativeTime(email.lastSyncAt) : "Not connected"}
-          href="/email"
-        />
-      </div>
 
-      <Card className="py-0">
-        <CardContent className="py-4 px-4">
-          <p className="text-xs text-muted-foreground mb-3">Applications by status</p>
+        <div className={cn(CELL, "min-w-0 sm:col-span-2 lg:col-span-3")}>
+          <Eyebrow>Applications by status</Eyebrow>
           {pipeline.byStatus.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No applications yet.</p>
+            <p className="mt-3 text-sm text-muted-foreground">No applications in this cycle yet.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="mt-3 space-y-2">
               {pipeline.byStatus.map(({ status, count }) => (
                 <div key={status} className="flex items-center gap-3 text-sm">
-                  <span className="w-28 shrink-0 truncate text-muted-foreground">{status}</span>
-                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                  <span className="flex w-32 shrink-0 items-center gap-2 truncate text-muted-foreground">
+                    <StatusDot status={status} />
+                    <span className="truncate">{status}</span>
+                  </span>
+                  <div className="h-1.5 flex-1 overflow-hidden bg-muted">
                     <div
-                      className={cn("h-full rounded-full", statusBarClass(status))}
+                      className={cn("h-full", statusBarClass(status))}
                       style={{ width: `${Math.max((count / maxStatusCount) * 100, 4)}%` }}
                     />
                   </div>
@@ -138,8 +161,14 @@ export default function StatisticsPanel({
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        <StatTile
+          className="sm:col-span-2 lg:col-span-1"
+          label="Rejection rate"
+          value={pipeline.rejectionRate === null ? "—" : `${Math.round(pipeline.rejectionRate * 100)}%`}
+          hint={`${pipeline.rejections} rejection${pipeline.rejections === 1 ? "" : "s"}`}
+        />
+      </div>
     </section>
   );
 }

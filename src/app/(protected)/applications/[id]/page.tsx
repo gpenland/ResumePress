@@ -64,7 +64,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight font-heading break-words">{application.roleTitle}</h1>
+            <h1 className="text-3xl tracking-tight font-heading break-words">{application.roleTitle}</h1>
             <EditableStatusBadge
               applicationId={application.id}
               status={application.status}

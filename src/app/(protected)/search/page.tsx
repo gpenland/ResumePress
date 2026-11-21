@@ -20,7 +20,7 @@ export default async function SearchPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold tracking-tight font-heading">Search</h1>
+        <h1 className="text-3xl tracking-tight font-heading">Search</h1>
         <form action="/search" method="GET" className="flex gap-2">
           <Input
             name="q"

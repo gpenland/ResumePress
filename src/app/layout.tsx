@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Source_Serif_4 } from "next/font/google";
+import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 
@@ -8,12 +8,15 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// Serif accent for page/card titles only — a small nod to the printed-resume
-// feel the app is named after, without turning UI chrome (buttons, nav,
-// labels, body copy) serif too. Wired up via --font-heading in globals.css.
-const sourceSerif = Source_Serif_4({
+// Italic serif accent for page/card titles and the wordmark only — a nod to
+// the printed-resume feel the app is named after, without turning UI chrome
+// (buttons, nav, labels, body copy) serif too. Wired up via --font-heading in
+// globals.css, which also pins it to italic 400 (the only cut that exists).
+const instrumentSerif = Instrument_Serif({
   variable: "--font-serif",
   subsets: ["latin"],
+  weight: "400",
+  style: "italic",
 });
 
 export const metadata: Metadata = {
@@ -45,14 +48,14 @@ console.log("%cPoking around the source? Respect. May your next status update sa
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${instrumentSerif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: CONSOLE_GREETING_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col bg-background text-foreground antialiased">
+      <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased">
         <Nav />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 flex flex-col">{children}</main>
       </body>
     </html>
   );

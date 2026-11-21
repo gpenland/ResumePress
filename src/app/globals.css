@@ -26,6 +26,7 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-grid: var(--grid);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -49,87 +50,81 @@
 }
 
 :root {
-  /* Nord light theme
-     Primary accent : hsl(213.1 32% 52.2%)  — nord9 blue
-     Card surface   : hsl(218.2 26.8% 92%)  — nord5 snow
-     Page background: hsl(217.5 26.7% 94.1%)— nord6 snow (lightest)
-     Foreground     : hsl(220 16.4% 21.6%)  — nord0 polar night
-  */
-  --background:          hsl(217.5 26.7% 94.1%);
-  --foreground:          hsl(220 16.4% 21.6%);
-  --card:                hsl(218.2 26.8% 92%);
-  --card-foreground:     hsl(220 16.4% 21.6%);
-  --popover:             hsl(218.2 26.8% 92%);
-  --popover-foreground:  hsl(220 16.4% 21.6%);
-  --primary:             hsl(213.1 32% 52.2%);
-  --primary-foreground:  hsl(218.2 26.8% 98%);
-  --secondary:           hsl(218 27% 89%);
-  --secondary-foreground:hsl(220 16.4% 21.6%);
-  --muted:               hsl(218 27% 89%);
-  --muted-foreground:    hsl(220 10% 46%);
-  --accent:              hsl(218 27% 89%);
-  --accent-foreground:   hsl(220 16.4% 21.6%);
-  --destructive:         hsl(354 42% 56%);
-  --border:              hsl(218 22% 84%);
-  --input:               hsl(218 22% 84%);
-  --ring:                hsl(213.1 32% 52.2%);
-  --chart-1:             hsl(213.1 32% 52.2%);
-  --chart-2:             hsl(193 43% 67%);
-  --chart-3:             hsl(178 35% 58%);
-  --chart-4:             hsl(92 28% 65%);
-  --chart-5:             hsl(40 68% 73%);
-  --radius: 0.5rem;
-  --sidebar:             hsl(218.2 26.8% 92%);
-  --sidebar-foreground:  hsl(220 16.4% 21.6%);
-  --sidebar-primary:     hsl(213.1 32% 52.2%);
-  --sidebar-primary-foreground: hsl(218.2 26.8% 98%);
-  --sidebar-accent:      hsl(218 27% 89%);
-  --sidebar-accent-foreground:  hsl(220 16.4% 21.6%);
-  --sidebar-border:      hsl(218 22% 84%);
-  --sidebar-ring:        hsl(213.1 32% 52.2%);
+  /* "Nord Paper" light theme — Nord's Snow Storm tones nudged toward a
+     neutral paper, Polar Night ink, nord10 blue as the one brand color.
+     --grid is the dashed column-grid hairline (see PageGrid.tsx). */
+  --background:          #EFF1F4;
+  --foreground:          #2E3440;
+  --card:                #F7F8FA;
+  --card-foreground:     #2E3440;
+  --popover:             #F7F8FA;
+  --popover-foreground:  #2E3440;
+  --primary:             #5E81AC;
+  --primary-foreground:  #F7F8FA;
+  --secondary:           #E3E7ED;
+  --secondary-foreground:#2E3440;
+  --muted:               #E3E7ED;
+  --muted-foreground:    #5F6675;
+  --accent:              #E3E7ED;
+  --accent-foreground:   #2E3440;
+  --destructive:         #BF616A;
+  --border:              #CDD3DC;
+  --input:               #C5CBD5;
+  --ring:                #5E81AC;
+  --grid:                #C5CBD5;
+  --chart-1:             #5E81AC;
+  --chart-2:             #88C0D0;
+  --chart-3:             #8FBCBB;
+  --chart-4:             #A3BE8C;
+  --chart-5:             #EBCB8B;
+  --radius: 0.125rem;
+  --sidebar:             #F7F8FA;
+  --sidebar-foreground:  #2E3440;
+  --sidebar-primary:     #5E81AC;
+  --sidebar-primary-foreground: #F7F8FA;
+  --sidebar-accent:      #E3E7ED;
+  --sidebar-accent-foreground:  #2E3440;
+  --sidebar-border:      #CDD3DC;
+  --sidebar-ring:        #5E81AC;
 }
 
 .dark {
-  /* Nord dark theme — the same palette as :root, inverted. Light mode's
-     background/foreground are nord6/nord0; dark mode swaps to nord0/nord6,
-     so it's a true palette inversion rather than an unrelated gray scheme.
-     Primary, destructive, and chart hues are carried over unchanged from
-     light mode (nord9 blue, nord11 red, nord7-9/13-14 for charts) so the
-     brand color reads the same in both themes — only lightened a few
-     points where needed for contrast against the dark surfaces.
-       nord0 #2E3440 bg   nord1 #3B4252 card   nord2 #434C5E muted/border
-       nord3 #4C566A input/border   nord4-6 #D8DEE9..#ECEFF4 foreground */
-  --background:          hsl(220 16% 22%);
-  --foreground:          hsl(218 27% 94%);
-  --card:                hsl(220 16% 28%);
-  --card-foreground:     hsl(218 27% 94%);
-  --popover:             hsl(220 16% 28%);
-  --popover-foreground:  hsl(218 27% 94%);
-  --primary:             hsl(213.1 32% 58%);
-  --primary-foreground:  hsl(220 16% 14%);
-  --secondary:           hsl(220 17% 32%);
-  --secondary-foreground:hsl(218 27% 94%);
-  --muted:               hsl(220 17% 32%);
-  --muted-foreground:    hsl(219 20% 68%);
-  --accent:              hsl(220 17% 32%);
-  --accent-foreground:   hsl(218 27% 94%);
-  --destructive:         hsl(354 42% 62%);
-  --border:              hsl(220 16% 36%);
-  --input:               hsl(220 16% 36%);
-  --ring:                hsl(213.1 32% 58%);
-  --chart-1:             hsl(213.1 32% 58%);
-  --chart-2:             hsl(193 43% 67%);
-  --chart-3:             hsl(178 35% 62%);
-  --chart-4:             hsl(92 28% 65%);
-  --chart-5:             hsl(40 68% 73%);
-  --sidebar:             hsl(220 16% 22%);
-  --sidebar-foreground:  hsl(218 27% 94%);
-  --sidebar-primary:     hsl(213.1 32% 58%);
-  --sidebar-primary-foreground: hsl(220 16% 14%);
-  --sidebar-accent:      hsl(220 17% 32%);
-  --sidebar-accent-foreground:  hsl(218 27% 94%);
-  --sidebar-border:      hsl(220 16% 36%);
-  --sidebar-ring:        hsl(213.1 32% 58%);
+  /* Nord dark — nord0 page, nord1 surfaces, nord2/3 rules. Muted text and
+     the grid hairline are lifted further than a straight palette swap would
+     give: at nord3 the dashed grid all but vanished on nord0, and muted
+     labels/tags went muddy. */
+  --background:          #2E3440;
+  --foreground:          #ECEFF4;
+  --card:                #3B4252;
+  --card-foreground:     #ECEFF4;
+  --popover:             #3B4252;
+  --popover-foreground:  #ECEFF4;
+  --primary:             #88A6C6;
+  --primary-foreground:  #2E3440;
+  --secondary:           #434C5E;
+  --secondary-foreground:#ECEFF4;
+  --muted:               #434C5E;
+  --muted-foreground:    #B6BECC;
+  --accent:              #434C5E;
+  --accent-foreground:   #ECEFF4;
+  --destructive:         #D57A83;
+  --border:              #4C566A;
+  --input:               #56617A;
+  --ring:                #88A6C6;
+  --grid:                #64708A;
+  --chart-1:             #88A6C6;
+  --chart-2:             #88C0D0;
+  --chart-3:             #8FBCBB;
+  --chart-4:             #A3BE8C;
+  --chart-5:             #EBCB8B;
+  --sidebar:             #2E3440;
+  --sidebar-foreground:  #ECEFF4;
+  --sidebar-primary:     #88A6C6;
+  --sidebar-primary-foreground: #2E3440;
+  --sidebar-accent:      #434C5E;
+  --sidebar-accent-foreground:  #ECEFF4;
+  --sidebar-border:      #4C566A;
+  --sidebar-ring:        #88A6C6;
 }
 
 @layer base {
@@ -142,4 +137,13 @@
   html {
     @apply font-sans;
   }
+}
+/* Headings use Instrument Serif Italic, which ships a single 400 weight.
+   Unlayered on purpose so it beats Tailwind's layered font-bold/semibold
+   utilities on any heading that still carries one — otherwise the browser
+   synthesizes a smeared faux-bold of the italic. */
+.font-heading {
+  font-style: italic;
+  font-weight: 400;
+  font-synthesis: none;
 }

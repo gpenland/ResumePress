@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
 import SubmitButton from "@/components/SubmitButton";
 import { auth, signIn, signOut } from "@/lib/auth";
@@ -26,47 +25,54 @@ export default async function Nav() {
     { href: "/email", label: "Email", badge: triageCount, alert: emailNeedsReauth },
   ];
 
+  // On lg the header shares the page's four-column grid: wordmark in the
+  // first column, links starting at the second, actions ending at the last —
+  // each 24px inside its column like everything below it.
   return (
-    <header className="bg-background sticky top-0 z-50">
-      <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4 min-w-0">
-        <Link href="/" className="font-heading font-semibold tracking-tight text-foreground shrink-0">
+    <header className="bg-background sticky top-0 z-50 border-b border-dashed border-grid">
+      <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between gap-4 min-w-0 lg:grid lg:grid-cols-4">
+        <Link href="/" className="font-heading text-2xl tracking-tight text-foreground shrink-0 lg:px-6">
           ResumePress
         </Link>
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <NavLinks links={navLinks} />
-          {session?.user && (
-            <Link
-              href="/search"
-              aria-label="Search"
-              className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "text-muted-foreground")}
-            >
-              <Search className="size-4" />
-            </Link>
-          )}
-          <ThemeToggle />
-          {session?.user ? (
-            <UserMenu
-              user={session.user}
-              signOutAction={async () => {
-                "use server";
-                await signOut({ redirectTo: "/" });
-              }}
-            />
-          ) : (
-            <form
-              action={async () => {
-                "use server";
-                await signIn("google");
-              }}
-            >
-              <SubmitButton size="sm" variant="outline" pendingText="Signing in…">
-                Sign in
-              </SubmitButton>
-            </form>
-          )}
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 justify-end lg:contents">
+          <div className="min-w-0 lg:col-span-2 lg:px-6">
+            <NavLinks links={navLinks} />
+          </div>
+          <div className="flex items-center justify-end gap-2 min-w-0 lg:px-6">
+            {session?.user && (
+              <Link
+                href="/search"
+                aria-label="Search"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-muted-foreground gap-2 max-lg:size-8 max-lg:px-0")}
+              >
+                <Search className="size-4" />
+                <span className="hidden lg:inline">Search</span>
+              </Link>
+            )}
+            <ThemeToggle />
+            {session?.user ? (
+              <UserMenu
+                user={session.user}
+                signOutAction={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/" });
+                }}
+              />
+            ) : (
+              <form
+                action={async () => {
+                  "use server";
+                  await signIn("google");
+                }}
+              >
+                <SubmitButton size="sm" variant="outline" pendingText="Signing in…">
+                  Sign in
+                </SubmitButton>
+              </form>
+            )}
+          </div>
         </div>
       </div>
-      <Separator />
     </header>
   );
 }

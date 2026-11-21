@@ -48,7 +48,7 @@ export default function EditableStatusBadge({ applicationId, status, updateStatu
           onClick={() => setEditing(true)}
           disabled={isPending}
           aria-label={`Change status, currently ${status}`}
-          className="cursor-pointer rounded-4xl disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg px-1.5 py-1 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
           <StatusBadge status={status} />
         </button>
