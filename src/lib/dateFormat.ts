@@ -24,11 +24,6 @@ export function formatShortDate(d: Date | string | null | undefined): string | n
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-/** "Nov 12" — for tight spots (kanban rows) where the year is implied by the cycle filter. Same UTC pinning as formatShortDate. */
-export function formatMonthDay(d: Date | string): string {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
 export function formatShortDateTime(d: Date | string | null | undefined): string | null {
   if (!d) return null;
   return new Date(d).toLocaleString("en-US", {

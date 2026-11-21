@@ -13,7 +13,9 @@ import {
   getGmailSyncStatusForUser,
 } from "@/lib/emailThreads";
 import { listContactOptionsForUser, listApplicationIdsByContactForUser } from "@/lib/contacts";
-import { Badge } from "@/components/ui/badge";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import GmailConnectionPanel from "@/components/gmail/GmailConnectionPanel";
 import TriageList from "@/components/gmail/TriageList";
 import StatusSuggestionsList from "@/components/gmail/StatusSuggestionsList";
@@ -103,75 +105,87 @@ export default async function EmailPage() {
     }
   }
 
+  const selfEmail = status.connected ? status.email : null;
+  const connectionPanel = status.connected ? (
+    <GmailConnectionPanel
+      connected
+      email={status.email}
+      connectedAt={status.connectedAt}
+      initialSyncStatus={syncStatus}
+      labels={labels}
+      labelsError={labelsError}
+      overrideLabelId={overrideLabelId}
+      saveOverrideLabel={saveOverrideLabel}
+      startSync={startGmailSync}
+      getSyncStatus={getGmailSyncStatus}
+      cancelSync={cancelSync}
+      clearUnmatched={clearUnmatchedThreads}
+      disconnect={disconnectGmail}
+    />
+  ) : (
+    <GmailConnectionPanel connected={false} />
+  );
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-8">
-      <div>
-        <h1 className="text-3xl tracking-tight font-heading">Email</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Connect Gmail to scan your inbox, then confirm, reassign, or ignore how each thread
-          matches a contact or application. Optional; nothing else requires it.
-        </p>
-      </div>
-
-      {status.connected ? (
-        <GmailConnectionPanel
-          connected
-          email={status.email}
-          connectedAt={status.connectedAt}
-          initialSyncStatus={syncStatus}
-          labels={labels}
-          labelsError={labelsError}
-          overrideLabelId={overrideLabelId}
-          saveOverrideLabel={saveOverrideLabel}
-          startSync={startGmailSync}
-          getSyncStatus={getGmailSyncStatus}
-          cancelSync={cancelSync}
-          clearUnmatched={clearUnmatchedThreads}
-          disconnect={disconnectGmail}
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Inbox"
+          title="Email"
+          description={
+            status.connected
+              ? "Confirm, reassign, or ignore how each thread matches a contact or application."
+              : "Connect Gmail to scan your inbox, then confirm, reassign, or ignore how each thread matches a contact or application. Optional; nothing else requires it."
+          }
         />
-      ) : (
-        <GmailConnectionPanel connected={false} />
-      )}
+      }
+    >
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-4">
+        {/* The connection and its settings in the side column; the queues
+            you actually work through get the other three. */}
+        <aside className={status.connected ? "lg:sticky lg:top-20 lg:order-last" : "lg:col-span-2"}>
+          <Panel title="Gmail" padded>
+            {connectionPanel}
+          </Panel>
+        </aside>
 
-      {status.connected && (
-        <>
-          <StatusSuggestionsList
-            threads={statusSuggestionThreads}
-            applySuggestion={applyEmailThreadStatusSuggestion}
-            dismissSuggestion={dismissEmailThreadStatusSuggestion}
-          />
+        {status.connected && (
+          <div className="space-y-8 lg:col-span-3">
+            <StatusSuggestionsList
+              threads={statusSuggestionThreads}
+              applySuggestion={applyEmailThreadStatusSuggestion}
+              dismissSuggestion={dismissEmailThreadStatusSuggestion}
+            />
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Needs review</h2>
-              {threads.length > 0 && <Badge variant="secondary">{threads.length}</Badge>}
-            </div>
-            {threads.length === 0 ? (
-              <p className="text-sm text-muted-foreground">All caught up — nothing pending triage.</p>
-            ) : (
-              <TriageList
-                threads={threads}
-                contactOptions={contactOptions}
-                applications={applications}
-                applicationIdsByContact={applicationIdsByContact}
-                confirmMatch={confirmEmailThreadMatch}
-                ignoreMatch={ignoreEmailThreadMatch}
-                bulkConfirmMatches={bulkConfirmEmailThreadMatches}
-                bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
-                createContact={createContactFromTriage}
-                createApplication={createApplicationFromTriage}
-                applyStatusSuggestion={applyEmailThreadStatusSuggestion}
-                dismissStatusSuggestion={dismissEmailThreadStatusSuggestion}
-                suggestMatch={suggestMatchForThread}
-              />
-            )}
+            <Panel title="Needs review" badge={threads.length > 0 ? threads.length : undefined} padded>
+              {threads.length === 0 ? (
+                <p className="text-sm text-muted-foreground">All caught up — nothing pending review.</p>
+              ) : (
+                <TriageList
+                  threads={threads}
+                  contactOptions={contactOptions}
+                  applications={applications}
+                  applicationIdsByContact={applicationIdsByContact}
+                  confirmMatch={confirmEmailThreadMatch}
+                  ignoreMatch={ignoreEmailThreadMatch}
+                  bulkConfirmMatches={bulkConfirmEmailThreadMatches}
+                  bulkIgnoreMatches={bulkIgnoreEmailThreadMatches}
+                  createContact={createContactFromTriage}
+                  createApplication={createApplicationFromTriage}
+                  applyStatusSuggestion={applyEmailThreadStatusSuggestion}
+                  dismissStatusSuggestion={dismissEmailThreadStatusSuggestion}
+                  suggestMatch={suggestMatchForThread}
+                  selfEmail={selfEmail}
+                />
+              )}
+            </Panel>
+
+            {threads.length === 0 && <RecentEmailsList threads={recentThreads} selfEmail={selfEmail} />}
+
+            <IgnoredThreadsList threads={ignoredThreads} restoreMatch={restoreEmailThreadMatch} selfEmail={selfEmail} />
           </div>
-
-          {threads.length === 0 && <RecentEmailsList threads={recentThreads} />}
-
-          <IgnoredThreadsList threads={ignoredThreads} restoreMatch={restoreEmailThreadMatch} />
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </PageGrid>
   );
 }

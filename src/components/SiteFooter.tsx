@@ -28,8 +28,8 @@ export default function SiteFooter() {
         <p className="lg:px-6">© {new Date().getFullYear()} ResumePress</p>
         <p className="font-heading text-base sm:text-center">{colophonLine()}</p>
         <nav className="flex justify-center gap-5 sm:justify-end lg:px-6">
-          <Link href="/applications/import" className="hover:text-foreground transition-colors">Import</Link>
-          <Link href="/search" className="hover:text-foreground transition-colors">Search</Link>
+          {/* Only links with no other home: Import lives in the applications
+              header and Search in the nav, so they aren't repeated here. */}
           <Link href="/settings/tokens" className="hover:text-foreground transition-colors">API tokens</Link>
         </nav>
       </div>

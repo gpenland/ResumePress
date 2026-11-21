@@ -37,7 +37,7 @@ export default function UserMenu({
           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
         </div>
         <DropdownMenuItem render={<Link href="/settings/tokens" />}>
-          API Tokens
+          API tokens
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"

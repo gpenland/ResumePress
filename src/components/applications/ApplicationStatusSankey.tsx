@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { APPLICATION_STATUSES, statusFillClass } from "@/lib/applicationsShared";
 import type { StatusFlowLink } from "@/lib/applications";
@@ -65,9 +65,16 @@ function computeLevels(links: StatusFlowLink[]): Map<string, number> {
 }
 
 const NODE_THICKNESS = 16;
-const COLUMN_SPACING = 180;
-const SIDE_PAD = 76;
-const NODE_GAP = 18;
+// Columns spread across whatever width the panel has (measured below), but
+// never closer than this — below it the chart scrolls sideways instead.
+const MIN_COLUMN_SPACING = 160;
+// Room for the first column's labels (drawn to the left of its nodes) and
+// the last column's (drawn to the right), so neither collides with a band.
+const LEFT_PAD = 96;
+const RIGHT_PAD = 120;
+// Middle-column labels sit above their node, so stacked nodes need enough
+// gap between them to fit one.
+const NODE_GAP = 30;
 const PLOT_HEIGHT = 380;
 const MARGIN_TOP = 28;
 const MARGIN_BOTTOM = 12;
@@ -77,6 +84,15 @@ type Tooltip = { x: number; y: number; label: string; value: number };
 export default function ApplicationStatusSankey({ links }: { links: StatusFlowLink[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+  const [availableWidth, setAvailableWidth] = useState(900);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Native SVG <title> tooltips are unreliable across browsers (slow/absent
   // delay, no keyboard-focus equivalent), so hover/focus is driven here
@@ -106,7 +122,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
 
   if (links.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
+      <div className="border bg-card p-10 text-center text-sm text-muted-foreground">
         No status history yet. It fills in as applications change status.
       </div>
     );
@@ -114,6 +130,10 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
 
   const levels = computeLevels(links);
   const numColumns = Math.max(...levels.values()) + 1;
+  const columnSpacing =
+    numColumns > 1
+      ? Math.max(MIN_COLUMN_SPACING, (availableWidth - LEFT_PAD - RIGHT_PAD - NODE_THICKNESS) / (numColumns - 1))
+      : 0;
   const columns: string[][] = Array.from({ length: numColumns }, () => []);
   for (const [name, level] of levels) columns[level].push(name);
   for (const col of columns) col.sort(compareNodes);
@@ -137,7 +157,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
   type NodePos = { x: number; y0: number; y1: number };
   const nodePos = new Map<string, NodePos>();
   columns.forEach((col, i) => {
-    const x = SIDE_PAD + i * COLUMN_SPACING;
+    const x = LEFT_PAD + i * columnSpacing;
     const heights = col.map((n) => Math.max(values.get(n)! * scale, 3));
     const totalHeight = heights.reduce((a, b) => a + b, 0) + (col.length - 1) * NODE_GAP;
     let y = MARGIN_TOP + (PLOT_HEIGHT - totalHeight) / 2;
@@ -174,11 +194,11 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
     }
   }
 
-  const totalWidth = SIDE_PAD * 2 + (numColumns - 1) * COLUMN_SPACING + NODE_THICKNESS;
+  const totalWidth = LEFT_PAD + RIGHT_PAD + (numColumns - 1) * columnSpacing + NODE_THICKNESS;
   const totalHeight = MARGIN_TOP + PLOT_HEIGHT + MARGIN_BOTTOM;
 
   return (
-    <div className="rounded-lg border bg-card p-6">
+    <div className="border bg-card px-4 py-6 lg:px-6">
       <div ref={containerRef} className="relative">
         <div className="overflow-x-auto">
           <svg
@@ -247,12 +267,7 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
                     onFocus={(e) => showAtElement(e, label, value)}
                     onBlur={hideTooltip}
                   />
-                  <text
-                    x={pos.x + NODE_THICKNESS / 2}
-                    y={pos.y0 - 8}
-                    textAnchor="middle"
-                    className="fill-foreground text-[11px]"
-                  >
+                  <text {...labelPosition(levels.get(name)!, numColumns, pos)} className="fill-foreground text-[11px]">
                     {name === "Start" ? "New" : name} · {value}
                   </text>
                 </g>
@@ -272,9 +287,25 @@ export default function ApplicationStatusSankey({ links }: { links: StatusFlowLi
         )}
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        Flow of applications between statuses, based on logged status changes. Hover a band or
-        node for its exact count.
+        How applications have moved between statuses, from logged status changes. Each number
+        counts applications that ever reached that status, so it can be higher than the
+        dashboard&apos;s count of applications currently in it. Hover a band or node for its
+        exact count.
       </p>
     </div>
   );
+}
+
+// First column: label to the left of the node; last column: to the right
+// (nothing flows out of it); middle columns: centred above the node, where
+// the bands entering and leaving it can't run through the text.
+function labelPosition(
+  level: number,
+  numColumns: number,
+  pos: { x: number; y0: number; y1: number }
+): { x: number; y: number; textAnchor: "start" | "middle" | "end"; dominantBaseline?: "middle" } {
+  const midY = (pos.y0 + pos.y1) / 2;
+  if (level === 0 && numColumns > 1) return { x: pos.x - 8, y: midY, textAnchor: "end", dominantBaseline: "middle" };
+  if (level === numColumns - 1) return { x: pos.x + NODE_THICKNESS + 8, y: midY, textAnchor: "start", dominantBaseline: "middle" };
+  return { x: pos.x + NODE_THICKNESS / 2, y: pos.y0 - 8, textAnchor: "middle" };
 }

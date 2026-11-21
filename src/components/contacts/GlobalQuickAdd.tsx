@@ -35,6 +35,21 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
   const formRef = useRef<HTMLFormElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fanOpen, setFanOpen] = useState(false);
+  // Slides out of the way while scrolling down — it sits over the right edge
+  // of every list, which is where row statuses live — and back on any
+  // scroll up. Never hides while its menu is open.
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      if (y > lastY + 4 && y > 120) setTucked(true);
+      else if (y < lastY - 4) setTucked(false);
+      lastY = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("Email");
   const [isPending, startTransition] = useTransition();
@@ -69,12 +84,12 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
   }
 
   const actions = [
-    { key: "application", label: "New Application", icon: Briefcase, href: "/applications/new" },
-    { key: "entry", label: "New Entry", icon: FileText, href: "/entries/new" },
-    { key: "contact", label: "New Contact", icon: UserPlus, href: "/contacts/new" },
+    { key: "application", label: "New application", icon: Briefcase, href: "/applications/new" },
+    { key: "entry", label: "New entry", icon: FileText, href: "/entries/new" },
+    { key: "contact", label: "New contact", icon: UserPlus, href: "/contacts/new" },
     {
       key: "interaction",
-      label: "Log Interaction",
+      label: "Log interaction",
       icon: MessageSquarePlus,
       onClick: () => {
         setFanOpen(false);
@@ -85,7 +100,13 @@ export default function GlobalQuickAdd({ contactOptions, applicationOptions, log
 
   return (
     <>
-      <div ref={containerRef} className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+      <div
+        ref={containerRef}
+        className={cn(
+          "fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 transition-transform duration-200",
+          tucked && !fanOpen && "translate-y-24"
+        )}
+      >
         {actions.map((action, i) => {
           const Icon = action.icon;
           // Label + icon live in one element with one transform, so they

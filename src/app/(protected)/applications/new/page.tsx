@@ -4,6 +4,9 @@ import { getUserId } from "@/lib/auth";
 import { listCompaniesForUser } from "@/lib/companies";
 import { listResumesForUser } from "@/lib/resumes";
 import ApplicationForm from "@/components/applications/ApplicationForm";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import { createApplication, autofillApplicationFromUrl } from "../actions";
 
 export default async function NewApplicationPage() {
@@ -13,18 +16,24 @@ export default async function NewApplicationPage() {
     : [[], []];
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 space-y-6">
-      <div>
-        <h1 className="text-3xl tracking-tight font-heading">New Application</h1>
-        <p className="text-muted-foreground text-sm mt-1">Track a new internship application</p>
-      </div>
-      <ApplicationForm
-        companies={companies}
-        resumes={resumes}
-        action={createApplication}
-        submitLabel="Create Application"
-        autofillFromUrl={autofillApplicationFromUrl}
-      />
-    </div>
+    <PageGrid
+      header={
+        <PageHeader
+          back={{ href: "/applications", label: "Applications" }}
+          title="New application"
+          description="Track a new internship application"
+        />
+      }
+    >
+      <Panel padded className="lg:w-1/2">
+        <ApplicationForm
+          companies={companies}
+          resumes={resumes}
+          action={createApplication}
+          submitLabel="Create application"
+          autofillFromUrl={autofillApplicationFromUrl}
+        />
+      </Panel>
+    </PageGrid>
   );
 }

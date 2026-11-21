@@ -33,9 +33,9 @@ function StatTile({
 }) {
   const body = (
     <>
-      <Eyebrow className={cn("truncate", emphasize && "text-primary")}>{label}</Eyebrow>
-      <p className={cn("mt-2 text-4xl font-light tracking-tight tabular-nums", emphasize && "text-primary")}>{value}</p>
-      {hint && <div className="mt-1.5 truncate text-xs text-muted-foreground">{hint}</div>}
+      <Eyebrow className={cn("sm:truncate", emphasize && "text-primary")}>{label}</Eyebrow>
+      <p className={cn("mt-2 text-3xl font-light tracking-tight tabular-nums sm:text-4xl", emphasize && "text-primary")}>{value}</p>
+      {hint && <div className="mt-1.5 text-xs text-muted-foreground sm:truncate">{hint}</div>}
     </>
   );
   return href ? (
@@ -106,7 +106,9 @@ export default function StatisticsPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-px overflow-hidden border bg-border sm:grid-cols-2 lg:grid-cols-4">
+      {/* Two tiles per row even on a phone, so the four headline numbers fit
+          on one screen instead of stacking into a long scroll. */}
+      <div className="grid grid-cols-2 gap-px overflow-hidden border bg-border lg:grid-cols-4">
         {/* The one actionable number leads, in the brand color when there's
             something to do. Last-synced rides along as its hint rather than
             taking a tile of its own. */}
@@ -140,7 +142,7 @@ export default function StatisticsPanel({
           hint={<WeekDelta thisWeek={pipeline.newThisWeek} lastWeek={pipeline.newLastWeek} />}
         />
 
-        <div className={cn(CELL, "min-w-0 sm:col-span-2 lg:col-span-3")}>
+        <div className={cn(CELL, "col-span-2 min-w-0 lg:col-span-3")}>
           <Eyebrow>Applications by status</Eyebrow>
           {pipeline.byStatus.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">No applications in this cycle yet.</p>
@@ -148,7 +150,7 @@ export default function StatisticsPanel({
             <div className="mt-3 space-y-2">
               {pipeline.byStatus.map(({ status, count }) => (
                 <div key={status} className="flex items-center gap-3 text-sm">
-                  <span className="flex w-32 shrink-0 items-center gap-2 truncate text-muted-foreground">
+                  <span className="flex w-28 shrink-0 items-center gap-2 truncate text-muted-foreground sm:w-32">
                     <StatusDot status={status} />
                     <span className="truncate">{status}</span>
                   </span>
@@ -165,7 +167,7 @@ export default function StatisticsPanel({
           )}
         </div>
         <StatTile
-          className="sm:col-span-2 lg:col-span-1"
+          className="col-span-2 lg:col-span-1"
           label="Rejection rate"
           value={pipeline.rejectionRate === null ? "—" : `${Math.round(pipeline.rejectionRate * 100)}%`}
           hint={`${pipeline.rejections} rejection${pipeline.rejections === 1 ? "" : "s"}`}

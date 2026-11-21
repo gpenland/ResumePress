@@ -7,8 +7,10 @@ import { updateResumeEntries } from "@/app/(protected)/resumes/actions";
 import { fetchResumePdf, triggerBlobDownload } from "@/lib/pdfDownloadClient";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
 import { ChevronUp, ChevronDown, GripVertical, Pencil, X } from "lucide-react";
+import { Panel } from "@/components/Panel";
+import { GRID_INSET } from "@/components/PageGrid";
+import { cn } from "@/lib/utils";
 
 type EntryWithCategory = Entry & { category: Category };
 
@@ -17,15 +19,22 @@ type Props = {
   allEntries: EntryWithCategory[];
   selectedEntries: ResumeEntry[];
   categories: Category[];
+  /** Shown at the top of the sticky right-hand column, above the preview. */
+  identityPanel: React.ReactNode;
 };
 
-export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, categories }: Props) {
+export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, categories, identityPanel }: Props) {
   // Ordered array of selected entry IDs — index determines PDF order within categories
   const [selectedOrder, setSelectedOrder] = useState<string[]>(
     selectedEntries
       .sort((a, b) => a.order - b.order)
       .map((re) => re.entryId)
   );
+
+  // What's actually saved, to tell whether the current selection has
+  // unsaved changes.
+  const [savedOrder, setSavedOrder] = useState<string[]>(selectedOrder);
+  const isDirty = selectedOrder.join() !== savedOrder.join();
 
   const [saving, startSave] = useTransition();
   const [downloading, startDownload] = useTransition();
@@ -46,6 +55,14 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
     };
   }, []);
+
+  // Warn before leaving the page with unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
 
   function toggle(entryId: string) {
     setSelectedOrder((prev) => {
@@ -102,7 +119,9 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
   }
 
   async function persistSelection() {
-    await updateResumeEntries(resumeId, selectedOrder);
+    const order = selectedOrder;
+    await updateResumeEntries(resumeId, order);
+    setSavedOrder(order);
     setSaved(true);
     if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
     savedTimeoutRef.current = setTimeout(() => setSaved(false), 2500);
@@ -155,226 +174,229 @@ export default function ResumeBuilder({ resumeId, allEntries, selectedEntries, c
     }))
     .filter((g) => g.entries.length > 0);
 
+  const toolbar = (
+    <>
+      <span className={cn("text-xs", isDirty ? "font-medium text-foreground" : "text-muted-foreground")} aria-live="polite">
+        {isDirty ? "Unsaved changes" : saved && !isBusy ? "Saved" : "All changes saved"}
+      </span>
+      <Button variant={isDirty ? "default" : "outline"} onClick={handleSave} disabled={isBusy || !isDirty}>
+        {saving ? "Saving…" : "Save"}
+      </Button>
+    </>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {selectedOrder.length}{" "}
-          {selectedOrder.length === 1 ? "entry" : "entries"} selected
-        </p>
-        <div className="flex items-center gap-2">
-          {saved && !isBusy && (
-            <span className="text-sm text-green-600">Saved</span>
-          )}
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={isBusy}>
-            {saving ? "Saving..." : "Save"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePreview} disabled={isBusy}>
-            {previewing ? "Compiling..." : "Preview"}
-          </Button>
-          <Button size="sm" onClick={handleDownload} disabled={isBusy}>
-            {downloading ? "Generating..." : "Download PDF"}
-          </Button>
-        </div>
-      </div>
+    // List on the left, identity and the compiled preview on the right —
+    // sticky, so the preview stays in view while you work down the list.
+    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+      <Panel
+        title={`${selectedOrder.length} ${selectedOrder.length === 1 ? "entry" : "entries"} selected`}
+        actions={toolbar}
+      >
+        {entriesByCategory.length === 0 ? (
+          <p className={cn("py-10 text-center text-sm text-muted-foreground", GRID_INSET)}>
+            No entries yet.{" "}
+            <Link href="/entries/new" className="text-primary underline underline-offset-4">
+              Add some entries
+            </Link>{" "}
+            to start building.
+          </p>
+        ) : (
+          <div className={cn("space-y-5 pt-2 pb-4", GRID_INSET)}>
+            {entriesByCategory.map(({ category, entries }) => {
+              // Split into selected (preserving their order) and unselected
+              const selectedInCat = selectedOrder.filter((id) => entries.some((e) => e.id === id));
+              const unselectedInCat = entries.filter((e) => !selectedSet.has(e.id));
+              const orderedEntries = [
+                ...selectedInCat.map((id) => entries.find((e) => e.id === id)!),
+                ...unselectedInCat,
+              ];
 
-      {(downloadError || previewError) && (
-        <p className="text-sm text-destructive">{downloadError || previewError}</p>
-      )}
+              return (
+                <div key={category.id} className="space-y-1.5">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{category.name}</p>
 
-      {previewUrl && (
-        <Card className="py-0">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <p className="text-sm font-medium">PDF Preview</p>
-              <Button variant="ghost" size="sm" onClick={closePreview} aria-label="Close preview">
-                <X className="size-4" />
-              </Button>
-            </div>
-            <iframe
-              src={previewUrl}
-              title="Resume PDF preview"
-              className="h-[80vh] w-full"
-            />
-          </CardContent>
-        </Card>
-      )}
+                  {orderedEntries.map((entry) => {
+                    const isSelected = selectedSet.has(entry.id);
+                    const posInCat = selectedInCat.indexOf(entry.id);
+                    const isFirst = posInCat === 0;
+                    const isLast = posInCat === selectedInCat.length - 1;
 
-      {entriesByCategory.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              No entries yet.{" "}
-              <a href="/entries/new" className="text-primary underline underline-offset-4">
-                Add some entries
-              </a>{" "}
-              to start building.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        entriesByCategory.map(({ category, entries }) => {
-          // Split into selected (preserving their order) and unselected
-          const selectedInCat = selectedOrder.filter((id) =>
-            entries.some((e) => e.id === id)
-          );
-          const unselectedInCat = entries.filter(
-            (e) => !selectedSet.has(e.id)
-          );
-          const orderedEntries = [
-            ...selectedInCat.map((id) => entries.find((e) => e.id === id)!),
-            ...unselectedInCat,
-          ];
-
-          return (
-            <div key={category.id} className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-                {category.name}
-              </p>
-
-              {orderedEntries.map((entry) => {
-                const isSelected = selectedSet.has(entry.id);
-                const posInCat = selectedInCat.indexOf(entry.id);
-                const isFirst = posInCat === 0;
-                const isLast = posInCat === selectedInCat.length - 1;
-
-                return (
-                  <div
-                    key={entry.id}
-                    className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 transition-colors ${
-                      isSelected
-                        ? "bg-muted/60 border-primary/30"
-                        : "hover:bg-muted/30 border-border cursor-pointer"
-                    } ${draggedId === entry.id ? "opacity-40" : ""} ${
-                      isSelected && dragOverId === entry.id && draggedId && draggedId !== entry.id
-                        ? "ring-2 ring-primary/50"
-                        : ""
-                    }`}
-                    onClick={!isSelected ? () => toggle(entry.id) : undefined}
-                    onDragOver={(e) => {
-                      if (!isSelected || !draggedId) return;
-                      e.preventDefault();
-                      if (dragOverId !== entry.id) setDragOverId(entry.id);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverId === entry.id) setDragOverId(null);
-                    }}
-                    onDrop={(e) => {
-                      if (!isSelected || !draggedId) return;
-                      e.preventDefault();
-                      reorderInCategory(category.id, draggedId, entry.id);
-                      setDraggedId(null);
-                      setDragOverId(null);
-                    }}
-                  >
-                    {/* Drag handle — only for selected entries, chevrons remain as fallback */}
-                    {isSelected && (
+                    return (
                       <div
-                        draggable
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          setDraggedId(entry.id);
-                          e.dataTransfer.effectAllowed = "move";
+                        key={entry.id}
+                        className={cn(
+                          "flex items-start gap-2 border px-2 py-2.5 transition-colors",
+                          isSelected ? "border-primary/30 bg-muted/60" : "cursor-pointer border-border hover:bg-muted/30",
+                          draggedId === entry.id && "opacity-40",
+                          isSelected && dragOverId === entry.id && draggedId && draggedId !== entry.id && "ring-2 ring-primary/50"
+                        )}
+                        onClick={!isSelected ? () => toggle(entry.id) : undefined}
+                        onDragOver={(e) => {
+                          if (!isSelected || !draggedId) return;
+                          e.preventDefault();
+                          if (dragOverId !== entry.id) setDragOverId(entry.id);
                         }}
-                        onDragEnd={() => {
+                        onDragLeave={() => {
+                          if (dragOverId === entry.id) setDragOverId(null);
+                        }}
+                        onDrop={(e) => {
+                          if (!isSelected || !draggedId) return;
+                          e.preventDefault();
+                          reorderInCategory(category.id, draggedId, entry.id);
                           setDraggedId(null);
                           setDragOverId(null);
                         }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-0.5 shrink-0 cursor-grab touch-none self-center text-muted-foreground/60 hover:text-muted-foreground active:cursor-grabbing"
-                        aria-hidden="true"
                       >
-                        <GripVertical className="size-4" />
-                      </div>
-                    )}
-
-                    {/* Checkbox */}
-                    <div
-                      className="mt-0.5 shrink-0"
-                      onClick={(e) => { e.stopPropagation(); toggle(entry.id); }}
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggle(entry.id)}
-                        className="pointer-events-none"
-                      />
-                    </div>
-
-                    {/* Entry info */}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-tight">
-                        {entry.displayTitle || entry.title}
-                      </p>
-                      {entry.displayTitle && entry.displayTitle !== entry.title && (
-                        <p className="text-xs text-muted-foreground/80 italic mt-0.5">PDF text: "{entry.title}"</p>
-                      )}
-                      {(entry.organization || entry.location || entry.startDate) && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {[entry.organization, entry.location]
-                            .filter(Boolean)
-                            .join(" · ")}
-                          {entry.startDate && (
-                            <span className="ml-2">
-                              {entry.startDate}
-                              {entry.endDate ? ` – ${entry.endDate}` : ""}
-                            </span>
+                        {/* Drag handle. The slot is always there (just empty
+                            when unselected) so ticking an entry doesn't shift
+                            its text sideways. */}
+                        <div
+                          draggable={isSelected}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            setDraggedId(entry.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDraggedId(null);
+                            setDragOverId(null);
+                          }}
+                          onClick={(e) => isSelected && e.stopPropagation()}
+                          className={cn(
+                            "w-4 shrink-0 self-center text-muted-foreground/60",
+                            isSelected && "cursor-grab touch-none hover:text-muted-foreground active:cursor-grabbing"
                           )}
-                        </p>
-                      )}
-                      {entry.bullets.length > 0 && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {entry.bullets.length} bullet
-                          {entry.bullets.length !== 1 ? "s" : ""}
-                        </p>
-                      )}
-                    </div>
+                          aria-hidden="true"
+                        >
+                          {isSelected && <GripVertical className="size-4" />}
+                        </div>
 
-                    {/* Edit entry */}
-                    <Link
-                      href={`/entries/${entry.id}/edit?resumeId=${resumeId}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-0.5 shrink-0 self-center p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
-                      aria-label={`Edit ${entry.displayTitle || entry.title}`}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Link>
-
-                    {/* Reorder controls — only for selected entries */}
-                    {isSelected && (
-                      <div className="flex flex-col shrink-0 self-center">
-                        <button
-                          type="button"
+                        {/* Checkbox */}
+                        <div
+                          className="mt-0.5 shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            moveInCategory(entry.id, category.id, "up");
+                            toggle(entry.id);
                           }}
-                          disabled={isFirst}
-                          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                          aria-label="Move up"
                         >
-                          <ChevronUp className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveInCategory(entry.id, category.id, "down");
-                          }}
-                          disabled={isLast}
-                          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors"
-                          aria-label="Move down"
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggle(entry.id)} className="pointer-events-none" />
+                        </div>
+
+                        {/* Entry info */}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-tight">{entry.displayTitle || entry.title}</p>
+                          {entry.displayTitle && entry.displayTitle !== entry.title && (
+                            <p className="mt-0.5 text-xs italic text-muted-foreground/80">PDF text: &ldquo;{entry.title}&rdquo;</p>
+                          )}
+                          {(entry.organization || entry.location || entry.startDate) && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {[
+                                entry.organization,
+                                entry.location,
+                                entry.startDate && `${entry.startDate}${entry.endDate ? ` – ${entry.endDate}` : ""}`,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
+                          {entry.bullets.length > 0 && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {entry.bullets.length} bullet{entry.bullets.length !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Edit entry */}
+                        <Link
+                          href={`/entries/${entry.id}/edit?resumeId=${resumeId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 shrink-0 self-center p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground"
+                          aria-label={`Edit ${entry.displayTitle || entry.title}`}
                         >
-                          <ChevronDown className="size-3.5" />
-                        </button>
+                          <Pencil className="size-3.5" />
+                        </Link>
+
+                        {/* Reorder controls — slot always reserved, like the handle. */}
+                        <div className="flex w-5 shrink-0 flex-col self-center">
+                          {isSelected && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveInCategory(entry.id, category.id, "up");
+                                }}
+                                disabled={isFirst}
+                                className="p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20"
+                                aria-label="Move up"
+                              >
+                                <ChevronUp className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveInCategory(entry.id, category.id, "down");
+                                }}
+                                disabled={isLast}
+                                className="p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-20"
+                                aria-label="Move down"
+                              >
+                                <ChevronDown className="size-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })
-      )}
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+
+      {/* The column stretches to the list's height so the preview inside it
+          can stick while the list scrolls; identity scrolls away above it,
+          and the preview is sized to fit the screen so its bottom is never
+          out of reach. */}
+      <div className="space-y-8 lg:self-stretch">
+        {identityPanel}
+
+        <div className="lg:sticky lg:top-20">
+        <Panel
+          title="Preview"
+          actions={
+            <>
+              {previewUrl && (
+                <Button variant="ghost" size="icon" onClick={closePreview} aria-label="Close preview">
+                  <X />
+                </Button>
+              )}
+              <Button variant="outline" onClick={handlePreview} disabled={isBusy}>
+                {previewing ? "Compiling…" : previewUrl ? "Refresh" : "Preview"}
+              </Button>
+              <Button onClick={handleDownload} disabled={isBusy}>
+                {downloading ? "Generating…" : "Download PDF"}
+              </Button>
+            </>
+          }
+        >
+          {(downloadError || previewError) && (
+            <p className={cn("pb-2 text-sm text-destructive", GRID_INSET)}>{downloadError || previewError}</p>
+          )}
+          {previewUrl ? (
+            <iframe src={previewUrl} title="Resume PDF preview" className="h-[70vh] w-full border-t lg:h-[calc(100vh-11rem)]" />
+          ) : (
+            <p className={cn("pb-4 text-sm text-muted-foreground", GRID_INSET)}>
+              Compile the resume to see the PDF here. Previewing or downloading saves your selection first.
+            </p>
+          )}
+        </Panel>
+        </div>
+      </div>
     </div>
   );
 }

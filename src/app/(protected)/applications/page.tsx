@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Upload } from "lucide-react";
 import { getUserId } from "@/lib/auth";
 import {
   listApplicationsForUser,
@@ -11,7 +12,6 @@ import { parseCycleSearchParam, serializeCycleSearchParam } from "@/lib/recruiti
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  deleteApplication,
   updateApplicationStatus,
   bulkUpdateApplicationStatus,
   bulkDeleteApplications,
@@ -22,6 +22,7 @@ import ApplicationStatusSankey from "@/components/applications/ApplicationStatus
 import CycleFilter from "@/components/applications/CycleFilter";
 import PageGrid from "@/components/PageGrid";
 import PageHeader from "@/components/PageHeader";
+import SegmentedLinks from "@/components/SegmentedLinks";
 
 export default async function ApplicationsPage({
   searchParams,
@@ -39,23 +40,24 @@ export default async function ApplicationsPage({
   // cases — instead of silently resetting to the default on navigation.
   const resolvedCycle = serializeCycleSearchParam(cycles);
 
-  const [applications, cycleOptions] = userId
+  // Fetched unfiltered by status so the list's status filters can show a
+  // count each; the status filter itself is applied below.
+  const [cycleApplications, cycleOptions] = userId
     ? await Promise.all([
-        listApplicationsForUser(userId, { status: isKanban || isFlow ? undefined : status, cycles }),
+        listApplicationsForUser(userId, { cycles }),
         listApplicationCycleOptionsForUser(userId),
       ])
     : [[], []];
   const statusFlow = isFlow && userId ? await getApplicationStatusFlowForUser(userId, { cycles }) : [];
 
-  const viewTab = (label: string, active: boolean, query: Record<string, string>) => (
-    <Link
-      href={{ pathname: "/applications", query }}
-      aria-current={active ? "page" : undefined}
-      className={cn(buttonVariants({ variant: active ? "default" : "ghost", size: "sm" }))}
-    >
-      {label}
-    </Link>
-  );
+  const statusCounts: Record<string, number> = {};
+  for (const a of cycleApplications) statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1;
+  const listApplications =
+    !isKanban && !isFlow && status ? cycleApplications.filter((a) => a.status === status) : cycleApplications;
+
+  // The per-row "Cycle 2026-2027" note only earns its place when the list
+  // mixes cycles; with one cycle selected it's the same on every row.
+  const showCycleOnRows = cycles === undefined || cycles.length > 1;
 
   return (
     <PageGrid
@@ -63,19 +65,33 @@ export default async function ApplicationsPage({
         <PageHeader
           eyebrow="Pipeline"
           title="Applications"
-          description={`${applications.length} total`}
+          description={`${cycleApplications.length} total`}
           actions={
             <>
-              <CycleFilter options={cycleOptions} selected={cycles} />
-              <div className="flex border bg-card p-0.5">
-                {viewTab("List", !isKanban && !isFlow, { ...(status ? { status } : {}), cycle: resolvedCycle })}
-                {viewTab("Kanban", isKanban, { view: "kanban", cycle: resolvedCycle })}
-                {viewTab("Flow", isFlow, { view: "flow", cycle: resolvedCycle })}
+              {/* Two groups, so on a phone they wrap into two even rows
+                  instead of scattering one control per line. */}
+              <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
+                <CycleFilter options={cycleOptions} selected={cycles} />
+                <SegmentedLinks
+                  label="View"
+                  items={[
+                    {
+                      label: "List",
+                      active: !isKanban && !isFlow,
+                      href: { pathname: "/applications", query: { ...(status ? { status } : {}), cycle: resolvedCycle } },
+                    },
+                    { label: "Kanban", active: isKanban, href: { pathname: "/applications", query: { view: "kanban", cycle: resolvedCycle } } },
+                    { label: "Flow", active: isFlow, href: { pathname: "/applications", query: { view: "flow", cycle: resolvedCycle } } },
+                  ]}
+                />
               </div>
-              <Link href="/applications/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-                Import
-              </Link>
-              <Link href="/applications/new" className={cn(buttonVariants())}>New application</Link>
+              <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
+                <Link href="/applications/import" className={cn(buttonVariants({ variant: "outline" }))}>
+                  <Upload aria-hidden="true" />
+                  Import
+                </Link>
+                <Link href="/applications/new" className={cn(buttonVariants())}>New application</Link>
+              </div>
             </>
           }
         />
@@ -84,13 +100,15 @@ export default async function ApplicationsPage({
       {isFlow ? (
         <ApplicationStatusSankey links={statusFlow} />
       ) : isKanban ? (
-        <ApplicationsKanban applications={applications} updateStatus={updateApplicationStatus} />
+        <ApplicationsKanban applications={cycleApplications} updateStatus={updateApplicationStatus} />
       ) : (
         <ApplicationsList
-          applications={applications}
+          applications={listApplications}
           status={status}
           cycle={resolvedCycle}
-          deleteApplication={deleteApplication}
+          statusCounts={statusCounts}
+          totalCount={cycleApplications.length}
+          showCycle={showCycleOnRows}
           updateStatus={updateApplicationStatus}
           bulkUpdateStatus={bulkUpdateApplicationStatus}
           bulkDelete={bulkDeleteApplications}

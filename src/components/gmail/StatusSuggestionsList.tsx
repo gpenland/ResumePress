@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Panel } from "@/components/Panel";
+import { GRID_INSET } from "@/components/PageGrid";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import StatusBadge from "@/components/applications/StatusBadge";
 import { decodeHtmlEntities } from "@/lib/emailThreadsShared";
 import { confidenceWord } from "@/lib/jev";
@@ -40,15 +41,11 @@ export default function StatusSuggestionsList({ threads, applySuggestion, dismis
   if (threads.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold">Suggested status updates</h2>
-        <Badge variant="secondary">{threads.length}</Badge>
-      </div>
-      <p className="text-sm text-muted-foreground">
+    <Panel title="Suggested status updates" badge={threads.length}>
+      <p className={cn("pb-2 text-sm text-muted-foreground", GRID_INSET)}>
         Matched emails that Jev thinks change where an application stands. Nothing changes until you apply it.
       </p>
-      <div className="space-y-1.5">
+      <div className="divide-y border-t">
         {threads.map((thread) => (
           <StatusSuggestionRow
             key={thread.id}
@@ -58,7 +55,7 @@ export default function StatusSuggestionsList({ threads, applySuggestion, dismis
           />
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -93,8 +90,7 @@ function StatusSuggestionRow({
   }
 
   return (
-    <Card>
-      <CardContent className="py-3 space-y-2">
+    <div className={cn("space-y-2 py-3", GRID_INSET)}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{decodeHtmlEntities(thread.subject || "(no subject)")}</p>
@@ -103,7 +99,7 @@ function StatusSuggestionRow({
             )}
             <p className="text-xs text-muted-foreground mt-1">
               <Link href={`/applications/${app.id}`} className="underline hover:text-foreground">
-                {app.roleTitle} @ {app.company.name}
+                {app.company.name} — {app.roleTitle}
               </Link>
               {thread.matchedContact && ` · ${thread.matchedContact.name}`}
             </p>
@@ -140,7 +136,6 @@ function StatusSuggestionRow({
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

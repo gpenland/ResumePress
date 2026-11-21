@@ -43,10 +43,10 @@ export default function SuggestStatusButton({ applicationId, suggestStatus, upda
           Jev suggests: <span className="font-medium text-foreground">{suggestion.status}</span>
           {suggestion.confidence !== null && ` · ${confidenceWord(suggestion.confidence)}`}
         </span>
-        <Button type="button" size="sm" onClick={() => handleApply(suggestion.status!)} disabled={isApplying}>
+        <Button type="button" onClick={() => handleApply(suggestion.status!)} disabled={isApplying}>
           {isApplying ? "Applying…" : "Apply"}
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setSuggestion(null)} disabled={isApplying}>
+        <Button type="button" variant="ghost" onClick={() => setSuggestion(null)} disabled={isApplying}>
           Dismiss
         </Button>
       </div>
@@ -55,7 +55,7 @@ export default function SuggestStatusButton({ applicationId, suggestStatus, upda
 
   return (
     <div className="flex items-center gap-2">
-      <Button type="button" size="sm" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
+      <Button type="button" variant="outline" onClick={handleSuggest} disabled={isSuggesting}>
         {isSuggesting ? "Checking…" : "Suggest status from emails"}
       </Button>
       {suggestion && !suggestion.ok && <span className="text-xs text-destructive">{suggestion.error}</span>}

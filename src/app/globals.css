@@ -55,9 +55,9 @@
      --grid is the dashed column-grid hairline (see PageGrid.tsx). */
   --background:          #EFF1F4;
   --foreground:          #2E3440;
-  --card:                #F7F8FA;
+  --card:                #FFFFFF;
   --card-foreground:     #2E3440;
-  --popover:             #F7F8FA;
+  --popover:             #FFFFFF;
   --popover-foreground:  #2E3440;
   --primary:             #5E81AC;
   --primary-foreground:  #F7F8FA;

@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { updateResumeIdentity } from "../../actions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PageGrid from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel } from "@/components/Panel";
 import SubmitButton from "@/components/SubmitButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +26,7 @@ export default async function EditResumePage({
   const updateWithId = updateResumeIdentity.bind(null, id);
 
   const fields = [
-    { label: "Full Name *", name: "name", required: true },
+    { label: "Full name *", name: "name", required: true },
     { label: "Email *", name: "email", type: "email", required: true },
     { label: "Phone", name: "phone" },
     { label: "Website", name: "website", type: "url" },
@@ -33,27 +35,19 @@ export default async function EditResumePage({
   ];
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 space-y-8">
-      <h1 className="text-3xl tracking-tight font-heading">Edit Resume</h1>
-
-      <form action={updateWithId} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Resume Name</CardTitle>
-          </CardHeader>
-          <CardContent>
+    <PageGrid header={<PageHeader back={{ href: `/resumes/${id}`, label: resume.name }} title="Edit resume" />}>
+      <form action={updateWithId} className="space-y-8 lg:w-1/2">
+        <Panel title="Details" padded>
+          <div>
             <div className="space-y-1.5">
-              <Label htmlFor="resumeName">Name *</Label>
+              <Label htmlFor="resumeName">Resume name *</Label>
               <Input id="resumeName" name="resumeName" required defaultValue={resume.name} />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Identity / Contact Info</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Panel title="Contact info" padded>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fields.map((f) => (
               <div key={f.name} className="space-y-1.5">
                 <Label htmlFor={f.name}>{f.label}</Label>
@@ -66,13 +60,13 @@ export default async function EditResumePage({
                 />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         <div className="flex justify-end">
-          <SubmitButton pendingText="Saving…">Save Changes</SubmitButton>
+          <SubmitButton pendingText="Saving…">Save changes</SubmitButton>
         </div>
       </form>
-    </div>
+    </PageGrid>
   );
 }

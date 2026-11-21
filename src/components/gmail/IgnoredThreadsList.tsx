@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/Panel";
+import { GRID_INSET } from "@/components/PageGrid";
 import { cn } from "@/lib/utils";
-import { decodeHtmlEntities } from "@/lib/emailThreadsShared";
+import { decodeHtmlEntities, otherParticipants } from "@/lib/emailThreadsShared";
 
 export type IgnoredThread = {
   id: string;
@@ -18,12 +19,13 @@ export type IgnoredThread = {
 type Props = {
   threads: IgnoredThread[];
   restoreMatch: (threadId: string) => Promise<void>;
+  selfEmail: string | null;
 };
 
 // The undo path for deleting a Gmail-sourced interaction (which ignores the
 // underlying thread instead of leaving a dangling "auto" match — see
 // deleteInteraction in contacts/actions.ts) and for Triage's own "Ignore".
-export default function IgnoredThreadsList({ threads, restoreMatch }: Props) {
+export default function IgnoredThreadsList({ threads, restoreMatch, selfEmail }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -38,38 +40,31 @@ export default function IgnoredThreadsList({ threads, restoreMatch }: Props) {
   }
 
   return (
-    <div className="space-y-3">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex items-center gap-2 text-left"
-      >
-        <h2 className="text-lg font-semibold text-muted-foreground">Ignored</h2>
-        <Badge variant="secondary">{threads.length}</Badge>
-        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
-      </button>
+    <Panel
+      title="Ignored"
+      badge={threads.length}
+      actions={
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? "Hide" : "Show"}
+          <ChevronDown className={cn("transition-transform", open && "rotate-180")} />
+        </Button>
+      }
+    >
       {open && (
-        <div className="space-y-1.5">
+        <div className="divide-y">
           {threads.map((thread) => (
-            <div key={thread.id} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border">
+            <div key={thread.id} className={cn("flex items-center gap-2 py-2.5 text-sm", GRID_INSET)}>
               <div className="min-w-0 flex-1">
                 <p className="truncate">{decodeHtmlEntities(thread.subject || "(no subject)")}</p>
-                <p className="text-xs text-muted-foreground truncate">{thread.participants.join(", ")}</p>
+                <p className="truncate text-xs text-muted-foreground">{otherParticipants(thread.participants, selfEmail).join(", ")}</p>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => handleRestore(thread.id)}
-                disabled={isPending}
-              >
+              <Button type="button" size="sm" variant="outline" onClick={() => handleRestore(thread.id)} disabled={isPending}>
                 Restore
               </Button>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

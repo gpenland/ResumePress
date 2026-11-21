@@ -51,11 +51,11 @@ export default function ContactLinks({ applicationId, linked, contactOptions, li
   return (
     <div className="space-y-2">
       {linked.length === 0 ? (
-        <p className="text-muted-foreground text-sm px-1">No contacts linked.</p>
+        <p className="text-muted-foreground text-sm">No contacts linked.</p>
       ) : (
         <div className="space-y-1.5">
           {linked.map((l) => (
-            <div key={l.contactId} className="flex items-center gap-2 text-sm px-1">
+            <div key={l.contactId} className="flex items-center gap-2 text-sm">
               <Link href={`/contacts/${l.contactId}`} className="hover:underline">
                 {l.name}
               </Link>
@@ -91,8 +91,8 @@ export default function ContactLinks({ applicationId, linked, contactOptions, li
               </option>
             ))}
           </select>
-          <Input name="role" placeholder="Role (e.g. Recruiter)" className="w-44 h-8" />
-          <Button type="submit" size="sm" variant="outline" disabled={isPending}>
+          <Input name="role" placeholder="Role (e.g. Recruiter)" className="w-44" />
+          <Button type="submit" variant="outline" disabled={isPending}>
             Link
           </Button>
         </form>

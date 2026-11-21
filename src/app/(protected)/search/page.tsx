@@ -3,9 +3,12 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
 import { globalSearch } from "@/lib/search";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import PageGrid, { GRID_INSET } from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel, PanelRow } from "@/components/Panel";
 
 export default async function SearchPage({
   searchParams,
@@ -18,108 +21,92 @@ export default async function SearchPage({
   const totalCount = results ? results.applications.length + results.contacts.length + results.interactions.length : 0;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-      <div className="space-y-3">
-        <h1 className="text-3xl tracking-tight font-heading">Search</h1>
-        <form action="/search" method="GET" className="flex gap-2">
-          <Input
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Search applications, contacts, interactions…"
-            autoFocus
-            className="max-w-md"
-          />
-          <Button type="submit" size="sm">Search</Button>
-        </form>
-        {q && <p className="text-muted-foreground text-sm">{totalCount} result(s) for &ldquo;{q}&rdquo;</p>}
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Search"
+          title={q ? `“${q}”` : "Search"}
+          description={
+            q ? `${totalCount} result${totalCount === 1 ? "" : "s"}` : "Search applications, contacts, and interactions"
+          }
+        />
+      }
+    >
+      <div className="space-y-8 lg:w-3/4">
+        <Panel padded>
+          <form action="/search" method="GET" className="flex gap-2">
+            <Input
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Search applications, contacts, interactions…"
+              aria-label="Search"
+              autoFocus
+            />
+            <Button type="submit">Search</Button>
+          </form>
+        </Panel>
+
+        {results && totalCount === 0 && (
+          <Panel padded>
+            <p className="text-sm text-muted-foreground">No results.</p>
+          </Panel>
+        )}
+
+        {results && results.applications.length > 0 && (
+          <Panel title="Applications" badge={results.applications.length}>
+            {results.applications.map((a) => (
+              <PanelRow key={a.id} href={`/applications/${a.id}`} title={a.companyName} subtitle={a.roleTitle} />
+            ))}
+          </Panel>
+        )}
+
+        {results && results.contacts.length > 0 && (
+          <Panel title="Contacts" badge={results.contacts.length}>
+            {results.contacts.map((c) => (
+              <PanelRow key={c.id} href={`/contacts/${c.id}`} title={c.name} subtitle={c.companyName ?? undefined} />
+            ))}
+          </Panel>
+        )}
+
+        {results && results.interactions.length > 0 && (
+          <Panel title="Interactions" badge={results.interactions.length}>
+            {results.interactions.map((i) => {
+              const href = i.contactId
+                ? `/contacts/${i.contactId}`
+                : i.applicationId
+                  ? `/applications/${i.applicationId}`
+                  : null;
+              const content = (
+                <span className="min-w-0 text-sm">
+                  <span className="font-medium">{i.type}</span>
+                  <span className="text-muted-foreground">: {i.summary}</span>
+                </span>
+              );
+              return (
+                <div key={i.id} className={cn("flex items-center justify-between gap-3 py-2.5", GRID_INSET)}>
+                  {href ? (
+                    <Link href={href} className="min-w-0 hover:underline underline-offset-2">
+                      {content}
+                    </Link>
+                  ) : (
+                    content
+                  )}
+                  {i.emailThreadGmailUrl && (
+                    <a
+                      href={i.emailThreadGmailUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-xs underline hover:text-foreground"
+                    >
+                      Open email
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </Panel>
+        )}
       </div>
-
-      {!results ? (
-        <p className="text-muted-foreground text-sm">Search applications, contacts, and interactions above.</p>
-      ) : totalCount === 0 ? (
-        <p className="text-muted-foreground text-sm">No results.</p>
-      ) : (
-        <div className="space-y-6">
-          {results.applications.length > 0 && (
-            <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Applications</p>
-              <div className="space-y-1.5">
-                {results.applications.map((a) => (
-                  <Card key={a.id} className="py-0 hover:bg-muted/30 transition-colors">
-                    <CardContent className="py-3 px-4">
-                      <Link href={`/applications/${a.id}`} className="text-sm hover:underline">
-                        {a.roleTitle} <span className="text-muted-foreground">@ {a.companyName}</span>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {results.contacts.length > 0 && (
-            <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Contacts</p>
-              <div className="space-y-1.5">
-                {results.contacts.map((c) => (
-                  <Card key={c.id} className="py-0 hover:bg-muted/30 transition-colors">
-                    <CardContent className="py-3 px-4">
-                      <Link href={`/contacts/${c.id}`} className="text-sm hover:underline">
-                        {c.name}
-                        {c.companyName && <span className="text-muted-foreground"> @ {c.companyName}</span>}
-                      </Link>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {results.interactions.length > 0 && (
-            <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Interactions</p>
-              <div className="space-y-1.5">
-                {results.interactions.map((i) => {
-                  const href = i.contactId
-                    ? `/contacts/${i.contactId}`
-                    : i.applicationId
-                      ? `/applications/${i.applicationId}`
-                      : null;
-                  const content = (
-                    <>
-                      <span className="font-medium">{i.type}</span>
-                      <span className="text-muted-foreground">: {i.summary}</span>
-                    </>
-                  );
-                  return (
-                    <Card key={i.id} className="py-0 hover:bg-muted/30 transition-colors">
-                      <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
-                        {href ? (
-                          <Link href={href} className="text-sm hover:underline">
-                            {content}
-                          </Link>
-                        ) : (
-                          <span className="text-sm">{content}</span>
-                        )}
-                        {i.emailThreadGmailUrl && (
-                          <a
-                            href={i.emailThreadGmailUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs underline hover:text-foreground shrink-0"
-                          >
-                            Open email
-                          </a>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
-    </div>
+    </PageGrid>
   );
 }

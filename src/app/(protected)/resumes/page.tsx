@@ -4,11 +4,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { deleteResume, duplicateResume } from "./actions";
-import DeleteItemButton from "@/components/DeleteItemButton";
+import { duplicateResume } from "./actions";
+import PageGrid, { GRID_INSET } from "@/components/PageGrid";
+import PageHeader from "@/components/PageHeader";
+import { Panel, PanelEmpty } from "@/components/Panel";
+import { formatShortDate } from "@/lib/dateFormat";
 import CloneItemButton from "@/components/CloneItemButton";
 import ResumeSectionTabs from "@/components/ResumeSectionTabs";
 
@@ -23,60 +24,46 @@ export default async function ResumesPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-      <ResumeSectionTabs />
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl tracking-tight font-heading">Resumes</h1>
-          <p className="text-muted-foreground text-sm mt-1">{resumes.length} saved</p>
-        </div>
-        <Link href="/resumes/new" className={cn(buttonVariants())}>New Resume</Link>
-      </div>
-
+    <PageGrid
+      header={
+        <PageHeader
+          eyebrow="Resume builder"
+          title="Resumes"
+          description={`${resumes.length} saved`}
+          actions={
+            <>
+              <ResumeSectionTabs />
+              <Link href="/resumes/new" className={cn(buttonVariants())}>New resume</Link>
+            </>
+          }
+        />
+      }
+    >
       {resumes.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center py-16 text-center gap-3">
-            <p className="text-muted-foreground text-sm">No resumes yet</p>
-            <Link href="/resumes/new" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-              Add your first resume
-            </Link>
-          </CardContent>
-        </Card>
+        <Panel>
+          <PanelEmpty message="No resumes yet" action={{ label: "Add your first resume", href: "/resumes/new" }} />
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        // Four to a row at desktop, so each card spans exactly one grid column.
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {resumes.map((resume) => (
-            <Card key={resume.id} className="hover:bg-muted/30 transition-colors">
-              <CardHeader className="pb-2 flex-row items-start justify-between gap-2">
-                <Link href={`/resumes/${resume.id}`} className="flex-1 min-w-0">
-                  <CardTitle className="text-base truncate">{resume.name}</CardTitle>
-                </Link>
-                <div className="flex items-center gap-1 shrink-0">
-                  <CloneItemButton
-                    action={duplicateResume.bind(null, resume.id)}
-                    itemName={resume.name}
-                  />
-                  <DeleteItemButton
-                    action={deleteResume.bind(null, resume.id)}
-                    itemName={resume.name}
-                  />
-                </div>
-              </CardHeader>
-              <Link href={`/resumes/${resume.id}`}>
-                <CardContent className="space-y-2">
-                  <div className="flex gap-2 flex-wrap">
-                    <Badge variant="secondary">{resume._count.entries} entries</Badge>
-                    <Badge variant="outline">{resume.templateId}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Updated {new Date(resume.updatedAt).toLocaleDateString()}
-                  </p>
-                </CardContent>
+            <div key={resume.id} className="flex flex-col border bg-card transition-colors hover:bg-muted/30">
+              <Link href={`/resumes/${resume.id}`} className={cn("flex-1 pt-4 pb-3", GRID_INSET)}>
+                <h2 className="truncate text-2xl font-heading">{resume.name}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {resume._count.entries} {resume._count.entries === 1 ? "entry" : "entries"}
+                </p>
               </Link>
-            </Card>
+              {/* Footer: when it changed on the left, the one card action on the
+                  right. Delete lives in the resume editor, not on the card. */}
+              <div className={cn("flex items-center justify-between gap-2 border-t py-2", GRID_INSET)}>
+                <span className="text-xs text-muted-foreground">Updated {formatShortDate(resume.updatedAt)}</span>
+                <CloneItemButton action={duplicateResume.bind(null, resume.id)} itemName={resume.name} />
+              </div>
+            </div>
           ))}
         </div>
       )}
-    </div>
+    </PageGrid>
   );
 }

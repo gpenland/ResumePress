@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { GRID_INSET } from "@/components/PageGrid";
@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, nativeSelectClassName } from "@/lib/utils";
 import EditableStatusBadge from "@/components/applications/EditableStatusBadge";
-import DeleteItemButton from "@/components/DeleteItemButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +30,11 @@ type Props = {
   // switching status doesn't silently reset the cycle filter back to its
   // current-cycle default (GitHub issue #106 follow-up).
   cycle: string;
-  deleteApplication: (id: string) => Promise<void>;
+  /** Count per status across the whole selected cycle, for the filter buttons. */
+  statusCounts: Record<string, number>;
+  totalCount: number;
+  /** Whether rows show their computed cycle — only useful when several cycles are listed. */
+  showCycle: boolean;
   updateStatus: (id: string, status: string) => Promise<void>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
@@ -51,7 +54,9 @@ export default function ApplicationsList({
   applications,
   status,
   cycle,
-  deleteApplication,
+  statusCounts,
+  totalCount,
+  showCycle,
   updateStatus,
   bulkUpdateStatus,
   bulkDelete,
@@ -129,32 +134,24 @@ export default function ApplicationsList({
           aria-label="Search applications"
         />
 
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex gap-2 flex-wrap">
-            <Link
-              href={`/applications?cycle=${encodeURIComponent(cycle)}`}
-              className={cn(buttonVariants({ variant: !status ? "default" : "outline", size: "sm" }))}
-            >
-              All
-            </Link>
+        {/* One scrollable row rather than wrapping: on a phone the filters
+            would otherwise stack three rows deep above the list. The
+            negative margin lets it scroll to the panel edge, where a fade
+            shows there's more. */}
+        <div className="relative -mx-4 lg:-mx-6">
+          <div className="flex gap-2 overflow-x-auto px-4 lg:px-6 [scrollbar-width:none]">
+            <FilterLink href={`/applications?cycle=${encodeURIComponent(cycle)}`} active={!status} label="All" count={totalCount} />
             {APPLICATION_STATUSES.map((s) => (
-              <Link
+              <FilterLink
                 key={s}
                 href={`/applications?status=${encodeURIComponent(s)}&cycle=${encodeURIComponent(cycle)}`}
-                className={cn(buttonVariants({ variant: status === s ? "default" : "outline", size: "sm" }))}
-              >
-                {s}
-              </Link>
+                active={status === s}
+                label={s}
+                count={statusCounts[s] ?? 0}
+              />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            aria-label={`Sort by date, currently ${sortDir === "desc" ? "newest first" : "oldest first"}`}
-          >
-            Date {sortDir === "desc" ? "↓ Newest" : "↑ Oldest"}
-          </button>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent lg:hidden" />
         </div>
       </div>
 
@@ -253,6 +250,16 @@ export default function ApplicationsList({
             <span className="text-xs text-muted-foreground">
               {allFilteredSelected ? "Deselect all" : "Select all"}
             </span>
+            {/* Sort lives on the list's own header row, leaving the filter
+                row the full width. */}
+            <button
+              type="button"
+              onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "ml-auto -mr-2.5 text-muted-foreground")}
+              aria-label={`Sort by date, currently ${sortDir === "desc" ? "newest first" : "oldest first"}`}
+            >
+              {sortDir === "desc" ? "Newest first ↓" : "Oldest first ↑"}
+            </button>
           </div>
           {filtered.map((app) => (
             <div key={app.id} className={cn("flex items-center gap-2 py-3 hover:bg-muted/40 transition-colors", GRID_INSET)}>
@@ -274,34 +281,51 @@ export default function ApplicationsList({
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {(() => {
-                        const cycle = cycleForApplication(app.term, app.appliedAt);
-                        return [
+                        const appCycle = cycleForApplication(app.term, app.appliedAt);
+                        const parts = [
                           app.term,
                           app.location,
                           formatShortDate(app.appliedAt) && `Applied ${formatShortDate(app.appliedAt)}`,
-                          // Surfaces what the cycle filter actually computed for this
-                          // row, so a misparsed term/appliedAt is visible while
-                          // scanning the list, not just invisibly wrong (issue #106
-                          // follow-up).
-                          cycle !== null && `Cycle ${cycleShortLabel(cycle)}`,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ");
+                          // Surfaces what the cycle filter computed for this row
+                          // (issue #106 follow-up) — only when several cycles are
+                          // listed; otherwise it's identical on every row.
+                          showCycle && appCycle !== null && `Cycle ${cycleShortLabel(appCycle)}`,
+                        ].filter(Boolean) as string[];
+                        // Each piece is unbreakable, so a narrow screen wraps
+                        // between pieces rather than mid-date.
+                        return parts.map((part, i) => (
+                          <Fragment key={i}>
+                            {i > 0 && " · "}
+                            <span className="whitespace-nowrap">{part}</span>
+                          </Fragment>
+                        ));
                       })()}
                     </p>
                   </div>
                 </Link>
+                {/* No per-row delete: it sat next to the status on every row.
+                    Delete from the application's own page, or select rows
+                    and use "Delete selected". */}
                 <div className="shrink-0">
                   <EditableStatusBadge applicationId={app.id} status={app.status} updateStatus={updateStatus} />
                 </div>
-                <DeleteItemButton
-                  action={deleteApplication.bind(null, app.id)}
-                  itemName={`${app.company.name} — ${app.roleTitle}`}
-                />
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function FilterLink({ href, active, label, count }: { href: string; active: boolean; label: string; count: number }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(buttonVariants({ variant: active ? "default" : "outline", size: "sm" }), "shrink-0 gap-1.5")}
+    >
+      {label}
+      <span className={cn("tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>{count}</span>
+    </Link>
   );
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import RichTextArea from "@/components/RichTextArea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Panel } from "@/components/Panel";
 import { ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { getFieldConfig } from "@/lib/entryFields";
 import { parseRichText, type RichTextNode } from "@/lib/richTextMarkers";
@@ -67,7 +67,9 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
   const descLabel = typeof cfg.description === "string" ? cfg.description : "Description";
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 items-start">
+    // Form and preview as two panels, each spanning two page-grid columns.
+    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+      <Panel padded>
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <input type="hidden" name="categoryId" value={category.id} />
 
@@ -217,20 +219,20 @@ export default function EntryForm({ category, entry, action, submitLabel }: Prop
           <Button type="submit" disabled={isPending}>{isPending ? "Saving…" : submitLabel}</Button>
         </div>
       </form>
+      </Panel>
 
-      <div className="xl:sticky xl:top-20 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Preview</p>
-        <Card>
-          <CardContent className="pt-5 pb-5 text-[13px] leading-snug space-y-2">
+      <div className="lg:sticky lg:top-20">
+        <Panel title="Preview" padded>
+          <div className="space-y-2 text-[13px] leading-snug">
             <EntryPreview
               categorySlug={category.slug}
               title={title} organization={organization} location={location}
               startDate={startDate} endDate={endDate} description={description}
               bullets={bullets} tags={tags}
             />
-          </CardContent>
-        </Card>
-        <p className="text-xs text-muted-foreground px-1">Approximation of the PDF layout</p>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">Approximation of the PDF layout</p>
+        </Panel>
       </div>
     </div>
   );
